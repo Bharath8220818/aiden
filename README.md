@@ -1,114 +1,259 @@
-# AIDEN
+# AIDEN — AI-Driven Data Pipeline Platform
 
-AIDEN is a FastAPI + React platform for creating, managing, and monitoring data pipelines with a prompt-driven workflow.
+AIDEN is a full-stack AI-assisted platform for creating, managing, and monitoring data pipelines using natural language prompts. The frontend is built with React 19 + TypeScript + Tailwind CSS, and the backend is a FastAPI async Python application with SQLAlchemy.
 
-## Current Implementation Status
-The project is now in a verified working state for the core foundation:
+---
 
-- Backend auth endpoints are implemented and returning real responses.
-- Backend pipeline CRUD and execution history endpoints are implemented.
-- Frontend auth flow is connected to the backend instead of relying on demo-only behavior.
-- Frontend test suite passes.
-- Frontend production build succeeds.
-- Backend health and signup flows have been verified locally.
-
-## Verified Runtime Notes
-The backend health endpoint returns a healthy response, and a real signup request was accepted and persisted by the application layer using the local SQLite-compatible test configuration.
-
-## Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.11+
-- Node.js 18+
-- Optional: Docker Desktop for containerized services
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Python | 3.11+ | Backend runtime |
+| Node.js | 18+ | Frontend runtime |
+| Redis | 7+ (optional) | Celery task queue |
 
-### Backend
+### 1. Backend Setup
 ```bash
 cd backend
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
+
+# Run Alembic migrations (creates initial DB tables)
+set PYTHONPATH=.
+venv\Scripts\alembic.exe upgrade head
+
+# Start the API server
+venv\Scripts\uvicorn.exe app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Run the backend:
-```bash
-set DATABASE_URL=sqlite+aiosqlite:///./aiden.db
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-### Frontend
+### 2. Frontend Setup
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-The frontend is typically available at http://localhost:5173.
+Open **http://localhost:5173** in your browser.
 
-## Project Structure
-```text
+---
+
+## ✅ Verified Workflow (End-to-End Test)
+
+All core flows have been verified via the live API:
+
+```
+1. Health Check       → GET  /health                      ✅ {"status":"healthy"}
+2. Signup             → POST /api/v1/auth/signup          ✅ 201 Created
+3. Login              → POST /api/v1/auth/login           ✅ JWT token returned
+4. Get Current User   → GET  /api/v1/auth/me              ✅ User profile returned
+5. Pipeline from Prompt → POST /api/v1/pipelines/from-prompt ✅ Pipeline created
+6. List Pipelines     → GET  /api/v1/pipelines/           ✅ User scoped list
+7. Run Pipeline       → POST /api/v1/pipelines/{id}/run   ✅ Execution record created
+```
+
+---
+
+## 📦 External Tools Required
+
+### Required (for basic local dev)
+| Tool | Install |
+|------|---------|
+| Python 3.11+ | [python.org](https://www.python.org/) |
+| Node.js 18+ | [nodejs.org](https://nodejs.org/) |
+| npm (bundled with Node) | Comes with Node.js |
+
+### Required (for the complete stack)
+| Tool | Install | Used By |
+|------|---------|---------|
+| Redis 7+ | `docker compose up redis` or [redis.io](https://redis.io/download) | Celery task broker |
+| PostgreSQL 15 | `docker compose up postgres` or [postgresql.org](https://www.postgresql.org/) | Production database |
+| Docker Desktop | [docker.com](https://www.docker.com/products/docker-desktop/) | Running full infrastructure |
+
+### Optional (for AI / ML features)
+| Tool | Install | Used By |
+|------|---------|---------|
+| HuggingFace Transformers | `pip install transformers accelerate` | AI prompt parsing (coming soon) |
+| Ollama | [ollama.ai](https://ollama.ai/) | Local LLM inference |
+| Qdrant | `docker compose up qdrant` | Vector storage |
+
+---
+
+## 📋 Pending Work & Roadmap
+
+### 🔴 High Priority (blocking production use)
+| Item | Impact | Status |
+|------|--------|--------|
+| **Real pipeline execution engine** | `POST /pipelines/{id}/run` only creates a DB record — no actual data movement | 🟡 Celery task scaffolded |
+| **Wire HuggingFace inference** | `hf_service.py` returns mock data — prompt parsing is rule-based only | 🟡 Deps in requirements.txt |
+| **Backend test suite** | No pytest files exist — API endpoints are untested | 🔴 Missing |
+| **Monitoring page** | `MonitoringPage.tsx` is an empty placeholder | 🔴 Missing |
+
+### 🟡 Medium Priority
+| Item | Impact | Status |
+|------|--------|--------|
+| **PipelineDetailsPage** | Shows only name/description — no execution history UI | 🟡 Minimal |
+| **Duplicate ChatInterface** | Two copies exist (`components/chat/` and `components/ChatInterface.tsx`) | 🟡 Needs cleanup |
+| **PipelineCanvas not wired** | Visual canvas uses hardcoded demo nodes, not real pipeline config | 🟡 Static |
+| **WebSocket not fully active** | Server and client exist but no real events flow | 🟡 Scaffolded |
+| **Dashboard prompt panel** | "Use prompt" button now wired, but no template-to-API link | ✅ Done in M4 |
+
+### 🟢 Low Priority (polish)
+| Item | Details |
+|------|---------|
+| Dashboard `fetchExecutions(0)` | Passes `0` as pipeline ID — harmless but incorrect |
+| No CI/CD pipeline | No GitHub Actions or build automation |
+| Alembic migration | Initial migration created — needs future iterations |
+| Dark mode toggle | Not implemented |
+| Animation / transitions | Minimal — could be enhanced |
+
+---
+
+## 📐 Project Structure
+
+```
 aiden/
-├── backend/
+├── backend/                          # Python FastAPI backend
+│   ├── alembic/                      # Database migrations
+│   │   ├── versions/                 # Migration scripts
+│   │   ├── env.py                    # Alembic environment config
+│   │   └── script.py.mako            # Migration template
 │   ├── app/
-│   │   ├── api/v1/
-│   │   │   ├── auth.py
-│   │   │   ├── pipelines.py
-│   │   │   └── websocket.py
+│   │   ├── api/v1/                   # REST endpoints
+│   │   │   ├── auth.py              # Signup, login, me
+│   │   │   ├── pipelines.py         # Pipeline CRUD + execution
+│   │   │   ├── websocket.py         # Real-time connections
+│   │   │   └── deps.py              # Auth dependency
 │   │   ├── core/
-│   │   ├── models/
-│   │   ├── schemas/
-│   │   ├── services/
-│   │   ├── config.py
-│   │   ├── database.py
-│   │   └── main.py
+│   │   │   ├── security.py          # JWT + password hashing
+│   │   │   └── intent_parser.py     # NLP prompt → pipeline config
+│   │   ├── models/                  # SQLAlchemy models
+│   │   │   ├── user.py
+│   │   │   ├── pipeline.py
+│   │   │   └── execution.py
+│   │   ├── schemas/                 # Pydantic request/response schemas
+│   │   ├── services/                # Business logic
+│   │   │   ├── database_service.py  # External DB connections
+│   │   │   └── hf_service.py        # HuggingFace (mock)
+│   │   ├── tasks.py                 # Celery async tasks
+│   │   ├── config.py                # Settings via pydantic-settings
+│   │   ├── database.py              # Async SQLAlchemy engine
+│   │   └── main.py                  # FastAPI application entry
+│   ├── .env                         # Local dev environment config
 │   ├── requirements.txt
 │   └── Dockerfile
-├── frontend/
+├── frontend/                        # React SPA
 │   ├── src/
-│   │   ├── api/
+│   │   ├── api/                     # Axios API clients
+│   │   │   ├── auth.ts
+│   │   │   ├── pipelines.ts
+│   │   │   └── index.ts
 │   │   ├── components/
-│   │   ├── hooks/
-│   │   ├── pages/
-│   │   ├── store/
-│   │   └── types/
+│   │   │   ├── auth/                # Login, Signup, ProtectedRoute
+│   │   │   ├── builder/             # PipelineCanvas (ReactFlow), AgentManagerPanel
+│   │   │   ├── chat/                # ChatInterface, MessageInput, MessageList
+│   │   │   ├── common/              # Header, ErrorBoundary, LoadingSpinner
+│   │   │   ├── dashboard/           # StatsCard
+│   │   │   └── layout/              # AppLayout, MobileNav
+│   │   ├── hooks/                   # useWebSocket hook
+│   │   ├── pages/                   # 8 route pages
+│   │   ├── store/                   # Zustand stores (auth, pipeline, notification)
+│   │   └── types/                   # TypeScript type definitions
 │   ├── package.json
-│   └── vite.config.ts
-├── infrastructure/
-│   └── docker/
+│   ├── vite.config.ts
+│   └── Dockerfile
+├── infrastructure/docker/           # Docker Compose + Nginx + Alembic config
+│   ├── docker-compose.yml           # 6 services (postgres, redis, qdrant, minio, backend, frontend)
+│   └── nginx/                       # Production reverse proxy
 ├── docs/
-│   └── PROJECT_STATUS_REPORT.md
+│   ├── PROJECT_STATUS_REPORT.md     # Detailed project analysis
+│   └── RUN_DOC.md                   # Local development run guide
+├── .gitignore
 └── README.md
 ```
 
-## API Surface
+---
+
+## 📡 API Surface
+
 ### Authentication
-- POST /api/v1/auth/signup
-- POST /api/v1/auth/login
-- GET /api/v1/auth/me
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/auth/signup` | Register new user |
+| POST | `/api/v1/auth/login` | Login (OAuth2 form) |
+| GET | `/api/v1/auth/me` | Get current user profile |
 
 ### Pipelines
-- POST /api/v1/pipelines/from-prompt
-- POST /api/v1/pipelines/
-- GET /api/v1/pipelines/
-- GET /api/v1/pipelines/{pipeline_id}
-- PUT /api/v1/pipelines/{pipeline_id}
-- DELETE /api/v1/pipelines/{pipeline_id}
-- POST /api/v1/pipelines/{pipeline_id}/run
-- GET /api/v1/pipelines/{pipeline_id}/executions
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/pipelines/from-prompt` | Create from natural language |
+| POST | `/api/v1/pipelines/` | Create from structured data |
+| GET | `/api/v1/pipelines/` | List user's pipelines (filtered, paginated) |
+| GET | `/api/v1/pipelines/{id}` | Get single pipeline |
+| PUT | `/api/v1/pipelines/{id}` | Update pipeline |
+| DELETE | `/api/v1/pipelines/{id}` | Soft-delete pipeline |
+| POST | `/api/v1/pipelines/{id}/run` | Trigger execution |
+| GET | `/api/v1/pipelines/{id}/executions` | Execution history |
+| GET | `/api/v1/executions/{id}/logs` | Execution logs |
 
-## Validation Commands
+### Real-time
+| Type | Endpoint | Description |
+|------|----------|-------------|
+| WebSocket | `/api/v1/ws` | Real-time status updates |
+
+---
+
+## 🧪 Validation Commands
+
 ```bash
+# --- Backend ---
 cd backend
-venv\Scripts\python.exe -c "from app.main import app; from fastapi.testclient import TestClient; client=TestClient(app); print(client.get('/health').json())"
+set PYTHONPATH=.
 
+# Check health
+venv\Scripts\python.exe -c "import urllib.request; import json; print(json.loads(urllib.request.urlopen('http://127.0.0.1:8000/health').read()))"
+
+# Run Alembic migrations
+venv\Scripts\alembic.exe upgrade head
+
+# --- Frontend ---
 cd frontend
-npm test -- --run src/components/auth/Login.test.tsx
+
+# TypeScript check
+npx tsc --noEmit
+
+# Run tests
+npm test -- --run
+
+# Production build
 npm run build
+
+# --- Full stack Docker ---
+cd infrastructure/docker
+docker compose up --build
 ```
 
-## Roadmap Status
-- Core backend APIs: Implemented
-- Real auth integration: Implemented
-- Prompt-based pipeline creation: Implemented
-- Production-grade orchestration: In progress
-- Full PostgreSQL-backed live validation: Pending environment setup
+---
+
+## 📊 Current Status
+
+| Check | Result |
+|-------|--------|
+| Backend health | ✅ `{"status":"healthy"}` |
+| User signup / login | ✅ JWT auth, bcrypt hashing |
+| Pipeline CRUD | ✅ Full REST API |
+| Pipeline from prompt | ✅ Intent parser with rule-based fallback |
+| Alembic migrations | ✅ Initial migration applied |
+| Celery tasks | ✅ Scaffolded (`app/tasks.py`) |
+| TypeScript compilation | ✅ Clean — zero errors |
+| Frontend tests | ✅ 3/3 passing |
+| Frontend production build | ✅ Successful |
+
+---
+
+## 🔗 Links
+
+- **Live dev servers**: Backend http://localhost:8000 | Frontend http://localhost:5173
+- **Project Analysis**: [docs/PROJECT_STATUS_REPORT.md](docs/PROJECT_STATUS_REPORT.md)
+- **Local Run Guide**: [docs/RUN_DOC.md](docs/RUN_DOC.md)
