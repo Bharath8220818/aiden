@@ -1,9 +1,15 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Login from './Login';
 import { BrowserRouter } from 'react-router-dom';
+import { useAuthStore } from '../../store/authStore';
 
 describe('Login Component', () => {
+  beforeEach(() => {
+    useAuthStore.setState({ user: null, token: null, isAuthenticated: false, error: null });
+    localStorage.clear();
+  });
+
   it('renders login form', () => {
     render(
       <BrowserRouter>
@@ -27,5 +33,15 @@ describe('Login Component', () => {
 
     expect(await screen.findByText(/Username is required/i)).toBeInTheDocument();
     expect(await screen.findByText(/Password is required/i)).toBeInTheDocument();
+  });
+
+  it('does not render the demo shortcut', () => {
+    render(
+      <BrowserRouter>
+        <Login />
+      </BrowserRouter>
+    );
+
+    expect(screen.queryByRole('button', { name: /Use demo account/i })).not.toBeInTheDocument();
   });
 });

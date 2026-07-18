@@ -17,28 +17,27 @@ const MobileNav = () => {
   }
 
   return (
-    <nav
-      className="md:hidden fixed bottom-0 inset-x-0 z-50 border-t border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 safe-area-pb"
-      aria-label="Mobile navigation"
-    >
-      <div className="grid grid-cols-4 h-16">
-        {items.map((item) => {
-          const active = pathname === item.to || (item.to !== '/' && pathname.startsWith(item.to));
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={`flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${
-                active ? 'text-primary-600' : 'text-gray-500'
-              }`}
-            >
-              <span className="text-lg leading-none" aria-hidden>
-                {item.icon}
-              </span>
-              {item.label}
-            </Link>
-          );
-        })}
+    <nav className="fixed inset-x-3 bottom-3 z-50 md:hidden" aria-label="Mobile navigation">
+      <div className="rounded-[1.5rem] border border-white/70 bg-slate-900/90 px-1.5 py-1.5 shadow-[0_20px_60px_-20px_rgba(15,23,42,0.55)] backdrop-blur-xl">
+        <div className="grid grid-cols-4 gap-1">
+          {items.map((item) => {
+            const active = pathname === item.to || (item.to !== '/' && pathname.startsWith(item.to));
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`flex flex-col items-center justify-center rounded-[1rem] px-2 py-2 text-[11px] font-semibold transition ${
+                  active ? 'bg-primary-500 text-white shadow-sm' : 'text-slate-300 hover:bg-white/10'
+                }`}
+              >
+                <span className="text-lg leading-none" aria-hidden>
+                  {item.icon}
+                </span>
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );

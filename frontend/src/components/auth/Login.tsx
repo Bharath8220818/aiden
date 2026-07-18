@@ -13,8 +13,6 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
-const FAKE_AUTH = import.meta.env.VITE_FAKE_AUTH === 'true';
-
 const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
@@ -32,27 +30,6 @@ const Login: React.FC = () => {
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
-      if (FAKE_AUTH && data.username && data.password) {
-        const fakeUser = {
-          id: 1,
-          username: data.username,
-          email: 'test@example.com',
-          full_name: 'Test User',
-          is_active: true,
-          created_at: new Date().toISOString(),
-        };
-        localStorage.setItem('auth_token', 'fake-token-123');
-        useAuthStore.setState({
-          user: fakeUser,
-          token: 'fake-token-123',
-          isAuthenticated: true,
-          error: null,
-        });
-        addNotification({ type: 'success', message: 'Welcome! (Test Mode)' });
-        navigate('/');
-        return;
-      }
-
       await login(data);
       addNotification({
         type: 'success',
@@ -70,27 +47,36 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <div className="flex justify-center">
-            <div className="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center text-white text-2xl font-bold">
+    <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-6xl items-center justify-center px-3 py-6 sm:px-6 lg:px-8">
+      <div className="grid w-full overflow-hidden rounded-[2rem] border border-white/70 bg-white/80 shadow-[0_20px_60px_-25px_rgba(15,23,42,0.25)] backdrop-blur-xl lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="hidden bg-gradient-to-br from-primary-600 via-indigo-600 to-slate-900 p-8 lg:flex lg:flex-col lg:justify-between">
+          <div>
+            <div className="inline-flex rounded-full bg-white/15 px-3 py-1 text-sm font-medium text-white/90">Welcome back</div>
+            <h2 className="mt-6 text-3xl font-semibold text-white">Design pipelines with clarity and pace.</h2>
+            <p className="mt-3 max-w-sm text-sm text-slate-200">Coordinate data workflows, monitor health, and ship reliable integrations from one thoughtful workspace.</p>
+          </div>
+          <div className="rounded-[1.25rem] border border-white/20 bg-white/10 p-4 text-sm text-slate-100">
+            AIDEN keeps your onboarding smooth for both desktop and mobile experiences.
+          </div>
+        </div>
+
+        <div className="p-6 sm:p-8 lg:p-10">
+          <div className="flex justify-center lg:justify-start">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-600 to-indigo-500 text-2xl font-bold text-white shadow-sm">
               A
             </div>
           </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-6 text-center text-3xl font-semibold text-slate-900 lg:text-left">
             Sign in to AIDEN
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-center text-sm text-slate-600 lg:text-left">
             Or{' '}
             <Link to="/signup" className="font-medium text-primary-600 hover:text-primary-500">
               create a new account
             </Link>
           </p>
-        </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
-          <div className="space-y-4">
+          <form className="mt-8 space-y-5" onSubmit={handleSubmit(onSubmit)}>
             <div>
               <label htmlFor="username" className="label">
                 Username
@@ -103,9 +89,7 @@ const Login: React.FC = () => {
                 placeholder="Enter your username"
                 disabled={isLoading}
               />
-              {errors.username && (
-                <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
-              )}
+              {errors.username && <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>}
             </div>
 
             <div>
@@ -120,40 +104,24 @@ const Login: React.FC = () => {
                 placeholder="Enter your password"
                 disabled={isLoading}
               />
-              {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
-              )}
+              {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>}
             </div>
-          </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="remember-me"
-                name="remember-me"
-                type="checkbox"
-                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-              />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
+            <div className="flex items-center justify-between">
+              <label htmlFor="remember-me" className="flex items-center gap-2 text-sm text-slate-700">
+                <input id="remember-me" name="remember-me" type="checkbox" className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
                 Remember me
               </label>
-            </div>
-
-            <div className="text-sm">
-              <a href="#" className="font-medium text-primary-600 hover:text-primary-500">
-                Forgot your password?
+              <a href="#" className="text-sm font-medium text-primary-600 hover:text-primary-500">
+                Forgot password?
               </a>
             </div>
-          </div>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full btn-primary py-3"
-          >
-            {isLoading ? 'Signing in...' : 'Sign in'}
-          </button>
-        </form>
+            <button type="submit" disabled={isLoading} className="w-full btn-primary py-3">
+              {isLoading ? 'Signing in...' : 'Sign in'}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

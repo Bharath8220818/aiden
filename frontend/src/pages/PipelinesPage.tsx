@@ -47,130 +47,107 @@ const PipelinesPage: React.FC = () => {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pipelines</h1>
-          <p className="text-gray-500">Manage all your data pipelines</p>
+    <div className="space-y-6">
+      <div className="soft-card p-5 sm:p-6 lg:p-8">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-primary-600">Operations center</p>
+            <h1 className="mt-2 text-2xl font-semibold text-slate-900 sm:text-3xl">Pipelines</h1>
+            <p className="mt-2 text-sm text-slate-500 sm:text-base">Manage all your data pipelines in one calm workspace.</p>
+          </div>
+          <Link to="/builder" className="btn-primary self-start">
+            ✨ New Pipeline
+          </Link>
         </div>
-        <Link to="/builder" className="btn-primary">
-          ✨ New Pipeline
-        </Link>
+
+        <div className="mt-6 flex flex-wrap gap-2">
+          {['all', 'draft', 'pending', 'running', 'success', 'failed', 'paused'].map((filter) => (
+            <button
+              key={filter}
+              onClick={() => setSelectedFilter(filter)}
+              className={`rounded-full px-3.5 py-2 text-sm capitalize transition ${
+                selectedFilter === filter
+                  ? 'bg-primary-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              {filter}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        {['all', 'draft', 'pending', 'running', 'success', 'failed', 'paused'].map((filter) => (
-          <button
-            key={filter}
-            onClick={() => setSelectedFilter(filter)}
-            className={`px-3 py-1.5 rounded-full text-sm capitalize transition-colors ${
-              selectedFilter === filter
-                ? 'bg-primary-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            {filter}
-          </button>
-        ))}
-      </div>
-
-      {/* Pipelines List */}
       {filteredPipelines.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-          <div className="text-6xl mb-4">📭</div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No pipelines found</h3>
-          <p className="text-gray-500 mb-4">
-            {selectedFilter !== 'all' 
-              ? `No pipelines with status "${selectedFilter}"` 
+        <div className="soft-card p-10 text-center">
+          <div className="mb-4 text-6xl">📭</div>
+          <h3 className="text-lg font-semibold text-slate-900">No pipelines found</h3>
+          <p className="mt-2 text-sm text-slate-500">
+            {selectedFilter !== 'all'
+              ? `No pipelines with status "${selectedFilter}"`
               : 'Create your first pipeline using the AI assistant'}
           </p>
-          <Link to="/builder" className="btn-primary">
+          <Link to="/builder" className="btn-primary mt-5">
             Create Pipeline
           </Link>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="soft-card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50/80">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-500 sm:px-6">
                     Name
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-500 sm:px-6">
                     Source
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-500 sm:px-6">
                     Destination
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-500 sm:px-6">
                     Schedule
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-500 sm:px-6">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-500 sm:px-6">
                     Last Run
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-500 sm:px-6">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-slate-200 bg-white/60">
                 {filteredPipelines.map((pipeline) => (
-                  <tr key={pipeline.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <Link
-                        to={`/pipelines/${pipeline.id}`}
-                        className="font-medium text-gray-900 hover:text-primary-600"
-                      >
+                  <tr key={pipeline.id} className="transition-colors hover:bg-slate-50/70">
+                    <td className="px-4 py-4 sm:px-6">
+                      <Link to={`/pipelines/${pipeline.id}`} className="font-medium text-slate-900 hover:text-primary-600">
                         {pipeline.name}
                       </Link>
-                      <p className="text-sm text-gray-500 truncate max-w-xs">
-                        {pipeline.description}
-                      </p>
+                      <p className="mt-1 max-w-xs truncate text-sm text-slate-500">{pipeline.description}</p>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {pipeline.source_type}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {pipeline.destination_type}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {pipeline.schedule || 'Not scheduled'}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(pipeline.status)}`}>
+                    <td className="px-4 py-4 text-sm text-slate-600 sm:px-6">{pipeline.source_type}</td>
+                    <td className="px-4 py-4 text-sm text-slate-600 sm:px-6">{pipeline.destination_type}</td>
+                    <td className="px-4 py-4 text-sm text-slate-600 sm:px-6">{pipeline.schedule || 'Not scheduled'}</td>
+                    <td className="px-4 py-4 sm:px-6">
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusColor(pipeline.status)}`}>
                         {pipeline.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {pipeline.last_run_at
-                        ? formatDistanceToNow(new Date(pipeline.last_run_at), { addSuffix: true })
-                        : 'Never'}
+                    <td className="px-4 py-4 text-sm text-slate-500 sm:px-6">
+                      {pipeline.last_run_at ? formatDistanceToNow(new Date(pipeline.last_run_at), { addSuffix: true }) : 'Never'}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4 sm:px-6">
                       <div className="flex gap-2">
-                        <Link
-                          to={`/pipelines/${pipeline.id}`}
-                          className="text-gray-400 hover:text-gray-600"
-                        >
+                        <Link to={`/pipelines/${pipeline.id}`} className="rounded-full bg-slate-100 p-2 text-slate-500 transition hover:text-slate-900" title="View pipeline">
                           👁️
                         </Link>
-                        <button
-                          onClick={() => handleRun(pipeline.id)}
-                          className="text-green-400 hover:text-green-600"
-                          title="Run pipeline"
-                        >
+                        <button onClick={() => handleRun(pipeline.id)} className="rounded-full bg-emerald-100 p-2 text-emerald-600 transition hover:text-emerald-700" title="Run pipeline">
                           ▶️
                         </button>
-                        <button
-                          onClick={() => handleDelete(pipeline.id, pipeline.name)}
-                          className="text-red-400 hover:text-red-600"
-                          title="Delete pipeline"
-                        >
+                        <button onClick={() => handleDelete(pipeline.id, pipeline.name)} className="rounded-full bg-rose-100 p-2 text-rose-600 transition hover:text-rose-700" title="Delete pipeline">
                           🗑️
                         </button>
                       </div>
