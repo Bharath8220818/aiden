@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
     container_name: aiden-postgres
     environment:
       POSTGRES_USER: aiden
@@ -18,31 +18,40 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - aiden-network
 
   # Redis Cache
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
     container_name: aiden-redis
     ports:
       - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - aiden-network
 
   # Qdrant Vector Database
   qdrant:
-    image: qdrant/qdrant
+    image: qdrant/qdrant:latest
     container_name: aiden-qdrant
     ports:
       - "6333:6333"
     volumes:
       - qdrant_data:/qdrant/storage
+    networks:
+      - aiden-network
 
   # MinIO S3 Storage
   minio:
-    image: minio/minio
+    image: minio/minio:latest
     container_name: aiden-minio
     ports:
       - "9000:9000"
@@ -53,8 +62,58 @@ services:
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aiden-network
+
+  # Backend API
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    container_name: aiden-backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://aiden:aiden123@postgres:5432/aiden
+      REDIS_URL: redis://redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      MINIO_ENDPOINT: minio:9000
+      DEBUG: "True"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - aiden-network
+    restart: unless-stopped
+
+  # Frontend UI
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+    container_name: aiden-frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+    networks:
+      - aiden-network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  redis_data:
   qdrant_data:
   minio_data:
+
+networks:
+  aiden-network:
+    driver: bridge
