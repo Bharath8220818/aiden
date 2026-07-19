@@ -74,9 +74,13 @@ All core flows have been verified via the live API:
 ### Optional (for AI / ML features)
 | Tool | Install | Used By |
 |------|---------|---------|
-| HuggingFace Transformers | `pip install transformers accelerate` | AI prompt parsing (coming soon) |
-| Ollama | [ollama.ai](https://ollama.ai/) | Local LLM inference |
-| Qdrant | `docker compose up qdrant` | Vector storage |
+| HuggingFace Transformers | `pip install transformers accelerate` | AI prompt parsing, model loading |
+| HuggingFace smolagents | `pip install smolagents` | Multi-agent orchestration |
+| Sentence-Transformers | `pip install sentence-transformers` | Embeddings for RAG retrieval |
+| TRL + Datasets | `pip install trl datasets` | LoRA fine-tuning pipeline |
+| Ollama | [ollama.ai](https://ollama.ai/) | Local LLM inference (alternative) |
+| Qdrant | `docker compose up qdrant` | Vector storage for RAG |
+| PyTorch (CUDA) | [pytorch.org](https://pytorch.org/) | GPU-accelerated model inference |
 
 ---
 
@@ -86,18 +90,25 @@ All core flows have been verified via the live API:
 | Item | Impact | Status |
 |------|--------|--------|
 | **Real pipeline execution engine** | `POST /pipelines/{id}/run` only creates a DB record — no actual data movement | 🟡 Celery task scaffolded |
-| **Wire HuggingFace inference** | `hf_service.py` returns mock data — prompt parsing is rule-based only | 🟡 Deps in requirements.txt |
+| **Rewrite `hf_service.py`** | Currently a mock returning hardcoded JSON — needs real model loading, quantization (4-bit), caching, pipeline creation, and sentence embeddings | 🔴 Mock only |
+| **Create `agent_orchestrator.py`** | Multi-agent system with smolagents (ExtractionAgent, AnalysisAgent, PipelineBuilderAgent) does not exist | 🔴 Missing |
+| **Rewrite `intent_parser.py`** | Currently rule-based keyword matching — needs NLP-powered parsing via HuggingFace pipeline with Llama 3 | 🟡 Rule-based fallback |
+| **Add missing Python deps** | `sentence-transformers`, `smolagents`, `trl`, `datasets`, `torch` not in requirements.txt | 🔴 Missing |
 | **Backend test suite** | No pytest files exist — API endpoints are untested | 🔴 Missing |
 | **Monitoring page** | `MonitoringPage.tsx` is an empty placeholder | 🔴 Missing |
 
 ### 🟡 Medium Priority
 | Item | Impact | Status |
 |------|--------|--------|
+| **Update `config.py` with HF settings** | Needs HF_TOKEN, HF_CACHE_DIR, USE_4BIT_QUANTIZATION, INTENT_MODEL, AGENT_MODEL, EMBEDDING_MODEL | ❌ Missing |
+| **Create fine-tuning pipeline** | LoRA training with SFTTrainer in `backend/app/fine_tuning/train.py` | ❌ Missing |
+| **Create training dataset** | 100-500 JSONL examples for intent parsing fine-tuning | ❌ Missing |
+| **Create `Dockerfile.prod`** | Multi-stage Docker build with model caching at build time | ❌ Missing |
 | **PipelineDetailsPage** | Shows only name/description — no execution history UI | 🟡 Minimal |
 | **Duplicate ChatInterface** | Two copies exist (`components/chat/` and `components/ChatInterface.tsx`) | 🟡 Needs cleanup |
 | **PipelineCanvas not wired** | Visual canvas uses hardcoded demo nodes, not real pipeline config | 🟡 Static |
 | **WebSocket not fully active** | Server and client exist but no real events flow | 🟡 Scaffolded |
-| **Dashboard prompt panel** | "Use prompt" button now wired, but no template-to-API link | ✅ Done in M4 |
+| **Dashboard prompt panel** | "Use prompt" button now wired, but no template-to-API link | ✅ Done |
 
 ### 🟢 Low Priority (polish)
 | Item | Details |

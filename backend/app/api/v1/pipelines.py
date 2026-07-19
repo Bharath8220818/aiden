@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +18,8 @@ from app.schemas.pipeline import (
     PipelineUpdate,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 intent_parser = IntentParser()
 
@@ -26,11 +30,25 @@ async def create_pipeline_from_prompt(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Create a pipeline from a natural language prompt."""
+    """Create a pipeline from a natural language prompt using HF AI agents."""
     if not prompt or not prompt.strip():
         raise HTTPException(status_code=400, detail="Prompt cannot be empty")
 
+    # 1. Parse intent using HuggingFace IntentParser (with rule-based fallback)
     parsed_intent = await intent_parser.parse(prompt)
+
+    # 2. Execute through multi-agent system for code generation (lazy import
+    #    so the routes module loads even if smolagents isn't installed yet)
+    try:
+        from app.core.agent_orchestrator import AgentOrchestrator  # noqa: E402
+        orchestrator = AgentOrchestrator()
+        agent_result = await orchestrator.execute(prompt, parsed_intent)
+        agent_code = agent_result.get("result", "")
+    except Exception:
+        logger.warning("Agent orchestration failed, proceeding with parsed intent only")
+        agent_code = None
+
+    # 3. Save pipeline
     new_pipeline = Pipeline(
         name=parsed_intent.get("name", "Untitled Pipeline"),
         description=prompt[:500],
@@ -41,7 +59,7 @@ async def create_pipeline_from_prompt(
         created_by=current_user.id,
         user_id=current_user.id,
         status=PipelineStatus.PENDING,
-        dbt_code=parsed_intent.get("dbt_code"),
+        dbt_code=parsed_intent.get("dbt_code") or str(agent_code) if agent_code else None,
         tests=parsed_intent.get("data_quality_rules", []),
         is_active=True,
     )

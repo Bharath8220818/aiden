@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { HelmetProvider } from 'react-helmet-async';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -27,76 +27,96 @@ const queryClient = new QueryClient({
   },
 });
 
+const AUTH_ROUTES = ['/login', '/signup'];
+
+function AppShell() {
+  const location = useLocation();
+  const isAuthRoute = AUTH_ROUTES.includes(location.pathname);
+
+  return (
+    <div className="app-shell">
+      <ErrorBoundary>
+        {!isAuthRoute && <Header />}
+        <main className={isAuthRoute ? '' : 'mx-auto w-full max-w-7xl px-3 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8'}>
+          <Routes>
+            {/* Public Routes — no header */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup" element={<SignupPage />} />
+
+            {/* Protected Routes — with header */}
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pipelines"
+              element={
+                <ProtectedRoute>
+                  <PipelinesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pipelines/:id"
+              element={
+                <ProtectedRoute>
+                  <PipelineDetailsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/builder"
+              element={
+                <ProtectedRoute>
+                  <PipelineBuilderPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/monitoring"
+              element={
+                <ProtectedRoute>
+                  <MonitoringPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Catch-all */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
+      </ErrorBoundary>
+    </div>
+  );
+}
+
 function App() {
   return (
     <HelmetProvider>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <div className="app-shell">
-            <ErrorBoundary>
-              <Header />
-              <main className="mx-auto w-full max-w-7xl px-3 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-                <Routes>
-                  {/* Public Routes */}
-                  <Route path="/login" element={<LoginPage />} />
-                  <Route path="/signup" element={<SignupPage />} />
-                  
-                  {/* Protected Routes */}
-                  <Route
-                    path="/"
-                    element={
-                      <ProtectedRoute>
-                        <DashboardPage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/pipelines"
-                    element={
-                      <ProtectedRoute>
-                        <PipelinesPage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/pipelines/:id"
-                    element={
-                      <ProtectedRoute>
-                        <PipelineDetailsPage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/builder"
-                    element={
-                      <ProtectedRoute>
-                        <PipelineBuilderPage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/monitoring"
-                    element={
-                      <ProtectedRoute>
-                        <MonitoringPage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  
-                  {/* Catch-all */}
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </main>
-            </ErrorBoundary>
-          </div>
+          <AppShell />
         </BrowserRouter>
         <Toaster
           position="top-right"
           toastOptions={{
             duration: 4000,
             style: {
-              background: '#363636',
-              color: '#fff',
+              background: '#1e293b',
+              color: '#f1f5f9',
+              borderRadius: '12px',
+              border: '1px solid rgba(255,255,255,0.1)',
+              fontSize: '14px',
+            },
+            success: {
+              iconTheme: { primary: '#22c55e', secondary: '#fff' },
+            },
+            error: {
+              iconTheme: { primary: '#ef4444', secondary: '#fff' },
             },
           }}
         />
