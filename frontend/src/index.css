@@ -2,27 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 :root {
   color-scheme: light;
   font-family: 'Inter', -apple-system, system-ui, sans-serif;
 
-  /* Color Palette */
+  /* Core palette */
   --color-primary: #2563EB;
   --color-primary-dark: #1D4ED8;
+  --color-flow: #06B6D4;
+  --color-process: #F59E0B;
   --color-success: #22C55E;
   --color-warning: #EAB308;
   --color-error: #EF4444;
   --color-info: #6366F1;
-  --color-bg: #F9FAFB;
+
+  /* Surfaces */
+  --color-bg: #F8FAFC;
   --color-card: #FFFFFF;
-  --color-text-primary: #111827;
-  --color-text-secondary: #6B7280;
-  --color-border: #E5E7EB;
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #64748B;
+  --color-border: #E2E8F0;
 
   /* Auth dark background */
-  --auth-bg-from: #0F172A;
+  --auth-bg-from: #0B1120;
   --auth-bg-to: #1E293B;
 }
 
@@ -36,9 +40,10 @@
   }
 
   body {
-    @apply min-h-screen text-slate-900 antialiased;
+    @apply min-h-screen antialiased;
     font-family: 'Inter', -apple-system, system-ui, sans-serif;
     background-color: var(--color-bg);
+    color: var(--color-text-primary);
   }
 
   ::selection {
@@ -56,7 +61,7 @@
   /* ─── Auth Page Layout ─────────────────────────────────────────────── */
   .auth-page {
     min-height: 100vh;
-    background: linear-gradient(135deg, #0F172A 0%, #1E293B 60%, #0F172A 100%);
+    background: linear-gradient(145deg, #0B1120 0%, #1E293B 60%, #0B1120 100%);
     position: relative;
     overflow: hidden;
   }
@@ -66,15 +71,15 @@
     position: absolute;
     inset: 0;
     background-image:
-      radial-gradient(circle at 20% 30%, rgba(37, 99, 235, 0.15) 0%, transparent 50%),
-      radial-gradient(circle at 80% 70%, rgba(99, 102, 241, 0.12) 0%, transparent 50%);
+      radial-gradient(circle at 15% 25%, rgba(6, 182, 212, 0.12) 0%, transparent 50%),
+      radial-gradient(circle at 85% 70%, rgba(99, 102, 241, 0.10) 0%, transparent 50%);
     pointer-events: none;
   }
 
   .auth-grid-bg {
     background-image:
-      linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+      linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
     background-size: 40px 40px;
     position: absolute;
     inset: 0;
@@ -82,18 +87,18 @@
   }
 
   .auth-card {
-    @apply relative z-10 w-full rounded-2xl border border-white/10 bg-white shadow-2xl;
+    @apply relative z-10 w-full rounded-2xl border border-white/[0.08] bg-white shadow-2xl;
     box-shadow: 0 25px 80px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.05);
+  }
+
+  .auth-card-accent {
+    @apply h-1 w-full bg-gradient-to-r from-flow-500 via-blue-500 to-primary-500;
   }
 
   /* ─── Cards ─────────────────────────────────────────────────────────── */
   .soft-card {
     @apply rounded-2xl border border-white/70 bg-white/90 shadow-lg backdrop-blur-xl;
     box-shadow: 0 4px 24px -4px rgba(15, 23, 42, 0.12), 0 1px 4px rgba(15, 23, 42, 0.06);
-  }
-
-  .soft-panel {
-    @apply rounded-xl border border-slate-200/70 bg-slate-50/80 shadow-sm;
   }
 
   .card {
@@ -121,13 +126,17 @@
     @apply border-red-100 bg-gradient-to-br from-red-50 to-white;
   }
 
-  .stat-card-purple {
-    @apply border-purple-100 bg-gradient-to-br from-purple-50 to-white;
+  .stat-card-flow {
+    @apply border-flow-100 bg-gradient-to-br from-flow-50 to-white;
+  }
+
+  .stat-card-process {
+    @apply border-process-100 bg-gradient-to-br from-process-50 to-white;
   }
 
   /* ─── Buttons ────────────────────────────────────────────────────────── */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-blue-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.98];
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-primary-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.98];
   }
 
   .btn-secondary {
@@ -146,9 +155,14 @@
     @apply inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 shadow-sm transition-all duration-200 hover:bg-gray-50 hover:text-gray-900 hover:shadow-md;
   }
 
+  /* Flow accent button — for the signature "new pipeline" CTA */
+  .btn-flow {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-flow-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-flow-600 hover:shadow-lg hover:shadow-flow-500/30 focus:outline-none focus:ring-2 focus:ring-flow-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.98];
+  }
+
   /* ─── Form Elements ──────────────────────────────────────────────────── */
   .input-field {
-    @apply w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 transition-all duration-200 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:opacity-60;
+    @apply w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 transition-all duration-200 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:opacity-60;
   }
 
   .input-field-error {
@@ -196,8 +210,12 @@
     @apply badge bg-gray-100 text-gray-700;
   }
 
-  .badge-purple {
-    @apply badge bg-purple-100 text-purple-800;
+  .badge-flow {
+    @apply badge bg-flow-100 text-flow-800;
+  }
+
+  .badge-process {
+    @apply badge bg-process-100 text-process-800;
   }
 
   /* ─── Navigation ─────────────────────────────────────────────────────── */
@@ -206,7 +224,7 @@
   }
 
   .nav-link-active {
-    @apply bg-blue-600 text-white hover:bg-blue-700 hover:text-white;
+    @apply bg-primary-600 text-white hover:bg-primary-700 hover:text-white;
   }
 
   /* ─── Filter Tabs ────────────────────────────────────────────────────── */
@@ -215,7 +233,7 @@
   }
 
   .filter-tab-active {
-    @apply bg-blue-600 text-white hover:bg-blue-700 hover:text-white shadow-sm;
+    @apply bg-primary-600 text-white hover:bg-primary-700 hover:text-white shadow-sm;
   }
 
   /* ─── Password Strength ──────────────────────────────────────────────── */
@@ -238,7 +256,7 @@
 
   /* ─── Chat Bubbles ───────────────────────────────────────────────────── */
   .chat-bubble-user {
-    @apply ml-auto max-w-[80%] rounded-2xl rounded-tr-sm bg-blue-600 px-4 py-3 text-sm text-white shadow-sm;
+    @apply ml-auto max-w-[80%] rounded-2xl rounded-tr-sm bg-primary-600 px-4 py-3 text-sm text-white shadow-sm;
   }
 
   .chat-bubble-ai {
@@ -252,12 +270,66 @@
 
   /* ─── Quick Action Card ──────────────────────────────────────────────── */
   .quick-action-card {
-    @apply flex flex-col items-center gap-2 rounded-xl border border-gray-100 bg-white p-4 text-center shadow-sm transition-all duration-200 hover:border-blue-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer;
+    @apply flex flex-col items-center gap-2 rounded-xl border border-gray-100 bg-white p-4 text-center shadow-sm transition-all duration-200 hover:border-flow-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer;
   }
 
   /* ─── Monitoring ─────────────────────────────────────────────────────── */
   .metric-card {
     @apply rounded-2xl border border-gray-100 bg-white p-5 shadow-sm;
+  }
+
+  /* ─── Ambient Flow Background ────────────────────────────────────────── */
+  .ambient-flow-bg {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .ambient-flow-dot {
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: rgba(6, 182, 212, 0.35);
+    animation: flowDrift linear infinite;
+  }
+
+  .ambient-flow-line {
+    position: absolute;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(6, 182, 212, 0.15),
+      rgba(6, 182, 212, 0.25),
+      rgba(6, 182, 212, 0.15),
+      transparent
+    );
+    animation: flowPulse 4s ease-in-out infinite;
+  }
+
+  @keyframes flowDrift {
+    0% {
+      transform: translate(0, 0);
+      opacity: 0;
+    }
+    10% {
+      opacity: 1;
+    }
+    90% {
+      opacity: 1;
+    }
+    100% {
+      transform: translate(120px, -40px);
+      opacity: 0;
+    }
+  }
+
+  @keyframes flowPulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
   }
 
   /* ─── Scrollbar ──────────────────────────────────────────────────────── */
@@ -295,8 +367,12 @@
     animation: scaleIn 0.2s ease-out both;
   }
 
-  .animate-pulse-dot {
-    animation: pulseDot 1.5s ease-in-out infinite;
+  .animate-flow-particle {
+    animation: flowParticle 8s ease-in-out infinite;
+  }
+
+  .animate-pulse-soft {
+    animation: pulseSoft 3s ease-in-out infinite;
   }
 
   @keyframes fadeIn {
@@ -314,9 +390,17 @@
     to { opacity: 1; transform: scale(1); }
   }
 
-  @keyframes pulseDot {
-    0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
-    40% { opacity: 1; transform: scale(1); }
+  @keyframes flowParticle {
+    0%, 100% { transform: translateX(0) translateY(0); opacity: 0; }
+    25% { opacity: 0.8; }
+    50% { opacity: 0.4; }
+    75% { opacity: 0.8; }
+    100% { transform: translateX(100px) translateY(-20px); opacity: 0; }
+  }
+
+  @keyframes pulseSoft {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
   }
 
   /* Typing indicator */
@@ -331,5 +415,10 @@
   @keyframes typingBounce {
     0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
     30% { transform: translateY(-6px); opacity: 1; }
+  }
+
+  /* Font utilities */
+  .font-mono-display {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
   }
 }

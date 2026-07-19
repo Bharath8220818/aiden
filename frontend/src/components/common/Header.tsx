@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import LoadingSpinner from './LoadingSpinner';
+import AmbientFlow from './AmbientFlow';
 
 const navItems = [
   {
@@ -67,8 +68,10 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/95 shadow-sm backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-3 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-50 border-b border-gray-200/60 bg-white/95 shadow-sm backdrop-blur-xl">
+      {/* Ambient pipeline flow signature */}
+      <AmbientFlow density="light" className="!fixed top-0 left-0 w-full h-full opacity-40" />
+      <div className="relative z-10 mx-auto flex h-16 max-w-7xl items-center justify-between px-3 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5 shrink-0">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 shadow-sm shadow-blue-500/30">
@@ -76,7 +79,7 @@ const Header: React.FC = () => {
           </div>
           <div className="hidden flex-col leading-none sm:flex">
             <span className="text-sm font-bold text-gray-900 tracking-tight">AIDEN</span>
-            <span className="text-[10px] font-medium uppercase tracking-widest text-gray-400">AI Studio</span>
+            <span className="text-[10px] font-medium uppercase tracking-widest text-flow-500">AI Studio</span>
           </div>
         </Link>
 

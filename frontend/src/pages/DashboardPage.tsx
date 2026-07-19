@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { usePipelineStore } from '../store/pipelineStore';
 import { useNotificationStore } from '../store/notificationStore';
+import AmbientFlow from '../components/common/AmbientFlow';
 
 // ─── Stat Card ─────────────────────────────────────────────────────────────────
 interface StatCardProps {
@@ -191,29 +192,45 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* ── Welcome Hero ─────────────────────────────── */}
-      <section className="overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 shadow-lg shadow-blue-500/20">
+      {/* ── Welcome Hero — Dark Gradient with Ambient Flow ──────────── */}
+      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-950 via-slate-900 to-gray-950 shadow-lg shadow-slate-900/30">
+        {/* Ambient pipeline flow signature */}
+        <AmbientFlow density="light" color="99, 102, 241" />
+
         <div className="relative p-6 lg:p-8">
-          {/* Decorative blobs */}
-          <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 translate-x-16 -translate-y-8 rounded-full bg-white/5 blur-2xl" />
-          <div className="pointer-events-none absolute bottom-0 right-32 h-40 w-40 translate-y-8 rounded-full bg-indigo-400/20 blur-xl" />
+          {/* Subtle grid pattern overlay */}
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.03]"
+            style={{
+              backgroundImage:
+                'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+              backgroundSize: '48px 48px',
+            }}
+          />
+
+          {/* Decorative orbs */}
+          <div className="pointer-events-none absolute right-0 top-0 h-72 w-72 translate-x-20 -translate-y-16 rounded-full bg-flow-500/8 blur-3xl" />
+          <div className="pointer-events-none absolute bottom-0 left-1/3 h-48 w-48 translate-y-12 rounded-full bg-indigo-500/10 blur-2xl" />
 
           <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-blue-200">
-                Project Dashboard
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-flow-400">
+                Operations Dashboard
               </p>
-              <h1 className="mt-2 text-3xl font-bold text-white sm:text-4xl">
-                👋 Welcome back, {user?.full_name?.split(' ')[0] || 'there'}!
+              <h1 className="mt-2 text-3xl font-bold text-white sm:text-4xl tracking-tight">
+                Welcome back,{' '}
+                <span className="bg-gradient-to-r from-flow-400 to-blue-400 bg-clip-text text-transparent">
+                  {user?.full_name?.split(' ')[0] || 'there'}
+                </span>
               </h1>
-              <p className="mt-2 max-w-lg text-sm text-blue-100/80">
-                Here's what's happening with your data pipelines today.
+              <p className="mt-2 max-w-lg text-sm text-slate-400">
+                Your pipelines are ready. Here's the pulse of your data infrastructure.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Link
                 to="/builder"
-                className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 shadow-sm transition-all hover:bg-blue-50 hover:shadow-md"
+                className="btn-flow inline-flex items-center gap-2"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -222,7 +239,7 @@ const DashboardPage: React.FC = () => {
               </Link>
               <Link
                 to="/monitoring"
-                className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-white/20"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/60 px-4 py-2.5 text-sm font-semibold text-slate-300 shadow-sm transition-all hover:bg-slate-700/60 hover:text-white"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />

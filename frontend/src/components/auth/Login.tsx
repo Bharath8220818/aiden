@@ -76,7 +76,7 @@ const Login: React.FC = () => {
       <div className="relative z-10 w-full max-w-md animate-slide-up">
         <div className="auth-card overflow-hidden rounded-2xl">
           {/* Card header accent */}
-          <div className="h-1 w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600" />
+          <div className="auth-card-accent" />
 
           <div className="px-8 pb-8 pt-7 sm:px-10 sm:pb-10 sm:pt-8">
             {/* Logo */}
