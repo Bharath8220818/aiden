@@ -25,12 +25,40 @@ from app.models import Pipeline, User, PipelineExecution  # noqa: E402, F401
 target_metadata = Base.metadata
 
 
+def _sync_url(url: str) -> str:
+    """Convert an async database URL (with SQLAlchemy async driver prefix)
+    to a sync URL that Alembic's create_engine() can use.
+
+    Handles:
+      sqlite+aiosqlite://  ->  sqlite://
+      postgresql+asyncpg:// ->  postgresql://
+    """
+    return url.replace("+aiosqlite", "").replace("+asyncpg", "")
+
+
+def get_database_url() -> str:
+    """Return the database URL, preferring the app's .env config
+    over the alembic.ini fallback.
+
+    This way the user manages DATABASE_URL in one place (.env)
+    rather than duplicating it in alembic.ini.
+    """
+    # Try the app's settings first (reads from .env)
+    try:
+        from app.config import settings
+
+        return settings.DATABASE_URL
+    except Exception:
+        pass
+
+    # Fallback to alembic.ini
+    return config.get_main_option("sqlalchemy.url")
+
+
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
-    # SQLite + aiosqlite doesn't work offline; rewrite to sqlite:// for URL parsing
-    safe_url = url.replace("+aiosqlite", "")
+    url = _sync_url(get_database_url())
     context.configure(
-        url=safe_url,
+        url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -40,10 +68,9 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    url = config.get_main_option("sqlalchemy.url")
-    safe_url = url.replace("+aiosqlite", "")
+    url = _sync_url(get_database_url())
     connectable = create_engine(
-        safe_url,
+        url,
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
