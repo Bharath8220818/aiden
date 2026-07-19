@@ -1,12 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactFlow, {
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
   Panel,
   useNodesState,
   useEdgesState,
   addEdge,
+} from 'reactflow';
+import type {
   Connection,
   Node,
   Edge,
@@ -45,7 +48,7 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
     updatePipeline,
   } = usePipelineStore();
   const { addNotification } = useNotificationStore();
-  const { addActivity, updateAgentStatus } = useAgentStore();
+  const { addActivity } = useAgentStore();
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -329,7 +332,6 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
       addNotification({
         type: 'info',
         message: `Removed ${deletedEdges.length} connection${deletedEdges.length > 1 ? 's' : ''}`,
-        duration: 2000,
       });
     },
     [addNotification],
@@ -516,7 +518,7 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
             color="#E2E8F0"
             gap={20}
             size={1}
-            variant="dots"
+            variant={BackgroundVariant.Dots}
           />
           <Controls
             showInteractive={false}

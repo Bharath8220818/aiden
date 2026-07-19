@@ -7,7 +7,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useNotificationStore } from '../../store/notificationStore';
 
 const loginSchema = z.object({
-  username: z.string().min(1, 'Username is required'),
+  email: z.string().email('Please enter a valid email'),
   password: z.string().min(1, 'Password is required'),
 });
 
@@ -37,7 +37,7 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
-  const { login } = useAuthStore();
+  const { signIn } = useAuthStore();
   const { addNotification } = useNotificationStore();
 
   const {
@@ -51,13 +51,13 @@ const Login: React.FC = () => {
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
-      await login(data);
+      await signIn(data.email, data.password);
       addNotification({ type: 'success', message: 'Welcome back!' });
       navigate('/');
     } catch (error: any) {
       addNotification({
         type: 'error',
-        message: error.response?.data?.detail || 'Login failed. Please check your credentials.',
+        message: error?.message || 'Login failed. Please check your credentials.',
       });
     } finally {
       setIsLoading(false);
@@ -90,31 +90,31 @@ const Login: React.FC = () => {
 
             {/* Form */}
             <form className="mt-8 space-y-5" onSubmit={handleSubmit(onSubmit)} noValidate>
-              {/* Username field */}
+              {/* Email field */}
               <div>
-                <label htmlFor="username" className="label">
-                  Username or Email
+                <label htmlFor="email" className="label">
+                  Email Address
                 </label>
                 <div className="input-with-icon">
                   <svg className="input-icon h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                   </svg>
                   <input
-                    id="username"
-                    type="text"
-                    {...register('username')}
-                    className={`input-field pl-10 ${errors.username ? 'input-field-error' : ''}`}
-                    placeholder="Enter your username or email"
+                    id="email"
+                    type="email"
+                    {...register('email')}
+                    className={`input-field pl-10 ${errors.email ? 'input-field-error' : ''}`}
+                    placeholder="you@company.com"
                     disabled={isLoading}
-                    autoComplete="username"
+                    autoComplete="email"
                   />
                 </div>
-                {errors.username && (
+                {errors.email && (
                   <p className="mt-1.5 flex items-center gap-1 text-xs text-red-600">
                     <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                     </svg>
-                    {errors.username.message}
+                    {errors.email.message}
                   </p>
                 )}
               </div>

@@ -44,8 +44,6 @@ const AgentManagerPanel: React.FC = () => {
           const isDone = agent.status === 'success';
           const isRunning = agent.status === 'running';
           const isError = agent.status === 'error';
-          const isIdle = agent.status === 'idle';
-
           const iconBg = isDone
             ? 'bg-green-500 text-white'
             : isRunning

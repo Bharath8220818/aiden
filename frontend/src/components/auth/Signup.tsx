@@ -9,7 +9,6 @@ import { useNotificationStore } from '../../store/notificationStore';
 const signupSchema = z.object({
   full_name: z.string().min(1, 'Full name is required'),
   email: z.string().email('Please enter a valid email'),
-  username: z.string().min(3, 'Username must be at least 3 characters'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   terms: z.boolean().refine((val) => val === true, 'You must accept the Terms & Conditions'),
 });
@@ -85,14 +84,17 @@ const Signup: React.FC = () => {
   const onSubmit = async (data: SignupFormData) => {
     setIsLoading(true);
     try {
-      const { terms: _terms, ...signupData } = data;
-      await signup(signupData);
+      await signup({
+        email: data.email,
+        password: data.password,
+        full_name: data.full_name,
+      });
       addNotification({ type: 'success', message: 'Account created! Welcome to AIDEN.' });
       navigate('/');
     } catch (error: any) {
       addNotification({
         type: 'error',
-        message: error.response?.data?.detail || 'Signup failed. Please try again.',
+        message: error?.message || 'Signup failed. Please try again.',
       });
     } finally {
       setIsLoading(false);
@@ -171,26 +173,6 @@ const Signup: React.FC = () => {
                   />
                 </div>
                 <FieldError message={errors.email?.message} />
-              </div>
-
-              {/* Username */}
-              <div>
-                <label htmlFor="username" className="label">Username</label>
-                <div className="input-with-icon">
-                  <svg className="input-icon h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                  </svg>
-                  <input
-                    id="username"
-                    type="text"
-                    {...register('username')}
-                    className={`input-field pl-10 ${errors.username ? 'input-field-error' : ''}`}
-                    placeholder="johndoe"
-                    disabled={isLoading}
-                    autoComplete="username"
-                  />
-                </div>
-                <FieldError message={errors.username?.message} />
               </div>
 
               {/* Password */}
