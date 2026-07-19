@@ -6,7 +6,7 @@ import { useAuthStore } from '../../store/authStore';
 
 describe('Login Component', () => {
   beforeEach(() => {
-    useAuthStore.setState({ user: null, token: null, isAuthenticated: false, error: null });
+    useAuthStore.setState({ user: null, session: null, isAuthenticated: false, isLoading: false });
     localStorage.clear();
   });
 
@@ -17,7 +17,7 @@ describe('Login Component', () => {
       </BrowserRouter>
     );
 
-    expect(screen.getByLabelText(/Username/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Password/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Sign in/i })).toBeInTheDocument();
   });
@@ -31,7 +31,7 @@ describe('Login Component', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
 
-    expect(await screen.findByText(/Username is required/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Please enter a valid email/i)).toBeInTheDocument();
     expect(await screen.findByText(/Password is required/i)).toBeInTheDocument();
   });
 

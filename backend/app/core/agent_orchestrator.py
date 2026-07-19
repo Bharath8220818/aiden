@@ -29,8 +29,6 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from smolagents import CodeAgent, Tool, ApiModel
-
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -39,6 +37,15 @@ logger = logging.getLogger(__name__)
 # ══════════════════════════════════════════════
 #  Custom Tools
 # ══════════════════════════════════════════════
+
+
+try:
+    from smolagents import ApiModel, CodeAgent, Tool
+except ImportError:
+    ApiModel = CodeAgent = None
+
+    class Tool:
+        pass
 
 
 class DatabaseTool(Tool):
@@ -111,7 +118,7 @@ class CodeGeneratorTool(Tool):
         elif type == "dbt":
             return self._generate_dbt(name, source, destination)
         elif type == "test":
-            return self._generate_tests(name, config.get("transformations", []))
+            return self._generate_tests(name, config.get("data_quality_rules", []))
         return f"Unknown code type: {type}"
 
     @staticmethod
@@ -176,9 +183,10 @@ SELECT * FROM transformed
             )
         if not tests:
             tests.append("  - name: test_not_null\n    condition: column IS NOT NULL")
+        rendered_tests = "\n".join(tests)
         return (
             f"# Data quality tests for {name}\n"
-            f"version: 2\n\nmodels:\n  - name: {name}\n    tests:\n{tests[0]}"
+            f"version: 2\n\nmodels:\n  - name: {name}\n    tests:\n{rendered_tests}"
         )
 
 
@@ -195,15 +203,25 @@ class AgentOrchestrator:
     """
 
     def __init__(self):
+        self._enabled = ApiModel is not None and CodeAgent is not None and bool(settings.HF_TOKEN)
+        self.model = None
+        self._agent = None
+
+        if not self._enabled:
+            logger.warning(
+                "Agent orchestration disabled. Install smolagents and set HF_TOKEN to enable it."
+            )
+            self.tools = [DatabaseTool(), CodeGeneratorTool()]
+            return
+
         # Use API model (HuggingFace Inference API) with token
         self.model = ApiModel(
-            model_id=settings.INTENT_MODEL,
+            model_id=settings.AGENT_MODEL or settings.INTENT_MODEL,
             token=settings.HF_TOKEN,
         )
 
         # All available tools
         self.tools = [DatabaseTool(), CodeGeneratorTool()]
-        self._agent = None
 
         logger.info("AgentOrchestrator initialized")
 
@@ -223,6 +241,12 @@ class AgentOrchestrator:
             Execution result with status, result, and tools_used.
         """
         logger.info("Orchestrator executing task: %s", task[:80])
+
+        if not self.is_enabled():
+            return {
+                "status": "disabled",
+                "message": "Agent orchestration is not available. Install smolagents and set HF_TOKEN.",
+            }
 
         try:
             # Lazy-init the agent so module can be imported without triggering
@@ -245,6 +269,9 @@ class AgentOrchestrator:
         except Exception as exc:
             logger.error("Orchestration failed: %s", exc)
             return {"status": "failed", "error": str(exc)}
+
+    def is_enabled(self) -> bool:
+        return self._enabled
 
     # ── Private ──
 

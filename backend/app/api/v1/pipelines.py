@@ -1,9 +1,11 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, BackgroundTasks
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
+from datetime import datetime
+from app.api.v1.websocket import manager
 
 from app.api.v1.deps import get_current_user
 from app.database import get_db
@@ -16,21 +18,24 @@ from app.schemas.pipeline import (
     PipelineExecutionResponse,
     PipelineResponse,
     PipelineUpdate,
+    PromptRequest,
 )
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+executions_router = APIRouter()
 intent_parser = IntentParser()
 
 
 @router.post("/from-prompt", response_model=PipelineResponse)
 async def create_pipeline_from_prompt(
-    prompt: str,
+    request: PromptRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Create a pipeline from a natural language prompt using HF AI agents."""
+    prompt = request.prompt
     if not prompt or not prompt.strip():
         raise HTTPException(status_code=400, detail="Prompt cannot be empty")
 
@@ -39,14 +44,27 @@ async def create_pipeline_from_prompt(
 
     # 2. Execute through multi-agent system for code generation (lazy import
     #    so the routes module loads even if smolagents isn't installed yet)
+    dag_code = None
+    dbt_code = None
+    tests = parsed_intent.get("data_quality_rules", [])
+
     try:
-        from app.core.agent_orchestrator import AgentOrchestrator  # noqa: E402
+        from app.core.agent_orchestrator import AgentOrchestrator, CodeGeneratorTool  # noqa: E402
+
         orchestrator = AgentOrchestrator()
-        agent_result = await orchestrator.execute(prompt, parsed_intent)
-        agent_code = agent_result.get("result", "")
-    except Exception:
-        logger.warning("Agent orchestration failed, proceeding with parsed intent only")
-        agent_code = None
+        if orchestrator.is_enabled():
+            agent_result = await orchestrator.execute(prompt, parsed_intent)
+            dbt_code = agent_result.get("result") if agent_result.get("status") == "success" else None
+
+        generator = CodeGeneratorTool()
+        spec = parsed_intent
+        import json
+
+        dag_code = generator.forward(json.dumps(spec), "dag")
+        dbt_code = dbt_code or generator.forward(json.dumps(spec), "dbt")
+        tests = parsed_intent.get("data_quality_rules", [])
+    except Exception as exc:
+        logger.warning("Pipeline code generation failed, proceeding with parsed intent only: %s", exc)
 
     # 3. Save pipeline
     new_pipeline = Pipeline(
@@ -59,8 +77,9 @@ async def create_pipeline_from_prompt(
         created_by=current_user.id,
         user_id=current_user.id,
         status=PipelineStatus.PENDING,
-        dbt_code=parsed_intent.get("dbt_code") or str(agent_code) if agent_code else None,
-        tests=parsed_intent.get("data_quality_rules", []),
+        code=dag_code,
+        dbt_code=dbt_code,
+        tests=tests,
         is_active=True,
     )
 
@@ -191,6 +210,7 @@ async def delete_pipeline(
 @router.post("/{pipeline_id}/run", response_model=PipelineExecutionResponse)
 async def run_pipeline(
     pipeline_id: int,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -216,6 +236,16 @@ async def run_pipeline(
     db.add(execution)
     await db.commit()
     await db.refresh(execution)
+
+    # Emit status update via websocket
+    await manager.broadcast({
+        "type": "pipeline_status",
+        "pipeline_id": pipeline_id,
+        "execution_id": execution.id,
+        "status": "running",
+        "timestamp": datetime.now().isoformat()
+    })
+
     return execution
 
 
@@ -253,3 +283,13 @@ async def get_execution_logs(
     if not execution:
         raise HTTPException(status_code=404, detail="Execution not found")
     return execution.logs or []
+
+
+@executions_router.get("/{execution_id}/logs")
+async def get_execution_logs_public(
+    execution_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return logs for an execution using the public executions route."""
+    return await get_execution_logs(execution_id, db, current_user)

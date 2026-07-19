@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from typing import List, Optional
 
 
@@ -50,6 +51,17 @@ class Settings(BaseSettings):
     AGENT_MODEL: str = "HuggingFaceTB/SmolAgent"
     CODE_MODEL: str = "HuggingFaceH4/starchat-beta"
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug(cls, value):
+        if isinstance(value, str) and value.lower() in {"release", "prod", "production"}:
+            return False
+        return value
+
+    # Supabase Settings
+    SUPABASE_URL: str = ""
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
 
     class Config:
         env_file = ".env"

@@ -56,7 +56,6 @@ class IntentParser:
 
     def __init__(self, model_name: Optional[str] = None):
         self.model_name = model_name or settings.INTENT_MODEL
-        self._pipeline = None
 
     # ── Public ──
 
@@ -93,18 +92,15 @@ class IntentParser:
                 logger.debug("HF service not available, skipping AI parse")
                 return None
 
-            # Lazy-init the pipeline
-            if self._pipeline is None:
-                self._pipeline = hf_service.create_pipeline(
-                    "text-generation",
-                    self.model_name,
-                    max_new_tokens=512,
-                    temperature=0.1,
-                    do_sample=True,
-                )
-
             prompt = SYSTEM_PROMPT.format(query=query)
-            result = self._pipeline(prompt)[0]["generated_text"]
+            result = hf_service.generate(
+                prompt,
+                model_name=self.model_name,
+                max_new_tokens=512,
+                temperature=0.1,
+            )
+            if result is None:
+                return None
 
             # Extract JSON block from the generated text
             json_start = result.find("{")
@@ -117,10 +113,15 @@ class IntentParser:
             json_str = result[json_start:json_end]
             parsed = json.loads(json_str)
 
-            # Ensure required fields exist
-            for field in ("name", "source_type", "destination_type"):
-                if field not in parsed:
-                    parsed[field] = "unknown"
+            if not self._validate(parsed):
+                logger.warning("AI response did not include a usable pipeline intent")
+                return None
+
+            parsed.setdefault("source_config", {})
+            parsed.setdefault("destination_config", {})
+            parsed.setdefault("transformations", [])
+            parsed.setdefault("schedule", "0 6 * * *")
+            parsed.setdefault("data_quality_rules", [])
 
             logger.info("AI intent parsed: %s", parsed.get("name"))
             return parsed
@@ -128,6 +129,10 @@ class IntentParser:
         except Exception as exc:
             logger.warning("AI intent parsing failed: %s", exc)
             return None
+
+    @staticmethod
+    def _validate(parsed: Dict[str, Any]) -> bool:
+        return all(parsed.get(field) for field in ("name", "source_type", "destination_type"))
 
     # ── Rule-based Fallback ──
 

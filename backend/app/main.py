@@ -33,6 +33,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(pipelines.router, prefix="/api/v1/pipelines", tags=["pipelines"])
+app.include_router(pipelines.executions_router, prefix="/api/v1/executions", tags=["executions"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 
 # WebSocket endpoint

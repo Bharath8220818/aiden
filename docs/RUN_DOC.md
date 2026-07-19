@@ -1,68 +1,74 @@
-# AIDEN — Local Run Doc
+# AIDEN Local Run Guide
 
-## Artifact Setup
-
-Before running the dev servers, reproduce these uncommitted artifacts:
+## Backend
 
 ```bash
-# 1. Backend: install dependencies
 cd backend
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
-
-# 2. Backend: initialize Alembic (already done — skip if `backend/alembic/` exists)
-alembic init alembic
-
-# 3. Backend: copy .env template (already present — otherwise copy from backend/.env)
-#    The DATABASE_URL must point to SQLite for local dev:
-#      DATABASE_URL=sqlite+aiosqlite:///./aiden.db
-#    For production, use PostgreSQL:
-#      DATABASE_URL=postgresql+asyncpg://aiden:aiden123@postgres:5432/aiden
-
-# 4. Backend: run Alembic migrations
+copy .env.example .env
 set PYTHONPATH=.
 alembic upgrade head
-
-# 5. Frontend: install dependencies
-cd frontend
-npm install
-```
-
-## Running Dev Servers
-
-### Backend (FastAPI)
-```bash
-cd backend
-venv\Scripts\activate
-set PYTHONPATH=.
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
-Available at: http://localhost:8000
-Health check: http://localhost:8000/health
 
-### Frontend (Vite + React)
+Check it:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+## Frontend
+
 ```bash
 cd frontend
+npm install
+copy .env.example .env
 npm run dev
 ```
-Available at: http://localhost:5173
 
-### Celery Worker (optional — for pipeline execution)
+Open http://localhost:5173.
+
+## Optional Worker
+
 ```bash
 cd backend
 venv\Scripts\activate
-venv\Scripts\celery.exe -A app.tasks worker --loglevel=info
+celery -A app.tasks worker --loglevel=info
 ```
-Requires Redis running (see `infrastructure/docker/docker-compose.yml`).
 
-## Docker (full stack)
+Redis is required for the worker.
+
+## Docker
+
 ```bash
 cd infrastructure/docker
 docker compose up --build
 ```
 
+## Verified Commands
+
+```bash
+cd frontend
+npm test -- --run
+npm run build
+npm run lint
+
+cd ..\backend
+venv\Scripts\python.exe test_db_connection.py
+venv\Scripts\alembic.exe current
+```
+
 ## Notes
-- The `.env` file at `backend/.env` is **not** committed to git. It overrides `app/config.py` defaults.
-- Alembic migration files live in `backend/alembic/versions/`.
-- Frontend proxies `/api/` and `/ws` to the backend via Vite config.
+
+- `.env` files are local-only and must not be committed.
+- Local development defaults to SQLite unless `DATABASE_URL` is changed.
+- To use Supabase, create a Supabase project, copy its Postgres connection string, convert it to the async SQLAlchemy form, and set it in `backend/.env`:
+
+```bash
+DATABASE_URL=postgresql+asyncpg://postgres.your-project-ref:your-password@aws-0-your-region.pooler.supabase.com:6543/postgres
+```
+
+Then run `alembic upgrade head` from `backend` to create the app tables in Supabase.
+- The Vite frontend uses `VITE_API_URL` and `VITE_WS_URL` from `frontend/.env`.
