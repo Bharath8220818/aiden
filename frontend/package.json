@@ -22,7 +22,9 @@
     "axios": "^1.18.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
+    "framer-motion": "^12.42.2",
     "html2canvas": "^1.4.1",
+    "lucide-react": "^1.25.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-helmet-async": "^3.0.0",
@@ -32,6 +34,7 @@
     "reactflow": "^11.11.4",
     "recharts": "^3.9.2",
     "socket.io-client": "^4.8.3",
+    "tailwind-merge": "^3.6.0",
     "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
