@@ -3,12 +3,13 @@ import type { LoginCredentials, SignupData, AuthResponse, User } from '../types/
 
 export const authApi = {
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
-    const formData = new FormData();
-    formData.append('username', credentials.username);
-    formData.append('password', credentials.password);
-    
-    const response = await api.post('/api/v1/auth/login', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+    // Use URLSearchParams for proper OAuth2 password flow (application/x-www-form-urlencoded)
+    const params = new URLSearchParams();
+    params.append('username', credentials.username);
+    params.append('password', credentials.password);
+
+    const response = await api.post('/api/v1/auth/login', params.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
     return response.data;
   },

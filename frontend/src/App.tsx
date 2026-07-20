@@ -22,6 +22,9 @@ const PipelineDetailsPage = lazy(() => import('./pages/PipelineDetailsPage'));
 const MonitoringPage = lazy(() => import('./pages/MonitoringPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
+const ChangelogPage = lazy(() => import('./pages/ChangelogPage'));
+const TermsPage = lazy(() => import('./pages/TermsPage'));
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,6 +54,9 @@ function AppShell() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignupPage />} />
                 <Route path="/about" element={<AboutPage />} />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/changelog" element={<ChangelogPage />} />
 
                 {/* Protected Routes — with header */}
                 <Route
