@@ -22,10 +22,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware
+# CORS middleware — allow all in production (Vercel + Render)
+# Set CORS_ORIGINS env var to restrict (comma-separated URLs)
+cors_origins = settings.CORS_ORIGINS if settings.CORS_ORIGINS else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

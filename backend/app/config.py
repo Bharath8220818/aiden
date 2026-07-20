@@ -34,12 +34,18 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 1440
 
-    # CORS
-    CORS_ORIGINS: List[str] = [
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:3000",
-    ]
+    # CORS — Allow all origins in production for Render + Vercel
+    CORS_ORIGINS: List[str] = []
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value):
+        if isinstance(value, str):
+            origins = [o.strip() for o in value.split(",") if o.strip()]
+            return origins
+        if isinstance(value, list):
+            return value
+        return []
 
     # ── Hugging Face Settings ──
     HF_TOKEN: Optional[str] = None
