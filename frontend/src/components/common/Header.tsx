@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import LoadingSpinner from './LoadingSpinner';
 import AmbientFlow from './AmbientFlow';
+import ThemeToggle from './ThemeToggle';
 
 const navItems = [
   {
@@ -108,6 +109,7 @@ const Header: React.FC = () => {
 
         {/* Right side actions */}
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           {/* Notification bell */}
           {isAuthenticated && (
             <button

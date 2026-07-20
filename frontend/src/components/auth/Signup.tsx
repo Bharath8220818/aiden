@@ -86,6 +86,7 @@ const Signup: React.FC = () => {
     setIsLoading(true);
     try {
       await signup({
+        username: data.username || data.email.split('@')[0],
         email: data.email,
         password: data.password,
         full_name: data.full_name,

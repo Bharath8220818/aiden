@@ -66,6 +66,26 @@ export const TableRowSkeleton: React.FC = () => (
   </div>
 );
 
+export const TableSkeleton: React.FC<{ rows?: number; cols?: number }> = ({
+  rows = 5,
+  cols = 4,
+}) => (
+  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+    <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+      <Skeleton variant="text" width="200px" height="1.5rem" />
+    </div>
+    <div className="divide-y divide-gray-200 dark:divide-gray-700">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="p-4 flex gap-4">
+          {Array.from({ length: cols }).map((_, j) => (
+            <Skeleton key={j} variant="text" width="100%" height="1rem" />
+          ))}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 export const PageSkeleton: React.FC = () => (
   <div className="space-y-6 p-6 animate-fade-in">
     <div className="flex items-center justify-between">

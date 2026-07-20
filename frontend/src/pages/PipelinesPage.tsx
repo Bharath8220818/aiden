@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { usePipelineStore } from '../store/pipelineStore';
-import LoadingSpinner from '../components/common/LoadingSpinner';
 import { formatDistanceToNow } from 'date-fns';
+
+import { PageSkeleton } from '../components/ui/Skeleton';
 
 const FILTERS = ['all', 'running', 'success', 'failed', 'draft', 'pending', 'paused'] as const;
 type Filter = (typeof FILTERS)[number];
@@ -66,11 +67,7 @@ const PipelinesPage: React.FC = () => {
   };
 
   if (isLoading && pipelines.length === 0) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   return (

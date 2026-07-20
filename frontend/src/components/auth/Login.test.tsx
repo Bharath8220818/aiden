@@ -6,7 +6,7 @@ import { useAuthStore } from '../../store/authStore';
 
 describe('Login Component', () => {
   beforeEach(() => {
-    useAuthStore.setState({ user: null, session: null, isAuthenticated: false, isLoading: false });
+    useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false, error: null });
     localStorage.clear();
   });
 

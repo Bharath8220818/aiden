@@ -3,7 +3,10 @@ import { create } from 'zustand';
 interface Notification {
   id: string;
   type: 'info' | 'success' | 'warning' | 'error';
-  message: string;
+  title?: string;
+  message?: string;
+  duration?: number;
+  action?: { label: string; onClick: () => void };
   timestamp: Date;
   read: boolean;
 }
@@ -11,8 +14,9 @@ interface Notification {
 interface NotificationState {
   notifications: Notification[];
   unreadCount: number;
-  
+
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => void;
+  removeNotification: (id: string) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearAll: () => void;
@@ -33,6 +37,26 @@ export const useNotificationStore = create<NotificationState>((set) => ({
       notifications: [newNotification, ...state.notifications],
       unreadCount: state.unreadCount + 1,
     }));
+
+    // Auto-remove after duration (default 5s)
+    const duration = notification.duration ?? 5000;
+    if (duration > 0) {
+      setTimeout(() => {
+        set((state) => ({
+          notifications: state.notifications.filter((n) => n.id !== newNotification.id),
+          unreadCount: Math.max(0, state.unreadCount - 1),
+        }));
+      }, duration + 300); // Extra 300ms for exit animation
+    }
+  },
+
+  removeNotification: (id: string) => {
+    set((state) => ({
+      notifications: state.notifications.filter((n) => n.id !== id),
+      unreadCount: state.notifications.find((n) => n.id === id && !n.read)
+        ? Math.max(0, state.unreadCount - 1)
+        : state.unreadCount,
+    }));
   },
 
   markAsRead: (id: string) => {
@@ -40,8 +64,8 @@ export const useNotificationStore = create<NotificationState>((set) => ({
       notifications: state.notifications.map((n) =>
         n.id === id ? { ...n, read: true } : n
       ),
-      unreadCount: state.notifications.filter((n) => n.id === id && !n.read).length > 0
-        ? state.unreadCount - 1
+      unreadCount: state.notifications.find((n) => n.id === id && !n.read)
+        ? Math.max(0, state.unreadCount - 1)
         : state.unreadCount,
     }));
   },

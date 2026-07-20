@@ -38,7 +38,7 @@ const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
-  const { signIn } = useAuthStore();
+  const { login } = useAuthStore();
   const { addNotification } = useNotificationStore();
 
   const {
@@ -52,7 +52,7 @@ const Login: React.FC = () => {
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
-      await signIn(data.email, data.password);
+      await login(data.email, data.password);
       addNotification({ type: 'success', message: 'Welcome back!' });
       navigate('/');
     } catch (error: any) {

@@ -12,7 +12,7 @@ export type { ModalProps } from './Modal';
 export { Toast } from './Toast';
 export type { ToastProps } from './Toast';
 
-export { Skeleton, StatsCardSkeleton, TableRowSkeleton, PageSkeleton } from './Skeleton';
+export { Skeleton, StatsCardSkeleton, TableRowSkeleton, TableSkeleton, PageSkeleton } from './Skeleton';
 export type { SkeletonProps } from './Skeleton';
 
 export { EmptyState } from './EmptyState';

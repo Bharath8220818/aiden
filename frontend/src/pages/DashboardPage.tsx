@@ -5,6 +5,8 @@ import { usePipelineStore } from '../store/pipelineStore';
 import { useNotificationStore } from '../store/notificationStore';
 import AmbientFlow from '../components/common/AmbientFlow';
 
+import { StatsCardSkeleton } from '../components/ui/Skeleton';
+
 // ─── Stat Card ─────────────────────────────────────────────────────────────────
 interface StatCardProps {
   title: string;
@@ -138,7 +140,7 @@ const statusMeta: Record<string, { bg: string; dot: string; label: string }> = {
 // ─── Main Dashboard ─────────────────────────────────────────────────────────────
 const DashboardPage: React.FC = () => {
   const { user } = useAuthStore();
-  const { pipelines, executions, fetchPipelines, fetchExecutions } = usePipelineStore();
+  const { pipelines, executions, isLoading, fetchPipelines, fetchExecutions } = usePipelineStore();
   const [prompt, setPrompt] = useState('Build a daily sales pipeline from PostgreSQL to Snowflake');
   const [selectedTemplate, setSelectedTemplate] = useState('Sales');
   const [isCreating, setIsCreating] = useState(false);
@@ -253,34 +255,45 @@ const DashboardPage: React.FC = () => {
 
       {/* ── Stats Row ─────────────────────────────────── */}
       <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard
-          title="Total Pipelines"
-          value={totalPipelines}
-          icon={<svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>}
-          trend={{ value: '+2 this week', up: true }}
-          variant="blue"
-        />
-        <StatCard
-          title="Running"
-          value={runningPipelines}
-          icon={<svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>}
-          trend={{ value: 'Live now', up: true }}
-          variant="green"
-        />
-        <StatCard
-          title="Failed"
-          value={failedPipelines}
-          icon={<svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-          trend={{ value: 'Needs attention', up: false }}
-          variant="red"
-        />
-        <StatCard
-          title="Success Rate"
-          value={`${successRate.toFixed(1)}%`}
-          icon={<svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-          trend={{ value: '+3% vs last week', up: true }}
-          variant="purple"
-        />
+        {isLoading ? (
+          <>
+            <StatsCardSkeleton />
+            <StatsCardSkeleton />
+            <StatsCardSkeleton />
+            <StatsCardSkeleton />
+          </>
+        ) : (
+          <>
+            <StatCard
+              title="Total Pipelines"
+              value={totalPipelines}
+              icon={<svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>}
+              trend={{ value: '+2 this week', up: true }}
+              variant="blue"
+            />
+            <StatCard
+              title="Running"
+              value={runningPipelines}
+              icon={<svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>}
+              trend={{ value: 'Live now', up: true }}
+              variant="green"
+            />
+            <StatCard
+              title="Failed"
+              value={failedPipelines}
+              icon={<svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+              trend={{ value: 'Needs attention', up: false }}
+              variant="red"
+            />
+            <StatCard
+              title="Success Rate"
+              value={`${successRate.toFixed(1)}%`}
+              icon={<svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+              trend={{ value: '+3% vs last week', up: true }}
+              variant="purple"
+            />
+          </>
+        )}
       </section>
 
       {/* ── Quick Actions ──────────────────────────────── */}

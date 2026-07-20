@@ -1,142 +1,105 @@
 import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
-import type { Session, User as SupabaseUser } from '@supabase/supabase-js';
-
-interface AppUser {
-  id: string;
-  email: string;
-  username: string;
-  full_name: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at?: string;
-}
+import { persist } from 'zustand/middleware';
+import { authApi } from '../api/auth';
+import type { User } from '../types/auth';
 
 interface AuthState {
-  user: AppUser | null;
-  session: Session | null;
+  user: User | null;
+  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  signUp: (email: string, password: string) => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
-  getSession: () => Promise<void>;
+  error: string | null;
+
+  login: (email: string, password: string) => Promise<void>;
+  signup: (data: {
+    username: string;
+    email: string;
+    full_name: string;
+    password: string;
+  }) => Promise<void>;
+  logout: () => void;
   getCurrentUser: () => Promise<void>;
-  login: (credentials: { email?: string; username?: string; password: string }) => Promise<void>;
-  signup: (data: { email: string; password: string; full_name?: string }) => Promise<void>;
-  logout: () => Promise<void>;
+  clearError: () => void;
 }
 
-const toAppUser = (user: SupabaseUser | null | undefined): AppUser | null => {
-  if (!user) return null;
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      token: localStorage.getItem('auth_token'),
+      isAuthenticated: !!localStorage.getItem('auth_token'),
+      isLoading: false,
+      error: null,
 
-  const displayName =
-    typeof user.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim()
-      ? user.user_metadata.full_name
-      : user.email || 'User';
+      // ── LOGIN ──
+      login: async (email: string, password: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await authApi.login({
+            username: email, // Backend expects 'username' field
+            password,
+          });
 
-  return {
-    id: user.id,
-    email: user.email || '',
-    username: user.email || user.id,
-    full_name: displayName,
-    is_active: true,
-    created_at: user.created_at || new Date().toISOString(),
-    updated_at: user.updated_at,
-  };
-};
+          const token = response.access_token;
+          localStorage.setItem('auth_token', token);
+          set({ token, isAuthenticated: true, isLoading: false });
+          await get().getCurrentUser();
+        } catch (error: any) {
+          const message =
+            error.response?.data?.detail || 'Login failed. Please check your credentials.';
+          set({ error: message, isLoading: false });
+          throw new Error(message);
+        }
+      },
 
-const setAuthToken = (session: Session | null) => {
-  if (session?.access_token) {
-    localStorage.setItem('auth_token', session.access_token);
-  } else {
-    localStorage.removeItem('auth_token');
-  }
-};
+      // ── SIGNUP ──
+      signup: async (data) => {
+        set({ isLoading: true, error: null });
+        try {
+          await authApi.signup({
+            username: data.username,
+            email: data.email,
+            full_name: data.full_name,
+            password: data.password,
+          });
 
-export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null,
-  session: null,
-  isAuthenticated: false,
-  isLoading: false,
+          // Auto-login after successful signup
+          await get().login(data.email, data.password);
+        } catch (error: any) {
+          const message =
+            error.response?.data?.detail || 'Signup failed. Please try again.';
+          set({ error: message, isLoading: false });
+          throw new Error(message);
+        }
+      },
 
-  signUp: async (email: string, password: string) => {
-    set({ isLoading: true });
-    try {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) throw error;
-      setAuthToken(data.session);
-      set({
-        user: toAppUser(data.user),
-        session: data.session,
-        isAuthenticated: Boolean(data.session || data.user),
-      });
-    } finally {
-      set({ isLoading: false });
+      // ── LOGOUT ──
+      logout: () => {
+        localStorage.removeItem('auth_token');
+        set({ user: null, token: null, isAuthenticated: false, error: null });
+      },
+
+      // ── GET CURRENT USER ──
+      getCurrentUser: async () => {
+        try {
+          const user = await authApi.getCurrentUser();
+          set({ user });
+        } catch {
+          // Token invalid — clear auth state
+          get().logout();
+        }
+      },
+
+      // ── CLEAR ERROR ──
+      clearError: () => set({ error: null }),
+    }),
+    {
+      name: 'auth-storage',
+      partialize: (state) => ({
+        token: state.token,
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+      }),
     }
-  },
-
-  signIn: async (email: string, password: string) => {
-    set({ isLoading: true });
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      setAuthToken(data.session);
-      set({
-        user: toAppUser(data.user),
-        session: data.session,
-        isAuthenticated: Boolean(data.session),
-      });
-    } finally {
-      set({ isLoading: false });
-    }
-  },
-
-  signOut: async () => {
-    await supabase.auth.signOut();
-    setAuthToken(null);
-    set({ user: null, session: null, isAuthenticated: false });
-  },
-
-  getSession: async () => {
-    const { data } = await supabase.auth.getSession();
-    setAuthToken(data.session);
-    set({
-      session: data.session,
-      user: toAppUser(data.session?.user),
-      isAuthenticated: Boolean(data.session),
-    });
-  },
-
-  getCurrentUser: async () => {
-    await get().getSession();
-  },
-
-  login: async ({ email, username, password }) => {
-    await get().signIn(email || username || '', password);
-  },
-
-  signup: async ({ email, password, full_name }) => {
-    set({ isLoading: true });
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: full_name ? { data: { full_name } } : undefined,
-      });
-      if (error) throw error;
-      setAuthToken(data.session);
-      set({
-        user: toAppUser(data.user),
-        session: data.session,
-        isAuthenticated: Boolean(data.session || data.user),
-      });
-    } finally {
-      set({ isLoading: false });
-    }
-  },
-
-  logout: async () => {
-    await get().signOut();
-  },
-}));
+  )
+);
