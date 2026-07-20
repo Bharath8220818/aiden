@@ -127,7 +127,7 @@ const PipelinesPage: React.FC = () => {
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
             placeholder="Search pipelines..."
-            className="input-field pl-10"
+            className="input pl-10"
           />
           {searchQuery && (
             <button
@@ -164,7 +164,7 @@ const PipelinesPage: React.FC = () => {
       ) : (
         <>
           {/* ── Desktop Table ────────────────────────── */}
-          <div className="hidden overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm sm:block">
+          <div className="hidden overflow-hidden card p-0 sm:block">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-100">
                 <thead className="bg-gray-50/80">
@@ -274,7 +274,7 @@ const PipelinesPage: React.FC = () => {
           {/* ── Mobile Card List ─────────────────────── */}
           <div className="flex flex-col gap-3 sm:hidden">
             {paginatedPipelines.map((pipeline) => (
-              <div key={pipeline.id} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+              <div key={pipeline.id} className="card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <Link

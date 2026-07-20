@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
 import { Toaster } from 'react-hot-toast';
 import { HelmetProvider } from 'react-helmet-async';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -7,6 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Header from './components/common/Header';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import { PageTransition } from './components/ui/PageTransition';
 
 // Pages
 import LoginPage from './pages/LoginPage';
@@ -16,6 +18,8 @@ import PipelinesPage from './pages/PipelinesPage';
 import PipelineBuilderPage from './pages/PipelineBuilderPage';
 import PipelineDetailsPage from './pages/PipelineDetailsPage';
 import MonitoringPage from './pages/MonitoringPage';
+import NotFoundPage from './pages/NotFoundPage';
+import AboutPage from './pages/AboutPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,56 +42,69 @@ function AppShell() {
       <ErrorBoundary>
         {!isAuthRoute && <Header />}
         <main className={isAuthRoute ? '' : 'mx-auto w-full max-w-7xl px-3 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8'}>
-          <Routes>
-            {/* Public Routes — no header */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
+          <AnimatePresence mode="wait">
+            <Routes location={location} key={location.pathname}>
+              {/* Public Routes — no header */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/signup" element={<SignupPage />} />
+              <Route path="/about" element={<AboutPage />} />
 
-            {/* Protected Routes — with header */}
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <DashboardPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/pipelines"
-              element={
-                <ProtectedRoute>
-                  <PipelinesPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/pipelines/:id"
-              element={
-                <ProtectedRoute>
-                  <PipelineDetailsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/builder"
-              element={
-                <ProtectedRoute>
-                  <PipelineBuilderPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/monitoring"
-              element={
-                <ProtectedRoute>
-                  <MonitoringPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Protected Routes — with header */}
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <PageTransition>
+                      <DashboardPage />
+                    </PageTransition>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/pipelines"
+                element={
+                  <ProtectedRoute>
+                    <PageTransition>
+                      <PipelinesPage />
+                    </PageTransition>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/pipelines/:id"
+                element={
+                  <ProtectedRoute>
+                    <PageTransition>
+                      <PipelineDetailsPage />
+                    </PageTransition>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/builder"
+                element={
+                  <ProtectedRoute>
+                    <PageTransition>
+                      <PipelineBuilderPage />
+                    </PageTransition>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/monitoring"
+                element={
+                  <ProtectedRoute>
+                    <PageTransition>
+                      <MonitoringPage />
+                    </PageTransition>
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Catch-all */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+              {/* Catch-all */}
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </AnimatePresence>
         </main>
       </ErrorBoundary>
     </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, HTMLMotionProps } from 'framer-motion';
+import { motion, type HTMLMotionProps } from 'framer-motion';
 import { cn } from '../../utils/cn';
 import { Loader2 } from 'lucide-react';
 
@@ -59,7 +59,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
       
       {children && (
         <span className={cn(loading && 'opacity-0')}>
-          {children}
+          {children as React.ReactNode}
         </span>
       )}
     </motion.button>

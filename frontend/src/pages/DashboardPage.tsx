@@ -40,13 +40,13 @@ const variantStyles = {
 const StatCard: React.FC<StatCardProps> = ({ title, value, icon, trend, variant }) => {
   const styles = variantStyles[variant];
   return (
-    <div className={`rounded-2xl border p-5 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${styles.card}`}>
+    <div className={`card-hover ${styles.card}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{title}</p>
           <p className="mt-2 text-3xl font-bold text-gray-900">{value}</p>
           {trend && (
-            <span className={`mt-2 inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold ${trend.up ? styles.trend.up : styles.trend.down}`}>
+            <span className={`mt-2 badge ${trend.up ? styles.trend.up : styles.trend.down}`}>
               {trend.up ? '↑' : '↓'} {trend.value}
             </span>
           )}
@@ -71,7 +71,7 @@ interface QuickActionProps {
 
 const QuickAction: React.FC<QuickActionProps> = ({ icon, label, desc, to, onClick, color }) => {
   const content = (
-    <div className="flex flex-col items-center gap-3 rounded-2xl border border-gray-100 bg-white p-5 text-center shadow-sm transition-all duration-200 hover:border-blue-200 hover:shadow-md hover:-translate-y-1 cursor-pointer group">
+    <div className="card-hover flex flex-col items-center gap-3 text-center cursor-pointer group">
       <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${color} shadow-sm transition-transform group-hover:scale-110`}>
         {icon}
       </div>
@@ -320,7 +320,7 @@ const DashboardPage: React.FC = () => {
       {/* ── Two Column: Chart + Activity ──────────────── */}
       <section className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
         {/* Pipeline Status */}
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <div className="card">
           <h2 className="text-lg font-bold text-gray-900">Pipeline Status</h2>
           <p className="mt-0.5 text-xs text-gray-500">Distribution across all pipelines</p>
 
@@ -349,7 +349,7 @@ const DashboardPage: React.FC = () => {
         </div>
 
         {/* Recent Activity */}
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <div className="card">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold text-gray-900">Recent Activity</h2>
@@ -379,11 +379,11 @@ const DashboardPage: React.FC = () => {
                         ? new Date(pipeline.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                         : 'just now'}
                     </span>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                      pipeline.status === 'success' ? 'bg-green-100 text-green-700'
-                      : pipeline.status === 'running' ? 'bg-blue-100 text-blue-700'
-                      : pipeline.status === 'failed' ? 'bg-red-100 text-red-700'
-                      : 'bg-gray-100 text-gray-600'
+                    <span className={`shrink-0 ${
+                      pipeline.status === 'success' ? 'badge-success'
+                      : pipeline.status === 'running' ? 'badge-info'
+                      : pipeline.status === 'failed' ? 'badge-error'
+                      : 'badge-gray'
                     }`}>
                       {meta.label}
                     </span>

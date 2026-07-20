@@ -58,7 +58,7 @@ const PipelineBuilderPage: React.FC = () => {
   return (
     <div className="flex flex-col gap-4 animate-fade-in">
       {/* ── Builder Header ───────────────────────────── */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="card p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <Link
             to="/pipelines"
@@ -77,7 +77,7 @@ const PipelineBuilderPage: React.FC = () => {
                 onChange={(e) => setPipelineName(e.target.value)}
                 onBlur={() => setEditingName(false)}
                 onKeyDown={(e) => e.key === 'Enter' && setEditingName(false)}
-                className="rounded-lg border border-blue-300 bg-white px-3 py-1 text-sm font-bold text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="input px-3 py-1 text-sm font-bold"
                 autoFocus
               />
             ) : (
@@ -100,11 +100,11 @@ const PipelineBuilderPage: React.FC = () => {
 
           {/* Status badge */}
           {currentPipeline && (
-            <span className={`ml-2 text-xs px-2 py-0.5 rounded-full font-medium ${
-              currentPipeline.status === 'running' ? 'bg-yellow-100 text-yellow-800' :
-              currentPipeline.status === 'success' ? 'bg-green-100 text-green-800' :
-              currentPipeline.status === 'failed' ? 'bg-red-100 text-red-800' :
-              'bg-gray-100 text-gray-600'
+            <span className={`ml-2 badge ${
+              currentPipeline.status === 'running' ? 'badge-warning' :
+              currentPipeline.status === 'success' ? 'badge-success' :
+              currentPipeline.status === 'failed' ? 'badge-error' :
+              'badge-gray'
             }`}>
               {currentPipeline.status || 'draft'}
             </span>
@@ -147,7 +147,7 @@ const PipelineBuilderPage: React.FC = () => {
       {/* ── Desktop 3-Panel Layout ───────────────────── */}
       <div className="hidden xl:grid xl:h-[calc(100vh-200px)] xl:grid-cols-[320px_1fr_280px] xl:gap-4">
         {/* Left: Chat Panel */}
-        <div className="flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <div className="card flex flex-col overflow-hidden p-0">
           <div className="flex items-center gap-2 border-b border-gray-100 px-5 py-4">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white">
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -169,12 +169,12 @@ const PipelineBuilderPage: React.FC = () => {
         </div>
 
         {/* Center: Canvas — pass pipelineId */}
-        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <div className="card overflow-hidden p-0">
           <PipelineCanvas pipelineId={pipelineId} />
         </div>
 
         {/* Right: Agents */}
-        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <div className="card overflow-hidden p-0">
           <AgentManagerPanel />
         </div>
       </div>
@@ -201,7 +201,7 @@ const PipelineBuilderPage: React.FC = () => {
         </div>
 
         {/* Panel Content */}
-        <div className="h-[calc(100vh-280px)] min-h-[400px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <div className="card p-0 h-[calc(100vh-280px)] min-h-[400px] overflow-hidden">
           {activePanel === 'chat' && <ChatInterface />}
           {activePanel === 'canvas' && <PipelineCanvas pipelineId={pipelineId} />}
           {activePanel === 'agents' && <AgentManagerPanel />}
