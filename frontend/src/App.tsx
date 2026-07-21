@@ -25,6 +25,9 @@ const AboutPage = lazy(() => import('./pages/AboutPage'));
 const ChangelogPage = lazy(() => import('./pages/ChangelogPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const GettingStartedPage = lazy(() => import('./pages/GettingStartedPage'));
+const TemplatesPage = lazy(() => import('./pages/TemplatesPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -105,6 +108,36 @@ function AppShell() {
                     <ProtectedRoute>
                       <PageTransition>
                         <MonitoringPage />
+                      </PageTransition>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/settings"
+                  element={
+                    <ProtectedRoute>
+                      <PageTransition>
+                        <SettingsPage />
+                      </PageTransition>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/getting-started"
+                  element={
+                    <ProtectedRoute>
+                      <PageTransition>
+                        <GettingStartedPage />
+                      </PageTransition>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/templates"
+                  element={
+                    <ProtectedRoute>
+                      <PageTransition>
+                        <TemplatesPage />
                       </PageTransition>
                     </ProtectedRoute>
                   }

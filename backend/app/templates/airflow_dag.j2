@@ -1,0 +1,51 @@
+from datetime import datetime, timedelta
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from airflow.operators.dummy import DummyOperator
+from airflow.providers.postgres.operators.postgres import PostgresOperator
+from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
+
+default_args = {
+    'owner': 'AIDEN',
+    'depends_on_past': False,
+    'start_date': datetime(2026, 1, 1),
+    'email_on_failure': True,
+    'email_on_retry': False,
+    'retries': 3,
+    'retry_delay': timedelta(minutes=5),
+}
+
+dag = DAG(
+    '{{ pipeline_name }}',
+    default_args=default_args,
+    description='AIDEN generated pipeline',
+    schedule_interval='{{ schedule }}',
+    catchup=False,
+    tags=['aiden', 'generated'],
+)
+
+start = DummyOperator(task_id='start', dag=dag)
+
+# Extract task
+extract = DummyOperator(task_id='extract_{{ source_type }}', dag=dag)
+
+# Transformation tasks
+{% for transform in transformations %}
+transform_{{ loop.index }} = DummyOperator(task_id='transform_{{ transform }}', dag=dag)
+{% endfor %}
+
+# Load task
+load = DummyOperator(task_id='load_{{ destination_type }}', dag=dag)
+
+end = DummyOperator(task_id='end', dag=dag)
+
+# Dependencies
+start >> extract
+
+{% for transform in transformations %}
+extract >> transform_{{ loop.index }} >> load
+{% else %}
+extract >> load
+{% endfor %}
+
+load >> end

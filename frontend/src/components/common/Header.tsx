@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { User, Settings, LogOut } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNotificationStore } from '../../store/notificationStore';
+import { Dropdown } from '../ui/Dropdown';
 import LoadingSpinner from './LoadingSpinner';
 import AmbientFlow from './AmbientFlow';
 import ThemeToggle from './ThemeToggle';
+import type { DropdownItem } from '../ui/Dropdown';
 
 const navItems = [
   {
@@ -68,6 +71,26 @@ const Header: React.FC = () => {
       .toUpperCase();
   };
 
+  const dropdownItems: DropdownItem[] = [
+    {
+      label: 'Profile',
+      icon: <User size={16} />,
+      onClick: () => navigate('/settings'),
+    },
+    {
+      label: 'Settings',
+      icon: <Settings size={16} />,
+      onClick: () => navigate('/settings'),
+    },
+    { label: '', onClick: () => {}, divider: true },
+    {
+      label: 'Logout',
+      icon: <LogOut size={16} />,
+      onClick: handleLogout,
+      danger: true,
+    },
+  ];
+
   return (
     <header className="sticky top-0 z-50 border-b border-gray-200/60 bg-white/95 shadow-sm backdrop-blur-xl">
       {/* Ambient pipeline flow signature */}
@@ -110,6 +133,7 @@ const Header: React.FC = () => {
         {/* Right side actions */}
         <div className="flex items-center gap-2">
           <ThemeToggle />
+
           {/* Notification bell */}
           {isAuthenticated && (
             <button
@@ -128,28 +152,23 @@ const Header: React.FC = () => {
             </button>
           )}
 
-          {/* User profile */}
+          {/* User profile — Dropdown */}
           {isAuthenticated && user ? (
-            <div className="hidden sm:flex items-center gap-2 rounded-xl border border-gray-200 bg-white pl-2 pr-1 py-1 shadow-sm">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-[11px] font-bold text-white">
-                {getInitials(user.full_name || user.username || 'U')}
-              </div>
-              <div className="hidden lg:block max-w-[120px]">
-                <p className="truncate text-xs font-semibold text-gray-900">{user.full_name || user.username}</p>
-                <p className="truncate text-[10px] text-gray-400">{user.email}</p>
-              </div>
-              <button
-                id="header-logout-btn"
-                onClick={handleLogout}
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
-                aria-label="Log out"
-                title="Log out"
-              >
-                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-              </button>
-            </div>
+            <Dropdown
+              trigger={
+                <button className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white pl-2 pr-3 py-1.5 shadow-sm transition-all duration-200 hover:bg-gray-50 hover:shadow-md">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-[11px] font-bold text-white">
+                    {getInitials(user.full_name || user.username || 'U')}
+                  </div>
+                  <span className="hidden text-sm font-semibold text-gray-900 lg:inline max-w-[100px] truncate">
+                    {user.full_name || user.username}
+                  </span>
+                </button>
+              }
+              items={dropdownItems}
+              align="right"
+              className="hidden sm:block"
+            />
           ) : !isAuthenticated ? (
             <div className="flex items-center gap-2">
               <Link to="/login" className="text-sm font-medium text-gray-600 transition-colors hover:text-gray-900">
@@ -219,13 +238,19 @@ const Header: React.FC = () => {
                 </div>
               </div>
             )}
+            <Link
+              to="/settings"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 transition-all hover:bg-gray-100"
+            >
+              <Settings size={16} />
+              Settings
+            </Link>
             <button
               onClick={handleLogout}
               className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-red-600 transition-all hover:bg-red-50"
             >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
+              <LogOut size={16} />
               Log Out
             </button>
           </nav>

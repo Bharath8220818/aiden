@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
+import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Dropdown } from './Dropdown';
 
@@ -19,6 +19,7 @@ describe('Dropdown', () => {
   });
 
   it('shows menu items when trigger is clicked', async () => {
+    const user = userEvent.setup();
     render(
       <Dropdown
         trigger={<button>Open</button>}
@@ -28,49 +29,53 @@ describe('Dropdown', () => {
         ]}
       />
     );
-    await userEvent.click(screen.getByText('Open'));
+    await user.click(screen.getByText('Open'));
     expect(screen.getByText('Profile')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
   });
 
   it('hides menu when Escape key is pressed', async () => {
+    const user = userEvent.setup();
     render(
       <Dropdown
         trigger={<button>Open</button>}
         items={[{ label: 'Item', onClick: () => {} }]}
       />
     );
-    await userEvent.click(screen.getByText('Open'));
+    // Click trigger to open menu
+    await user.click(screen.getByText('Open'));
     expect(screen.getByText('Item')).toBeInTheDocument();
 
-    // Flush effects before dispatching
-    act(() => {
-      fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' });
+    // Press Escape — use waitFor to handle async effect flush timing
+    await user.keyboard('{Escape}');
+    await waitFor(() => {
+      expect(screen.queryByText('Item')).not.toBeInTheDocument();
     });
-    expect(screen.queryByText('Item')).not.toBeInTheDocument();
   });
 
   it('hides menu when clicking outside', async () => {
+    const user = userEvent.setup();
     render(
       <div>
-        <div data-testid="outside">Outside</div>
+        <div data-testid="outside">Outside area</div>
         <Dropdown
           trigger={<button>Open</button>}
           items={[{ label: 'Item', onClick: () => {} }]}
         />
       </div>
     );
-    await userEvent.click(screen.getByText('Open'));
+    await user.click(screen.getByText('Open'));
     expect(screen.getByText('Item')).toBeInTheDocument();
 
-    // Flush effects before dispatching
-    act(() => {
-      fireEvent.mouseDown(screen.getByTestId('outside'));
+    // Click outside — use waitFor to handle async effect flush timing
+    await user.click(screen.getByTestId('outside'));
+    await waitFor(() => {
+      expect(screen.queryByText('Item')).not.toBeInTheDocument();
     });
-    expect(screen.queryByText('Item')).not.toBeInTheDocument();
   });
 
   it('calls onClick when an item is clicked', async () => {
+    const user = userEvent.setup();
     const onClick = vi.fn();
     render(
       <Dropdown
@@ -78,12 +83,13 @@ describe('Dropdown', () => {
         items={[{ label: 'Profile', onClick }]}
       />
     );
-    await userEvent.click(screen.getByText('Open'));
-    await userEvent.click(screen.getByText('Profile'));
+    await user.click(screen.getByText('Open'));
+    await user.click(screen.getByText('Profile'));
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
   it('renders divider when divider prop is true', async () => {
+    const user = userEvent.setup();
     render(
       <Dropdown
         trigger={<button>Open</button>}
@@ -94,13 +100,13 @@ describe('Dropdown', () => {
         ]}
       />
     );
-    await userEvent.click(screen.getByText('Open'));
-    // Divider should render as a horizontal rule element
+    await user.click(screen.getByText('Open'));
     const hr = document.querySelector('.my-1.border-t');
     expect(hr).toBeInTheDocument();
   });
 
   it('disables items when disabled prop is true', async () => {
+    const user = userEvent.setup();
     render(
       <Dropdown
         trigger={<button>Open</button>}
@@ -110,12 +116,13 @@ describe('Dropdown', () => {
         ]}
       />
     );
-    await userEvent.click(screen.getByText('Open'));
+    await user.click(screen.getByText('Open'));
     const disabledBtn = screen.getByText('Disabled').closest('button');
     expect(disabledBtn).toBeDisabled();
   });
 
   it('disabled items do not call onClick when clicked', async () => {
+    const user = userEvent.setup();
     const onClick = vi.fn();
     render(
       <Dropdown
@@ -125,25 +132,26 @@ describe('Dropdown', () => {
         ]}
       />
     );
-    await userEvent.click(screen.getByText('Open'));
-    await userEvent.click(screen.getByText('Disabled'));
+    await user.click(screen.getByText('Open'));
+    await user.click(screen.getByText('Disabled'));
     expect(onClick).not.toHaveBeenCalled();
   });
 
   it('applies danger class to danger item buttons', async () => {
+    const user = userEvent.setup();
     render(
       <Dropdown
         trigger={<button>Open</button>}
         items={[{ label: 'Delete', onClick: () => {}, danger: true }]}
       />
     );
-    await userEvent.click(screen.getByText('Open'));
-    // getByText returns the <span> inside the button, so climb to <button>
+    await user.click(screen.getByText('Open'));
     const deleteBtn = screen.getByText('Delete').closest('button');
     expect(deleteBtn?.className).toContain('text-red-600');
   });
 
   it('renders with align="right"', async () => {
+    const user = userEvent.setup();
     const { container } = render(
       <Dropdown
         trigger={<button>Open</button>}
@@ -151,7 +159,7 @@ describe('Dropdown', () => {
         align="right"
       />
     );
-    await userEvent.click(screen.getByText('Open'));
+    await user.click(screen.getByText('Open'));
     const menu = container.querySelector('.right-0');
     expect(menu).toBeInTheDocument();
   });

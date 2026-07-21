@@ -39,7 +39,7 @@ app.include_router(pipelines.executions_router, prefix="/api/v1/executions", tag
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 
 # WebSocket endpoint
-app.add_api_websocket_route("/api/v1/ws", websocket_endpoint)
+app.add_api_websocket_route("/api/v1/ws/{client_id}", websocket_endpoint)
 
 @app.get("/")
 async def root():
