@@ -29,7 +29,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({ className }) => {
         hover:bg-gray-50 hover:text-gray-700
         dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 
         dark:hover:bg-gray-700 dark:hover:text-gray-200
-        focus:outline-none focus:ring-2 focus:ring-blue-500
+        focus:outline-none focus:ring-2 focus:ring-purple-500
         ${className || ''}
       `}
       aria-label={getLabel()}

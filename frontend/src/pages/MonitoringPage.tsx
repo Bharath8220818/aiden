@@ -84,7 +84,7 @@ const MonitoringPage: React.FC = () => {
       {/* ── Page Header ─────────────────────────────── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-600">Operations</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-purple-600 dark:text-purple-400">Operations</p>
           <h1 className="mt-1 text-2xl font-bold text-gray-900 sm:text-3xl">Monitoring</h1>
           <p className="mt-1 text-sm text-gray-500">Real-time pipeline health, metrics, and alerts.</p>
         </div>
@@ -112,7 +112,7 @@ const MonitoringPage: React.FC = () => {
                 onClick={() => setTimeRange(r)}
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
                   timeRange === r
-                    ? 'bg-blue-600 text-white shadow-sm'
+                    ? 'bg-purple-600 text-white shadow-sm'
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
@@ -222,7 +222,7 @@ const MonitoringPage: React.FC = () => {
                 <span className="text-red-600 font-semibold">{criticalCount} need attention</span>
               </p>
             </div>
-            <Link to="/pipelines" className="text-xs font-semibold text-blue-600 hover:text-blue-700">
+            <Link to="/pipelines" className="text-xs font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400">
               Manage →
             </Link>
           </div>

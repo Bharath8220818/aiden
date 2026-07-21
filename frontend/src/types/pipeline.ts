@@ -15,6 +15,8 @@ export interface Pipeline {
   updated_at?: string;
   last_run_at?: string;
   code?: string;
+  dbt_code?: string;
+  tests?: string[];
 }
 
 export interface PipelineExecution {
@@ -24,9 +26,11 @@ export interface PipelineExecution {
   started_at: string;
   completed_at?: string;
   duration?: number;
+  duration_seconds?: number;
   logs?: string[];
   error_message?: string;
   records_processed?: number;
+  triggered_by?: string;
 }
 
 export interface PipelineCreateRequest {

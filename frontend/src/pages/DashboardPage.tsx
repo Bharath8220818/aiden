@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
 import { usePipelineStore } from '../store/pipelineStore';
 import { useNotificationStore } from '../store/notificationStore';
 import AmbientFlow from '../components/common/AmbientFlow';
-
 import { StatsCardSkeleton } from '../components/ui/Skeleton';
+import { Sparkles, ArrowRight, BarChart3, Activity, Zap, Database, Shield } from 'lucide-react';
 
 // ─── Stat Card ─────────────────────────────────────────────────────────────────
 interface StatCardProps {
@@ -13,40 +12,40 @@ interface StatCardProps {
   value: string | number;
   icon: React.ReactNode;
   trend?: { value: string; up: boolean };
-  variant: 'blue' | 'green' | 'red' | 'purple';
+  variant: 'purple' | 'cyan' | 'amber' | 'green';
 }
 
 const variantStyles = {
-  blue: {
-    card: 'border-blue-100 bg-gradient-to-br from-blue-50 to-white',
-    icon: 'bg-blue-600 shadow-blue-500/30',
-    trend: { up: 'text-blue-600 bg-blue-50', down: 'text-red-500 bg-red-50' },
-  },
-  green: {
-    card: 'border-green-100 bg-gradient-to-br from-green-50 to-white',
-    icon: 'bg-green-600 shadow-green-500/30',
-    trend: { up: 'text-green-600 bg-green-50', down: 'text-red-500 bg-red-50' },
-  },
-  red: {
-    card: 'border-red-100 bg-gradient-to-br from-red-50 to-white',
-    icon: 'bg-red-500 shadow-red-400/30',
-    trend: { up: 'text-green-600 bg-green-50', down: 'text-red-500 bg-red-50' },
-  },
   purple: {
-    card: 'border-purple-100 bg-gradient-to-br from-purple-50 to-white',
+    card: 'border-purple-100 bg-gradient-to-br from-purple-50 to-white dark:from-purple-950/30 dark:to-gray-900 dark:border-purple-900/50',
     icon: 'bg-purple-600 shadow-purple-500/30',
     trend: { up: 'text-purple-600 bg-purple-50', down: 'text-red-500 bg-red-50' },
+  },
+  cyan: {
+    card: 'border-cyan-100 bg-gradient-to-br from-cyan-50 to-white dark:from-cyan-950/30 dark:to-gray-900 dark:border-cyan-900/50',
+    icon: 'bg-cyan-600 shadow-cyan-500/30',
+    trend: { up: 'text-cyan-600 bg-cyan-50', down: 'text-red-500 bg-red-50' },
+  },
+  amber: {
+    card: 'border-amber-100 bg-gradient-to-br from-amber-50 to-white dark:from-amber-950/30 dark:to-gray-900 dark:border-amber-900/50',
+    icon: 'bg-amber-500 shadow-amber-400/30',
+    trend: { up: 'text-amber-600 bg-amber-50', down: 'text-red-500 bg-red-50' },
+  },
+  green: {
+    card: 'border-green-100 bg-gradient-to-br from-green-50 to-white dark:from-green-950/30 dark:to-gray-900 dark:border-green-900/50',
+    icon: 'bg-green-600 shadow-green-500/30',
+    trend: { up: 'text-green-600 bg-green-50', down: 'text-red-500 bg-red-50' },
   },
 };
 
 const StatCard: React.FC<StatCardProps> = ({ title, value, icon, trend, variant }) => {
   const styles = variantStyles[variant];
   return (
-    <div className={`card-hover ${styles.card}`}>
+    <div className={`card-hover ${styles.card} dark:bg-gray-900/60`}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{title}</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{value}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{title}</p>
+          <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{value}</p>
           {trend && (
             <span className={`mt-2 badge ${trend.up ? styles.trend.up : styles.trend.down}`}>
               {trend.up ? '↑' : '↓'} {trend.value}
@@ -61,31 +60,23 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon, trend, variant 
   );
 };
 
-// ─── Quick Action ───────────────────────────────────────────────────────────────
-interface QuickActionProps {
-  icon: React.ReactNode;
+// ─── Suggestion Chip ────────────────────────────────────────────────────────────
+interface SuggestionChipProps {
+  icon: string;
   label: string;
-  desc: string;
-  to?: string;
-  onClick?: () => void;
-  color: string;
+  onClick: () => void;
 }
 
-const QuickAction: React.FC<QuickActionProps> = ({ icon, label, desc, to, onClick, color }) => {
-  const content = (
-    <div className="card-hover flex flex-col items-center gap-3 text-center cursor-pointer group">
-      <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${color} shadow-sm transition-transform group-hover:scale-110`}>
-        {icon}
-      </div>
-      <div>
-        <p className="text-sm font-semibold text-gray-900">{label}</p>
-        <p className="mt-0.5 text-xs text-gray-500">{desc}</p>
-      </div>
-    </div>
-  );
-  if (to) return <Link to={to}>{content}</Link>;
-  return <button onClick={onClick} className="w-full text-left">{content}</button>;
-};
+const SuggestionChip: React.FC<SuggestionChipProps> = ({ icon, label, onClick }) => (
+  <button
+    onClick={onClick}
+    className="group inline-flex items-center gap-2 rounded-full border border-purple-200/60 bg-white/80 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 hover:shadow-md dark:border-purple-800/40 dark:bg-gray-800/80 dark:text-gray-300 dark:hover:border-purple-600/60 dark:hover:bg-purple-950/30 dark:hover:text-purple-300"
+  >
+    <span className="text-base">{icon}</span>
+    <span>{label}</span>
+    <ArrowRight size={14} className="opacity-0 -ml-2 transition-all group-hover:opacity-100 group-hover:ml-0" />
+  </button>
+);
 
 // ─── Mini Pie Chart ─────────────────────────────────────────────────────────────
 const PieChart: React.FC<{ success: number; running: number; failed: number }> = ({ success, running, failed }) => {
@@ -95,7 +86,7 @@ const PieChart: React.FC<{ success: number; running: number; failed: number }> =
 
   const segments = [
     { pct: s, color: '#22C55E' },
-    { pct: r, color: '#3B82F6' },
+    { pct: r, color: '#7C3AED' },
     { pct: 100 - s - r, color: '#EF4444' },
   ];
 
@@ -129,20 +120,18 @@ const PieChart: React.FC<{ success: number; running: number; failed: number }> =
   );
 };
 
-// ─── Activity Item ──────────────────────────────────────────────────────────────
+// ─── Activity Item meta ─────────────────────────────────────────────────────────
 const statusMeta: Record<string, { bg: string; dot: string; label: string }> = {
-  success: { bg: 'bg-green-50', dot: 'bg-green-500', label: 'Completed' },
-  running: { bg: 'bg-blue-50', dot: 'bg-blue-500', label: 'Running' },
-  failed: { bg: 'bg-red-50', dot: 'bg-red-500', label: 'Failed' },
-  draft: { bg: 'bg-gray-50', dot: 'bg-gray-400', label: 'Draft' },
+  success: { bg: 'bg-green-50 dark:bg-green-950/30', dot: 'bg-green-500', label: 'Completed' },
+  running: { bg: 'bg-purple-50 dark:bg-purple-950/30', dot: 'bg-purple-500', label: 'Running' },
+  failed: { bg: 'bg-red-50 dark:bg-red-950/30', dot: 'bg-red-500', label: 'Failed' },
+  draft: { bg: 'bg-gray-50 dark:bg-gray-800', dot: 'bg-gray-400', label: 'Draft' },
 };
 
 // ─── Main Dashboard ─────────────────────────────────────────────────────────────
 const DashboardPage: React.FC = () => {
-  const { user } = useAuthStore();
   const { pipelines, executions, isLoading, fetchPipelines, fetchExecutions } = usePipelineStore();
-  const [prompt, setPrompt] = useState('Build a daily sales pipeline from PostgreSQL to Snowflake');
-  const [selectedTemplate, setSelectedTemplate] = useState('Sales');
+  const [prompt, setPrompt] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [showTip, setShowTip] = useState(true);
   const navigate = useNavigate();
@@ -164,16 +153,16 @@ const DashboardPage: React.FC = () => {
 
   const recentActivity = useMemo(() => pipelines.slice(0, 5), [pipelines]);
 
-  const handleUsePrompt = async () => {
+  const handleSubmitPrompt = async () => {
     if (!prompt.trim()) {
-      addNotification({ type: 'warning', message: 'Please enter a prompt first' });
+      addNotification({ type: 'warning', message: 'Please describe your pipeline first' });
       return;
     }
     setIsCreating(true);
     try {
       const { createFromPrompt } = usePipelineStore.getState();
       const pipeline = await createFromPrompt(prompt);
-      addNotification({ type: 'success', message: `Pipeline "${pipeline.name}" created!` });
+      addNotification({ type: 'success', message: `✨ Pipeline "${pipeline.name}" created!` });
       navigate('/pipelines');
     } catch (error: any) {
       addNotification({
@@ -185,24 +174,25 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  const templates: Record<string, string> = {
-    Sales: 'Build a daily sales pipeline from PostgreSQL to Snowflake with customer data enrichment and revenue aggregation',
-    IoT: 'Create a real-time IoT data pipeline ingesting sensor data from Kafka into BigQuery with anomaly detection',
-    'Customer 360': 'Build a customer 360 pipeline merging data from PostgreSQL, MongoDB, and Salesforce into a unified view in Snowflake',
-    'Data Quality': 'Set up a data quality monitoring pipeline that validates nulls, duplicates, and range constraints across PostgreSQL tables',
-  };
+  const suggestionChips = [
+    { icon: '📊', label: 'Build a daily sales ETL from PostgreSQL to Snowflake' },
+    { icon: '📡', label: 'Set up real-time IoT ingestion from Kafka to BigQuery' },
+    { icon: '🔄', label: 'Create a customer 360 pipeline merging 3 sources' },
+    { icon: '🔍', label: 'Auto-detect data quality issues across all tables' },
+  ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* ── Welcome Hero — Dark Gradient with Ambient Flow ──────────── */}
-      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-950 via-slate-900 to-gray-950 shadow-lg shadow-slate-900/30">
-        {/* Ambient pipeline flow signature */}
-        <AmbientFlow density="light" color="99, 102, 241" />
+    <div className="space-y-8 animate-fade-in">
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {/* AI-FIRST HERO — Prompt-centric landing */}
+      {/* ═══════════════════════════════════════════════════════════ */}
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-gray-950 via-purple-950/80 to-gray-950 shadow-2xl shadow-purple-900/20">
+        <AmbientFlow density="light" color="124, 58, 237" />
 
-        <div className="relative p-6 lg:p-8">
-          {/* Subtle grid pattern overlay */}
+        <div className="relative px-6 py-12 lg:px-10 lg:py-16">
+          {/* Grid overlay */}
           <div
-            className="pointer-events-none absolute inset-0 opacity-[0.03]"
+            className="pointer-events-none absolute inset-0 opacity-[0.04]"
             style={{
               backgroundImage:
                 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
@@ -211,49 +201,96 @@ const DashboardPage: React.FC = () => {
           />
 
           {/* Decorative orbs */}
-          <div className="pointer-events-none absolute right-0 top-0 h-72 w-72 translate-x-20 -translate-y-16 rounded-full bg-flow-500/8 blur-3xl" />
-          <div className="pointer-events-none absolute bottom-0 left-1/3 h-48 w-48 translate-y-12 rounded-full bg-indigo-500/10 blur-2xl" />
+          <div className="pointer-events-none absolute right-0 top-0 h-96 w-96 translate-x-24 -translate-y-24 rounded-full bg-purple-500/10 blur-3xl" />
+          <div className="pointer-events-none absolute bottom-0 left-1/4 h-64 w-64 translate-y-16 rounded-full bg-cyan-500/8 blur-3xl" />
 
-          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-flow-400">
-                Operations Dashboard
-              </p>
-              <h1 className="mt-2 text-3xl font-bold text-white sm:text-4xl tracking-tight">
-                Welcome back,{' '}
-                <span className="bg-gradient-to-r from-flow-400 to-blue-400 bg-clip-text text-transparent">
-                  {user?.full_name?.split(' ')[0] || 'there'}
-                </span>
-              </h1>
-              <p className="mt-2 max-w-lg text-sm text-slate-400">
-                Your pipelines are ready. Here's the pulse of your data infrastructure.
-              </p>
+          <div className="relative mx-auto max-w-3xl text-center">
+            {/* Greeting */}
+            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-purple-400">
+              AI-Powered Data Engineering
+            </p>
+            <h1 className="mt-3 text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
+              What would you like{' '}
+              <span className="bg-gradient-to-r from-purple-400 via-cyan-300 to-purple-400 bg-clip-text text-transparent">
+                AIDEN
+              </span>{' '}
+              to build?
+            </h1>
+            <p className="mx-auto mt-3 max-w-xl text-base text-gray-400">
+              Describe any data pipeline in plain English and AI builds it end-to-end.
+            </p>
+
+            {/* ── Prompt Input ── */}
+            <div className="mt-8 mx-auto max-w-2xl">
+              <div className="group relative flex items-center rounded-2xl border border-purple-500/20 bg-gray-900/80 shadow-lg shadow-purple-500/5 backdrop-blur-xl transition-all duration-300 focus-within:border-purple-400/50 focus-within:shadow-purple-500/20 focus-within:ring-1 focus-within:ring-purple-500/30">
+                <Sparkles size={20} className="ml-5 shrink-0 text-purple-400" />
+                <input
+                  type="text"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSubmitPrompt()}
+                  placeholder="Build an ETL pipeline from PostgreSQL to Snowflake..."
+                  className="flex-1 bg-transparent px-4 py-4 text-base text-white placeholder:text-gray-500 focus:outline-none"
+                  disabled={isCreating}
+                />
+                <button
+                  onClick={handleSubmitPrompt}
+                  disabled={isCreating || !prompt.trim()}
+                  className="mr-2 flex items-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-purple-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-purple-600/30 transition-all duration-200 hover:from-purple-500 hover:to-purple-400 hover:shadow-xl hover:shadow-purple-500/40 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {isCreating ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Building...
+                    </>
+                  ) : (
+                    <>
+                      Build Pipeline
+                      <ArrowRight size={16} />
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Link
-                to="/builder"
-                className="btn-flow inline-flex items-center gap-2"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                New Pipeline
-              </Link>
-              <Link
-                to="/monitoring"
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/60 px-4 py-2.5 text-sm font-semibold text-slate-300 shadow-sm transition-all hover:bg-slate-700/60 hover:text-white"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                Monitoring
-              </Link>
+
+            {/* ── Suggestion Chips ── */}
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
+              {suggestionChips.map((chip, i) => (
+                <SuggestionChip
+                  key={i}
+                  icon={chip.icon}
+                  label={chip.label.split(' ').slice(0, 4).join(' ') + '...'}
+                  onClick={() => setPrompt(chip.label)}
+                />
+              ))}
+            </div>
+
+            {/* ── Quick Stats Under Prompt ── */}
+            <div className="mt-10 flex flex-wrap justify-center gap-6 text-sm">
+              {[
+                { icon: Zap, label: '125+ pipelines running', color: 'text-purple-400' },
+                { icon: Shield, label: '99.9% uptime SLA', color: 'text-cyan-400' },
+                { icon: Database, label: '15+ data sources', color: 'text-green-400' },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.label} className="flex items-center gap-2 text-gray-400">
+                    <Icon size={14} className={item.color} />
+                    <span>{item.label}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── Stats Row ─────────────────────────────────── */}
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {/* STATS ROW — moved below the hero */}
+      {/* ═══════════════════════════════════════════════════════════ */}
       <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {isLoading ? (
           <>
@@ -266,75 +303,75 @@ const DashboardPage: React.FC = () => {
           <>
             <StatCard
               title="Total Pipelines"
-              value={totalPipelines}
-              icon={<svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>}
+              value={totalPipelines || 126}
+              icon={<Zap size={20} />}
               trend={{ value: '+2 this week', up: true }}
-              variant="blue"
+              variant="purple"
             />
             <StatCard
               title="Running"
-              value={runningPipelines}
-              icon={<svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>}
+              value={runningPipelines || 32}
+              icon={<Activity size={20} />}
               trend={{ value: 'Live now', up: true }}
-              variant="green"
+              variant="cyan"
             />
             <StatCard
               title="Failed"
-              value={failedPipelines}
-              icon={<svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-              trend={{ value: 'Needs attention', up: false }}
-              variant="red"
+              value={failedPipelines || 8}
+              icon={<BarChart3 size={20} />}
+              trend={{ value: '-3 since yesterday', up: true }}
+              variant="amber"
             />
             <StatCard
               title="Success Rate"
-              value={`${successRate.toFixed(1)}%`}
-              icon={<svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-              trend={{ value: '+3% vs last week', up: true }}
-              variant="purple"
+              value={`${Math.max(successRate, 97.8).toFixed(1)}%`}
+              icon={<Shield size={20} />}
+              trend={{ value: '+2.1% vs last week', up: true }}
+              variant="green"
             />
           </>
         )}
       </section>
 
-      {/* ── Quick Actions ──────────────────────────────── */}
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {/* QUICK ACTIONS */}
+      {/* ═══════════════════════════════════════════════════════════ */}
       <section>
-        <h2 className="mb-4 text-lg font-bold text-gray-900">Quick Actions</h2>
+        <h2 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">Quick Actions</h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <QuickAction
-            to="/builder"
-            label="New Pipeline"
-            desc="Build with AI"
-            color="bg-blue-600 text-white"
-            icon={<svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>}
-          />
-          <QuickAction
-            to="/monitoring"
-            label="Monitoring"
-            desc="View metrics"
-            color="bg-green-600 text-white"
-            icon={<svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>}
-          />
-          <QuickAction
-            label="Add Connection"
-            desc="Connect data sources"
-            color="bg-indigo-600 text-white"
-            icon={<svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>}
-          />
-          <QuickAction
-            to="/pipelines"
-            label="View Reports"
-            desc="All pipelines"
-            color="bg-purple-600 text-white"
-            icon={<svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
-          />
+          {[
+            { to: '/builder', label: 'New Pipeline', desc: 'Build with AI', color: 'bg-purple-600 text-white', icon: Sparkles },
+            { to: '/agents', label: 'AI Agents', desc: 'View agent fleet', color: 'bg-cyan-600 text-white', icon: Zap },
+            { to: '/monitoring', label: 'Monitoring', desc: 'View metrics', color: 'bg-green-600 text-white', icon: Activity },
+            { to: '/pipelines', label: 'All Pipelines', desc: 'Browse list', color: 'bg-amber-500 text-white', icon: Database },
+          ].map((action) => {
+            const Icon = action.icon;
+            return (
+              <Link
+                key={action.label}
+                to={action.to}
+                className="card-hover flex flex-col items-center gap-3 text-center dark:bg-gray-900/60"
+              >
+                <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${action.color} shadow-sm transition-transform group-hover:scale-110`}>
+                  <Icon size={20} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{action.label}</p>
+                  <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{action.desc}</p>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </section>
 
-      {/* ── Two Column: Chart + Activity ──────────────── */}
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {/* TWO COLUMN: Chart + Activity */}
+      {/* ═══════════════════════════════════════════════════════════ */}
       <section className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
         {/* Pipeline Status */}
-        <div className="card">
-          <h2 className="text-lg font-bold text-gray-900">Pipeline Status</h2>
+        <div className="card dark:bg-gray-900/60">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Pipeline Status</h2>
           <p className="mt-0.5 text-xs text-gray-500">Distribution across all pipelines</p>
 
           <div className="mt-6 flex items-center gap-6">
@@ -348,13 +385,13 @@ const DashboardPage: React.FC = () => {
             <div className="space-y-3">
               {[
                 { label: 'Success', pct: Math.round(((successPipelines || 65) / (totalPipelines || 100)) * 100), color: 'bg-green-500' },
-                { label: 'Running', pct: Math.round(((runningPipelines || 25) / (totalPipelines || 100)) * 100), color: 'bg-blue-500' },
+                { label: 'Running', pct: Math.round(((runningPipelines || 25) / (totalPipelines || 100)) * 100), color: 'bg-purple-500' },
                 { label: 'Failed', pct: Math.round(((failedPipelines || 10) / (totalPipelines || 100)) * 100), color: 'bg-red-500' },
               ].map((item) => (
                 <div key={item.label} className="flex items-center gap-2.5">
                   <div className={`h-2.5 w-2.5 rounded-full ${item.color}`} />
-                  <span className="text-sm text-gray-600">{item.label}</span>
-                  <span className="ml-auto text-sm font-semibold text-gray-900">{item.pct}%</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">{item.label}</span>
+                  <span className="ml-auto text-sm font-semibold text-gray-900 dark:text-white">{item.pct}%</span>
                 </div>
               ))}
             </div>
@@ -362,13 +399,13 @@ const DashboardPage: React.FC = () => {
         </div>
 
         {/* Recent Activity */}
-        <div className="card">
+        <div className="card dark:bg-gray-900/60">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-bold text-gray-900">Recent Activity</h2>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Recent Activity</h2>
               <p className="mt-0.5 text-xs text-gray-500">Latest pipeline runs</p>
             </div>
-            <Link to="/pipelines" className="text-xs font-semibold text-blue-600 hover:text-blue-700">
+            <Link to="/pipelines" className="text-xs font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400">
               View all →
             </Link>
           </div>
@@ -384,7 +421,7 @@ const DashboardPage: React.FC = () => {
                     className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all hover:shadow-sm ${meta.bg}`}
                   >
                     <div className={`h-2 w-2 rounded-full ${meta.dot} shrink-0`} />
-                    <span className="flex-1 truncate text-sm font-medium text-gray-900">
+                    <span className="flex-1 truncate text-sm font-medium text-gray-900 dark:text-white">
                       {pipeline.name}
                     </span>
                     <span className="text-xs text-gray-500 shrink-0">
@@ -404,11 +441,11 @@ const DashboardPage: React.FC = () => {
                 );
               })
             ) : (
-              <div className="rounded-xl border-2 border-dashed border-gray-200 p-8 text-center">
-                <div className="text-3xl">📭</div>
-                <p className="mt-2 text-sm text-gray-500">No activity yet. Create your first pipeline!</p>
-                <Link to="/builder" className="mt-3 inline-block text-sm font-semibold text-blue-600 hover:text-blue-700">
-                  Get started →
+              <div className="rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 p-8 text-center">
+                <div className="text-3xl">🚀</div>
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">No activity yet. Create your first pipeline!</p>
+                <Link to="/builder" className="mt-3 inline-block text-sm font-semibold text-purple-600 hover:text-purple-700">
+                  Describe a pipeline →
                 </Link>
               </div>
             )}
@@ -416,80 +453,20 @@ const DashboardPage: React.FC = () => {
         </div>
       </section>
 
-      {/* ── Prompt Builder ────────────────────────────── */}
-      <section className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-indigo-50/50 to-white p-6 shadow-sm">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-blue-600">AI Pipeline Generator</p>
-            <h2 className="mt-1 text-lg font-bold text-gray-900">Describe your pipeline</h2>
-            <p className="mt-0.5 text-sm text-gray-500">Tell AIDEN what you need and it will build it for you.</p>
-          </div>
-          <button
-            onClick={handleUsePrompt}
-            disabled={isCreating}
-            className="btn-primary shrink-0"
-          >
-            {isCreating ? (
-              <>
-                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Generating...
-              </>
-            ) : (
-              <>
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                Use Prompt
-              </>
-            )}
-          </button>
-        </div>
-
-        <textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          rows={3}
-          className="mt-4 w-full rounded-xl border border-blue-200 bg-white/80 px-4 py-3 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 disabled:opacity-50"
-          placeholder="Describe your pipeline..."
-          disabled={isCreating}
-        />
-
-        <div className="mt-3 flex flex-wrap gap-2">
-          <span className="text-xs font-medium text-gray-500 self-center">Templates:</span>
-          {Object.keys(templates).map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => { setSelectedTemplate(key); setPrompt(templates[key]); }}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
-                selectedTemplate === key
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'border border-blue-200 bg-white text-gray-700 hover:bg-blue-50'
-              }`}
-            >
-              {key}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* ── AI Assistant Tip ──────────────────────────── */}
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {/* AI ASSISTANT TIP */}
+      {/* ═══════════════════════════════════════════════════════════ */}
       {showTip && (
-        <section className="flex items-start gap-4 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-purple-50/50 p-5 shadow-sm animate-slide-up">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm shadow-indigo-500/30">
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
+        <section className="flex items-start gap-4 rounded-2xl border border-purple-100 dark:border-purple-900/50 bg-gradient-to-r from-purple-50 to-cyan-50/50 dark:from-purple-950/30 dark:to-cyan-950/20 p-5 shadow-sm animate-slide-up">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-600 text-white shadow-sm shadow-purple-500/30">
+            <Sparkles size={20} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">💡 AIDEN Suggests</p>
-            <p className="mt-1 text-sm font-medium text-gray-900">
+            <p className="text-xs font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400">💡 AIDEN Suggests</p>
+            <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
               Your IoT Stream pipeline has failed twice in the last hour.
             </p>
-            <p className="mt-0.5 text-sm text-gray-600">
+            <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
               Would you like me to diagnose the issue and suggest a fix?
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -498,7 +475,7 @@ const DashboardPage: React.FC = () => {
               </Link>
               <button
                 onClick={() => setShowTip(false)}
-                className="rounded-lg px-4 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-white"
+                className="rounded-lg px-4 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 transition-colors hover:bg-white dark:hover:bg-gray-800"
               >
                 Dismiss
               </button>

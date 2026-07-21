@@ -75,7 +75,7 @@ const PipelinesPage: React.FC = () => {
       {/* ── Page Header ─────────────────────────────── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-600">Operations Center</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-purple-600 dark:text-purple-400">Operations Center</p>
           <h1 className="mt-1 text-2xl font-bold text-gray-900 sm:text-3xl">Pipelines</h1>
           <p className="mt-1 text-sm text-gray-500">
             {filteredPipelines.length} pipeline{filteredPipelines.length !== 1 ? 's' : ''} found
@@ -349,7 +349,7 @@ const PipelinesPage: React.FC = () => {
                     onClick={() => setCurrentPage(page)}
                     className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold transition-all ${
                       currentPage === page
-                        ? 'bg-blue-600 text-white shadow-sm'
+                        ? 'bg-purple-600 text-white shadow-sm'
                         : 'text-gray-600 hover:bg-gray-100'
                     }`}
                   >
