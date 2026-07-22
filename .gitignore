@@ -28,6 +28,13 @@ backend/venv/
 # ---------------------------
 logs/
 *.log
+
+# ---------------------------
+# Windows reserved names
+# ---------------------------
+nul
+NUL
+Nul
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -39,6 +46,12 @@ pnpm-debug.log*
 .env
 .env.local
 .env.*.local
+credentials/
+
+# ---------------------------
+# Model cache (HuggingFace downloads)
+# ---------------------------
+models/cache/
 
 # ---------------------------
 # Node / Frontend
@@ -72,6 +85,3 @@ Thumbs.db
 # ---------------------------
 *.pid
 *.seed
-
-docs / superpowers / plans
-*.md

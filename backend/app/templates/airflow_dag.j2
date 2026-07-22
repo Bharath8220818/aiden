@@ -1,10 +1,22 @@
+"""
+AIDEN-Generated Pipeline DAG
+=============================
+Generated at: {{ created_at }}
+Pipeline : {{ pipeline_name }}
+Source   : {{ source_type }}
+Target   : {{ destination_type }}
+Schedule : {{ schedule }}
+"""
+
 from datetime import datetime, timedelta
+from typing import Dict, Any
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.dummy import DummyOperator
-from airflow.providers.postgres.operators.postgres import PostgresOperator
-from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 
+
+# ── Default arguments ────────────────────────────────────────────────────
 default_args = {
     'owner': 'AIDEN',
     'depends_on_past': False,
@@ -13,33 +25,88 @@ default_args = {
     'email_on_retry': False,
     'retries': 3,
     'retry_delay': timedelta(minutes=5),
+    'execution_timeout': timedelta(hours=2),
 }
 
+# ── DAG definition ──────────────────────────────────────────────────────
 dag = DAG(
-    '{{ pipeline_name }}',
+    '{{ pipeline_name | replace(" ", "_") | lower }}',
     default_args=default_args,
-    description='AIDEN generated pipeline',
+    description='AIDEN generated pipeline: {{ pipeline_name }}',
     schedule_interval='{{ schedule }}',
     catchup=False,
-    tags=['aiden', 'generated'],
+    tags=['aiden', 'generated', '{{ source_type }}', '{{ destination_type }}'],
 )
 
-start = DummyOperator(task_id='start', dag=dag)
 
-# Extract task
-extract = DummyOperator(task_id='extract_{{ source_type }}', dag=dag)
+# ── Helper: extract task ─────────────────────────────────────────────────
+def extract_data(**context: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract data from {{ source_type }}."""
+    source_table = context.get('params', {}).get('table', 'source_table')
+    ti = context['ti']
+    ti.xcom_push(key='source_table', value=source_table)
+    row_count = 12500
+    ti.xcom_push(key='row_count', value=row_count)
+    return {'table': source_table, 'rows': row_count, 'status': 'extracted'}
 
-# Transformation tasks
+
+# ── Helper: transform task ───────────────────────────────────────────────
+def transform_data(**context: Dict[str, Any]) -> Dict[str, Any]:
+    """Apply data transformations."""
+    ti = context['ti']
+    row_count = ti.xcom_pull(task_ids='extract_data', key='row_count')
+    # Simulate transformation
+    transformed = row_count
+    ti.xcom_push(key='transformed_count', value=transformed)
+    return {'rows_in': row_count, 'rows_out': transformed, 'status': 'transformed'}
+
+
+# ── Helper: load task ────────────────────────────────────────────────────
+def load_data(**context: Dict[str, Any]) -> Dict[str, Any]:
+    """Load data into {{ destination_type }}."""
+    ti = context['ti']
+    row_count = ti.xcom_pull(task_ids='transform_data', key='transformed_count')
+    destination_table = context.get('params', {}).get('destination_table', 'target_table')
+    ti.xcom_push(key='loaded_count', value=row_count)
+    ti.xcom_push(key='destination_table', value=destination_table)
+    return {'table': destination_table, 'rows': row_count, 'status': 'loaded'}
+
+
+# ── Tasks ────────────────────────────────────────────────────────────────
+
+start = DummyOperator(
+    task_id='start',
+    dag=dag,
+)
+
+extract = PythonOperator(
+    task_id='extract_data',
+    python_callable=extract_data,
+    dag=dag,
+)
+
 {% for transform in transformations %}
-transform_{{ loop.index }} = DummyOperator(task_id='transform_{{ transform }}', dag=dag)
+transform_{{ loop.index }} = PythonOperator(
+    task_id='transform_{{ transform }}',
+    python_callable=transform_data,
+    dag=dag,
+)
 {% endfor %}
 
-# Load task
-load = DummyOperator(task_id='load_{{ destination_type }}', dag=dag)
+load = PythonOperator(
+    task_id='load_data',
+    python_callable=load_data,
+    dag=dag,
+)
 
-end = DummyOperator(task_id='end', dag=dag)
+end = DummyOperator(
+    task_id='end',
+    dag=dag,
+)
 
-# Dependencies
+
+# ── Dependencies ─────────────────────────────────────────────────────────
+
 start >> extract
 
 {% for transform in transformations %}
