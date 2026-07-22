@@ -1,31 +1,68 @@
-"""HuggingFace service with graceful fallback when dependencies are unavailable."""
+"""
+Hugging Face Service — Real LLM Integration
+============================================
+Handles model loading, 4-bit quantization, pipelines, embeddings, and
+fine-tuned model support via PEFT. Singleton pattern with graceful
+fallback when dependencies are unavailable.
+
+Architecture:
+    ┌──────────────────────┐
+    │  HuggingFaceService  │  (Singleton)
+    │  ┌────────────────┐  │
+    │  │ model cache     │  │  AutoModelForCausalLM instances
+    │  │ pipeline cache  │  │  text-generation, etc.
+    │  │ embedding model │  │  SentenceTransformer for RAG
+    │  └────────────────┘  │
+    └──────────────────────┘
+"""
 
 import logging
 import os
-from typing import Optional
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+# ── Conditional imports ────────────────────────────────────────────────
 try:
     import torch
-    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, pipeline
+    from peft import PeftModel
+    from sentence_transformers import SentenceTransformer
+    from transformers import (
+        AutoModelForCausalLM,
+        AutoTokenizer,
+        BitsAndBytesConfig,
+        pipeline as hf_pipeline,
+    )
     HF_AVAILABLE = True
-except ImportError:
+except ImportError as exc:
     torch = None
-    AutoModelForCausalLM = AutoTokenizer = BitsAndBytesConfig = pipeline = None
+    PeftModel = SentenceTransformer = None
+    AutoModelForCausalLM = AutoTokenizer = BitsAndBytesConfig = hf_pipeline = None
     HF_AVAILABLE = False
-    logger.warning("HuggingFace dependencies not installed — running in fallback mode")
+    HF_IMPORT_ERROR = exc
 
 
 class HuggingFaceService:
     """
-    Centralized HuggingFace service for model loading and inference.
-    Supports 4-bit quantization for memory efficiency.
-    Singleton pattern — one instance shared across the app.
+    Centralized HuggingFace service with:
+    - 4-bit quantization for memory efficiency
+    - Model caching to avoid re-downloading
+    - Pipeline creation for various tasks
+    - Embedding generation for RAG via sentence-transformers
+    - Fine-tuned (PEFT/LoRA) model support
+    - Graceful fallback when models fail
 
-    Gracefully degrades when transformers/torch are not installed.
+    Usage:
+        from app.services.hf_service import hf_service
+
+        # Get embeddings for RAG
+        vectors = hf_service.get_embeddings("some text")
+
+        # Create a text-generation pipeline
+        pipe = hf_service.create_pipeline("text-generation", "meta-llama/Llama-3.2-3B-Instruct")
+        result = pipe("Build a pipeline", max_new_tokens=100)
     """
 
     _instance = None
@@ -40,49 +77,109 @@ class HuggingFaceService:
             return
         self._initialized = True
 
-        self.models = {}
-        self.tokenizers = {}
-        self.pipelines = {}
-        self._available = HF_AVAILABLE
+        self.models: Dict[str, Any] = {}
+        self.tokenizers: Dict[str, Any] = {}
+        self.pipelines: Dict[str, Any] = {}
+        self.embeddings_model: Optional[SentenceTransformer] = None
+        self._available = False
 
         # Ensure cache directory exists
         os.makedirs(settings.HF_CACHE_DIR, exist_ok=True)
 
-        if HF_AVAILABLE:
+        if not HF_AVAILABLE:
+            logger.warning(
+                "HuggingFace dependencies not fully installed (%s). "
+                "The service will run in fallback mode.",
+                getattr(HF_IMPORT_ERROR, "__name__", "unknown"),
+            )
+            return
+
+        # 4-bit quantization config
+        try:
             self.quant_config = BitsAndBytesConfig(
                 load_in_4bit=settings.USE_4BIT_QUANTIZATION,
                 bnb_4bit_compute_dtype=torch.float16,
                 bnb_4bit_use_double_quant=True,
             )
-            logger.info("HuggingFaceService initialized (HF available)")
-        else:
-            self.quant_config = None
-            logger.info("HuggingFaceService initialized (HF unavailable, using fallback)")
+            # Sanity check: verify HF Hub is reachable
+            try:
+                from transformers import AutoModel
+                AutoModel.from_pretrained(
+                    "distilbert-base-uncased",
+                    cache_dir=settings.HF_CACHE_DIR,
+                )
+                self._available = True
+                logger.info("HuggingFace environment verified — Hub reachable")
+            except Exception as sanity_err:
+                logger.warning("HF Hub sanity check failed: %s", sanity_err)
+                self._available = False
+        except Exception as exc:
+            logger.warning("Could not initialize quantization config: %s", exc)
+            self._available = False
+
+    # ── Status ─────────────────────────────────────────────────────────
 
     def is_available(self) -> bool:
+        """Check if HuggingFace models can be loaded."""
         return self._available
 
-    def load_model(self, model_name: str, use_quantization: bool = True):
-        """Load a model from Hugging Face Hub with caching."""
+    # ── Model Loading ─────────────────────────────────────────────────
+
+    def load_model(
+        self,
+        model_name: str,
+        use_quantization: bool = True,
+    ) -> Tuple[Any, Any]:
+        """
+        Load a model from Hugging Face Hub or local cache.
+
+        Args:
+            model_name: Model identifier (e.g. "meta-llama/Llama-3.2-3B-Instruct")
+            use_quantization: Whether to use 4-bit quantization
+
+        Returns:
+            Tuple of (model, tokenizer)
+
+        Raises:
+            RuntimeError: If HF dependencies are not available
+        """
         if not self._available:
             raise RuntimeError("HuggingFace dependencies are not available")
 
         if model_name in self.models:
+            logger.info("Model %s loaded from cache", model_name)
             return self.models[model_name], self.tokenizers[model_name]
 
-        logger.info(f"Loading model: {model_name}")
+        logger.info("Loading model: %s", model_name)
 
         try:
-            model_kwargs = {
-                "device_map": "auto",
-                "trust_remote_code": True,
-                "cache_dir": settings.HF_CACHE_DIR,
-            }
+            # Check if this is a local fine-tuned model
+            is_peft = model_name.startswith("./models/") or (
+                os.path.isdir(model_name) and os.path.exists(os.path.join(model_name, "adapter_config.json"))
+            )
+            if is_peft:
+                from peft import PeftConfig
 
-            if use_quantization and settings.USE_4BIT_QUANTIZATION and torch.cuda.is_available():
-                model_kwargs["quantization_config"] = self.quant_config
+                config = PeftConfig.from_pretrained(model_name)
+                base_model = AutoModelForCausalLM.from_pretrained(
+                    config.base_model_name_or_path,
+                    device_map="auto",
+                    trust_remote_code=True,
+                    cache_dir=settings.HF_CACHE_DIR,
+                )
+                model = PeftModel.from_pretrained(base_model, model_name)
+            else:
+                # Load from Hugging Face Hub
+                model_kwargs = {
+                    "device_map": "auto",
+                    "trust_remote_code": True,
+                    "cache_dir": settings.HF_CACHE_DIR,
+                }
 
-            model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs)
+                if use_quantization and settings.USE_4BIT_QUANTIZATION:
+                    model_kwargs["quantization_config"] = self.quant_config
+
+                model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs)
 
             tokenizer = AutoTokenizer.from_pretrained(
                 model_name,
@@ -94,18 +191,37 @@ class HuggingFaceService:
             if tokenizer.pad_token is None:
                 tokenizer.pad_token = tokenizer.eos_token
 
+            # Cache
             self.models[model_name] = model
             self.tokenizers[model_name] = tokenizer
-            logger.info(f"Model {model_name} loaded successfully")
+
+            logger.info("Model %s loaded successfully", model_name)
             return model, tokenizer
 
-        except Exception as e:
-            logger.error(f"Failed to load model {model_name}: {e}")
+        except Exception as exc:
+            logger.error("Failed to load model %s: %s", model_name, exc)
             self._available = False
             raise
 
-    def create_pipeline(self, task: str, model_name: str, **kwargs):
-        """Create a Hugging Face pipeline with caching."""
+    # ── Pipeline Creation ────────────────────────────────────────────
+
+    def create_pipeline(
+        self,
+        task: str,
+        model_name: str,
+        **kwargs,
+    ) -> Optional[Any]:
+        """
+        Create a Hugging Face pipeline with caching.
+
+        Args:
+            task: Pipeline task (e.g. "text-generation")
+            model_name: Model to use
+            **kwargs: Additional pipeline arguments
+
+        Returns:
+            Pipeline object, or None on failure
+        """
         if not self._available:
             return None
 
@@ -115,15 +231,42 @@ class HuggingFaceService:
 
         try:
             model, tokenizer = self.load_model(model_name)
-            pipe = pipeline(task, model=model, tokenizer=tokenizer, device_map="auto", **kwargs)
+            pipe = hf_pipeline(
+                task,
+                model=model,
+                tokenizer=tokenizer,
+                device_map="auto",
+                **kwargs,
+            )
             self.pipelines[key] = pipe
             return pipe
-        except Exception as e:
-            logger.error(f"Failed to create pipeline: {e}")
+
+        except Exception as exc:
+            logger.error("Failed to create pipeline %s: %s", key, exc)
             return None
 
-    def generate(self, prompt: str, model_name: Optional[str] = None, **kwargs) -> Optional[str]:
-        """Generate text using a model."""
+    # ── Text Generation ───────────────────────────────────────────────
+
+    def generate(
+        self,
+        prompt: str,
+        model_name: Optional[str] = None,
+        max_new_tokens: int = 512,
+        temperature: float = 0.1,
+        **kwargs,
+    ) -> Optional[str]:
+        """
+        Generate text using a model.
+
+        Args:
+            prompt: Input prompt
+            model_name: Model to use (defaults to INTENT_MODEL)
+            max_new_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
+
+        Returns:
+            Generated text, or None if generation fails
+        """
         if not self._available:
             logger.info("HF unavailable — skipping generation")
             return None
@@ -134,9 +277,10 @@ class HuggingFaceService:
             pipe = self.create_pipeline(
                 "text-generation",
                 model_name,
-                max_new_tokens=kwargs.get("max_new_tokens", 512),
-                temperature=kwargs.get("temperature", 0.1),
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
                 do_sample=True,
+                **kwargs,
             )
 
             if pipe is None:
@@ -145,10 +289,53 @@ class HuggingFaceService:
             result = pipe(prompt)
             return result[0]["generated_text"]
 
-        except Exception as e:
-            logger.error(f"Generation failed: {e}")
+        except Exception as exc:
+            logger.error("Generation failed: %s", exc)
+            return None
+
+    # ── Embeddings (RAG) ──────────────────────────────────────────────
+
+    def get_embeddings(
+        self,
+        texts: Union[str, List[str]],
+    ) -> Optional[List[List[float]]]:
+        """
+        Generate embeddings using sentence-transformers.
+
+        Useful for RAG (Retrieval-Augmented Generation), semantic search,
+        and clustering.
+
+        Args:
+            texts: Single text string or list of text strings
+
+        Returns:
+            List of embedding vectors, or None if unavailable
+        """
+        if not self._available:
+            return None
+
+        try:
+            if self.embeddings_model is None:
+                self.embeddings_model = SentenceTransformer(
+                    settings.EMBEDDING_MODEL,
+                    cache_folder=settings.HF_CACHE_DIR,
+                )
+
+            if isinstance(texts, str):
+                texts = [texts]
+
+            embeddings = self.embeddings_model.encode(
+                texts,
+                convert_to_tensor=True,
+                normalize_embeddings=True,
+            )
+
+            return embeddings.tolist()
+
+        except Exception as exc:
+            logger.error("Embedding generation failed: %s", exc)
             return None
 
 
-# Singleton
+# Singleton instance
 hf_service = HuggingFaceService()
