@@ -21,7 +21,7 @@ bitsandbytes==0.43.3
 sentence-transformers>=3.0.0
 smolagents>=1.26.0
 trl>=0.9.0
-datasets>=2.20.0
+datasets>=5.0.0
 torch>=2.4.0
 wandb>=0.18.0
 google-cloud-bigquery>=3.20.0,<3.25.0
