@@ -95,8 +95,8 @@ const MonitoringPage: React.FC = () => {
             onClick={() => setLiveRefresh(!liveRefresh)}
             className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
               liveRefresh
-                ? 'border-green-200 bg-green-50 text-green-700'
-                : 'border-gray-200 bg-white text-gray-600'
+                ? 'border-green-200 bg-green-50 text-green-700 dark:bg-green-950/40 dark:border-green-900 dark:text-green-400'
+                : 'border-gray-200 bg-white text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
             }`}
           >
             <span className={`h-2 w-2 rounded-full ${liveRefresh ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
@@ -104,16 +104,16 @@ const MonitoringPage: React.FC = () => {
           </button>
 
           {/* Time range selector */}
-          <div className="flex rounded-xl border border-gray-100 bg-white p-1 shadow-sm">
+          <div className="flex rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-1 shadow-sm">
             {(['1H', '6H', '24H', '7D'] as TimeRange[]).map((r) => (
               <button
                 key={r}
                 id={`monitoring-range-${r}`}
                 onClick={() => setTimeRange(r)}
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
+                className={`rounded-lg px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-medium transition-all ${
                   timeRange === r
                     ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-100'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
                 {r}

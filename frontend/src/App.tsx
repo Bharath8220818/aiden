@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Header from './components/common/Header';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import MobileNav from './components/layout/MobileNav';
 import { PageTransition } from './components/ui/PageTransition';
 import { PageSkeleton } from './components/ui/Skeleton';
 import { ToastProvider } from './components/providers/ToastProvider';
@@ -44,12 +45,21 @@ const AUTH_ROUTES = ['/login', '/signup'];
 function AppShell() {
   const location = useLocation();
   const isAuthRoute = AUTH_ROUTES.includes(location.pathname);
+  const isBuilder = location.pathname.startsWith('/builder');
 
   return (
-    <div className="app-shell">
+    <div className="app-shell flex min-h-screen flex-col bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]">
       <ErrorBoundary>
         {!isAuthRoute && <Header />}
-        <main className={isAuthRoute ? '' : 'mx-auto w-full max-w-7xl px-3 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8'}>
+        <main
+          className={
+            isAuthRoute
+              ? ''
+              : isBuilder
+              ? 'flex-1 mx-auto w-full max-w-[1600px] px-3 py-3 pb-20 md:pb-4 lg:px-6'
+              : 'flex-1 mx-auto w-full max-w-7xl px-3 py-4 pb-20 sm:px-6 sm:py-6 lg:px-8 lg:py-8 md:pb-8'
+          }
+        >
           <Suspense fallback={<PageSkeleton />}>
             <AnimatePresence mode="wait">
               <Routes location={location} key={location.pathname}>
@@ -149,6 +159,7 @@ function AppShell() {
             </AnimatePresence>
           </Suspense>
         </main>
+        {!isAuthRoute && <MobileNav />}
       </ErrorBoundary>
 
       {/* ── Toast Notifications ── */}

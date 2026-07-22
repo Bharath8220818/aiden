@@ -4,6 +4,7 @@ import { usePipelineStore } from '../store/pipelineStore';
 import ChatInterface from '../components/chat/ChatInterface';
 import PipelineCanvas from '../components/builder/PipelineCanvas';
 import AgentManagerPanel from '../components/builder/AgentManagerPanel';
+import { MessageSquare, LayoutGrid, Bot, Save, Play, Download, ChevronLeft, Edit2, Check } from 'lucide-react';
 
 type Panel = 'chat' | 'canvas' | 'agents';
 
@@ -12,40 +13,17 @@ const PipelineBuilderPage: React.FC = () => {
   const pipelineId = id ? parseInt(id, 10) : undefined;
   const { currentPipeline } = usePipelineStore();
 
-  const [activePanel, setActivePanel] = useState<Panel>('chat');
+  const [activePanel, setActivePanel] = useState<Panel>('canvas');
+  const [laptopSidePanel, setLaptopSidePanel] = useState<'chat' | 'agents'>('chat');
   const [pipelineName, setPipelineName] = useState(
     currentPipeline?.name || 'New Pipeline'
   );
   const [editingName, setEditingName] = useState(false);
 
-  const tabs: { id: Panel; label: string; icon: React.ReactNode }[] = [
-    {
-      id: 'chat',
-      label: 'Chat',
-      icon: (
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-        </svg>
-      ),
-    },
-    {
-      id: 'canvas',
-      label: 'Canvas',
-      icon: (
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-        </svg>
-      ),
-    },
-    {
-      id: 'agents',
-      label: 'Agents',
-      icon: (
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2" />
-        </svg>
-      ),
-    },
+  const tabs: { id: Panel; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    { id: 'canvas', label: 'Canvas', icon: LayoutGrid },
+    { id: 'chat', label: 'AI Assistant', icon: MessageSquare },
+    { id: 'agents', label: 'Agents', icon: Bot },
   ];
 
   // Update pipeline name when currentPipeline changes
@@ -56,51 +34,55 @@ const PipelineBuilderPage: React.FC = () => {
   }, [currentPipeline?.name]);
 
   return (
-    <div className="flex flex-col gap-4 animate-fade-in">
+    <div className="flex flex-col gap-3 sm:gap-4 animate-fade-in min-h-[calc(100vh-140px)]">
       {/* ── Builder Header ───────────────────────────── */}
-      <div className="card p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="card p-3 sm:p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between dark:bg-gray-800 dark:border-gray-700">
         <div className="flex items-center gap-3">
           <Link
             to="/pipelines"
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:bg-gray-50 hover:text-gray-900"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 shadow-sm transition hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-white"
             title="Back to pipelines"
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
+            <ChevronLeft className="h-4 w-4" />
           </Link>
-          <div>
+          <div className="min-w-0 flex-1">
             {editingName ? (
-              <input
-                type="text"
-                value={pipelineName}
-                onChange={(e) => setPipelineName(e.target.value)}
-                onBlur={() => setEditingName(false)}
-                onKeyDown={(e) => e.key === 'Enter' && setEditingName(false)}
-                className="input px-3 py-1 text-sm font-bold"
-                autoFocus
-              />
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={pipelineName}
+                  onChange={(e) => setPipelineName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && setEditingName(false)}
+                  className="input px-2.5 py-1 text-sm font-bold max-w-[200px] sm:max-w-xs"
+                  autoFocus
+                />
+                <button
+                  onClick={() => setEditingName(false)}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg bg-green-600 text-white"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </button>
+              </div>
             ) : (
               <button
                 onClick={() => setEditingName(true)}
-                className="flex items-center gap-1.5 group"
+                className="flex items-center gap-1.5 group text-left max-w-full"
               >
-                <span className="text-sm font-bold text-gray-900 group-hover:text-blue-600">
+                <span className="text-sm sm:text-base font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate">
                   {pipelineName}
                 </span>
-                <svg className="h-3.5 w-3.5 text-gray-400 opacity-0 transition group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
+                <Edit2 className="h-3.5 w-3.5 text-gray-400 opacity-0 transition group-hover:opacity-100 shrink-0" />
               </button>
             )}
-            <p className="text-xs text-gray-500">
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
               {pipelineId ? `ID: #${pipelineId}` : 'New pipeline'}
+              {currentPipeline?.source_type && ` · ${currentPipeline.source_type} → ${currentPipeline.destination_type}`}
             </p>
           </div>
 
           {/* Status badge */}
           {currentPipeline && (
-            <span className={`ml-2 badge ${
+            <span className={`shrink-0 badge ${
               currentPipeline.status === 'running' ? 'badge-warning' :
               currentPipeline.status === 'success' ? 'badge-success' :
               currentPipeline.status === 'failed' ? 'badge-error' :
@@ -111,56 +93,48 @@ const PipelineBuilderPage: React.FC = () => {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-end sm:self-auto">
           <button
             id="builder-save-btn"
-            className="btn-secondary px-3 py-2 text-xs"
+            className="btn-secondary px-3 py-2 text-xs flex items-center gap-1.5"
           >
-            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-            </svg>
-            Save
+            <Save className="h-3.5 w-3.5" />
+            <span className="hidden xs:inline">Save</span>
           </button>
           <button
             id="builder-run-btn"
-            className="btn-primary px-3 py-2 text-xs"
+            className="btn-primary px-3 py-2 text-xs flex items-center gap-1.5"
             disabled={!currentPipeline}
             title={!currentPipeline ? 'Create a pipeline first' : 'Run pipeline'}
           >
-            <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-            Run
+            <Play className="h-3.5 w-3.5 fill-current" />
+            <span>Run</span>
           </button>
           <button
             id="builder-export-btn"
-            className="btn-icon"
-            title="Export"
+            className="btn-icon h-9 w-9 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            title="Export DAG JSON"
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
+            <Download className="h-4 w-4" />
           </button>
         </div>
       </div>
 
-      {/* ── Desktop 3-Panel Layout ───────────────────── */}
-      <div className="hidden xl:grid xl:h-[calc(100vh-200px)] xl:grid-cols-[320px_1fr_280px] xl:gap-4">
+      {/* ── Desktop 3-Panel Layout (>= 1280px) ───────────────────── */}
+      <div className="hidden xl:grid xl:h-[calc(100vh-210px)] xl:grid-cols-[320px_1fr_280px] xl:gap-4">
         {/* Left: Chat Panel */}
-        <div className="card flex flex-col overflow-hidden p-0">
-          <div className="flex items-center gap-2 border-b border-gray-100 px-5 py-4">
+        <div className="card flex flex-col overflow-hidden p-0 dark:bg-gray-800 dark:border-gray-700">
+          <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-700 px-4 py-3">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white">
-              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
+              <MessageSquare className="h-3.5 w-3.5" />
             </div>
             <div>
-              <p className="text-xs font-bold text-gray-900">AIDEN Chat</p>
-              <p className="text-[10px] text-gray-400">AI pipeline assistant</p>
+              <p className="text-xs font-bold text-gray-900 dark:text-white">AIDEN Chat</p>
+              <p className="text-[10px] text-gray-400">AI pipeline architect</p>
             </div>
             <div className="ml-auto flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-              <span className="text-[10px] text-green-600 font-medium">Online</span>
+              <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-[10px] text-green-600 dark:text-green-400 font-medium">Ready</span>
             </div>
           </div>
           <div className="flex-1 overflow-hidden">
@@ -168,42 +142,84 @@ const PipelineBuilderPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Center: Canvas — pass pipelineId */}
-        <div className="card overflow-hidden p-0">
+        {/* Center: Canvas */}
+        <div className="card overflow-hidden p-0 dark:bg-gray-800 dark:border-gray-700">
           <PipelineCanvas pipelineId={pipelineId} />
         </div>
 
         {/* Right: Agents */}
-        <div className="card overflow-hidden p-0">
+        <div className="card overflow-hidden p-0 dark:bg-gray-800 dark:border-gray-700">
           <AgentManagerPanel />
         </div>
       </div>
 
-      {/* ── Mobile Tab Layout ────────────────────────── */}
-      <div className="xl:hidden">
-        {/* Tab Switcher */}
-        <div className="mb-3 flex overflow-x-auto gap-1 rounded-xl border border-gray-100 bg-white p-1 shadow-sm">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              id={`builder-tab-${tab.id}`}
-              onClick={() => setActivePanel(tab.id)}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all whitespace-nowrap ${
-                activePanel === tab.id
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
+      {/* ── Laptop 2-Panel Layout (768px to 1279px) ────────────────────────── */}
+      <div className="hidden md:grid xl:hidden md:h-[calc(100vh-210px)] md:grid-cols-[1fr_340px] md:gap-3">
+        {/* Main Canvas */}
+        <div className="card overflow-hidden p-0 dark:bg-gray-800 dark:border-gray-700">
+          <PipelineCanvas pipelineId={pipelineId} />
         </div>
 
-        {/* Panel Content */}
-        <div className="card p-0 h-[calc(100vh-280px)] min-h-[400px] overflow-hidden">
-          {activePanel === 'chat' && <ChatInterface />}
+        {/* Right Side Switchable Drawer (Chat or Agents) */}
+        <div className="card flex flex-col overflow-hidden p-0 dark:bg-gray-800 dark:border-gray-700">
+          <div className="flex items-center border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 p-1">
+            <button
+              onClick={() => setLaptopSidePanel('chat')}
+              className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-all ${
+                laptopSidePanel === 'chat'
+                  ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+              }`}
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              AI Assistant
+            </button>
+            <button
+              onClick={() => setLaptopSidePanel('agents')}
+              className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-all ${
+                laptopSidePanel === 'agents'
+                  ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+              }`}
+            >
+              <Bot className="h-3.5 w-3.5" />
+              Agents Panel
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            {laptopSidePanel === 'chat' ? <ChatInterface /> : <AgentManagerPanel />}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Mobile View (< 768px) ────────────────────────── */}
+      <div className="flex flex-col md:hidden space-y-3">
+        {/* Tab Switcher */}
+        <div className="flex rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-1 shadow-sm">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                id={`builder-tab-${tab.id}`}
+                onClick={() => setActivePanel(tab.id)}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-all ${
+                  activePanel === tab.id
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Panel Content Box */}
+        <div className="card p-0 h-[calc(100vh-230px)] min-h-[420px] overflow-hidden dark:bg-gray-800 dark:border-gray-700">
           {activePanel === 'canvas' && <PipelineCanvas pipelineId={pipelineId} />}
+          {activePanel === 'chat' && <ChatInterface />}
           {activePanel === 'agents' && <AgentManagerPanel />}
         </div>
       </div>
@@ -212,3 +228,4 @@ const PipelineBuilderPage: React.FC = () => {
 };
 
 export default PipelineBuilderPage;
+

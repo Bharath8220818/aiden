@@ -234,7 +234,7 @@ const SettingsPage: React.FC = () => {
 
       <div className="mt-6 flex flex-col md:flex-row gap-6">
         {/* Sidebar tabs */}
-        <nav className="md:w-48 space-y-1 shrink-0" aria-label="Settings tabs">
+        <nav className="flex overflow-x-auto flex-nowrap gap-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-1 md:border-none md:bg-transparent md:p-0 md:flex-col md:w-52 md:space-y-1 shrink-0 scrollbar-none" aria-label="Settings tabs">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -242,9 +242,9 @@ const SettingsPage: React.FC = () => {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'w-full flex items-center gap-2.5 px-4 py-2.5 text-left rounded-lg text-sm font-medium transition-all',
+                  'flex items-center gap-2 px-3.5 py-2 md:px-4 md:py-2.5 text-left rounded-lg text-xs md:text-sm font-medium transition-all shrink-0 whitespace-nowrap md:w-full',
                   activeTab === tab.id
-                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 shadow-sm'
+                    ? 'bg-blue-600 text-white md:bg-blue-50 md:text-blue-700 dark:md:bg-blue-900/30 dark:md:text-blue-300 shadow-sm'
                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-200'
                 )}
               >

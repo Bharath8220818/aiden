@@ -337,15 +337,15 @@ const DashboardPage: React.FC = () => {
           <h2 className="text-lg font-bold text-gray-900">Pipeline Status</h2>
           <p className="mt-0.5 text-xs text-gray-500">Distribution across all pipelines</p>
 
-          <div className="mt-6 flex items-center gap-6">
-            <div className="h-40 w-40 shrink-0">
+          <div className="mt-6 flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-6">
+            <div className="h-36 w-36 sm:h-40 sm:w-40 shrink-0">
               <PieChart
                 success={successPipelines || 65}
                 running={runningPipelines || 25}
                 failed={failedPipelines || 10}
               />
             </div>
-            <div className="space-y-3">
+            <div className="w-full sm:w-auto space-y-3">
               {[
                 { label: 'Success', pct: Math.round(((successPipelines || 65) / (totalPipelines || 100)) * 100), color: 'bg-green-500' },
                 { label: 'Running', pct: Math.round(((runningPipelines || 25) / (totalPipelines || 100)) * 100), color: 'bg-blue-500' },
@@ -353,8 +353,8 @@ const DashboardPage: React.FC = () => {
               ].map((item) => (
                 <div key={item.label} className="flex items-center gap-2.5">
                   <div className={`h-2.5 w-2.5 rounded-full ${item.color}`} />
-                  <span className="text-sm text-gray-600">{item.label}</span>
-                  <span className="ml-auto text-sm font-semibold text-gray-900">{item.pct}%</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">{item.label}</span>
+                  <span className="ml-auto text-sm font-semibold text-gray-900 dark:text-white">{item.pct}%</span>
                 </div>
               ))}
             </div>

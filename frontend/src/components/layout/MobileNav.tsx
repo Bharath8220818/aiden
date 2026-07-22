@@ -1,11 +1,13 @@
 import { Link, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Wand2, Workflow, Activity, Settings } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
 const items = [
-  { to: '/', label: 'Home', icon: '🏠' },
-  { to: '/builder', label: 'Build', icon: '✨' },
-  { to: '/pipelines', label: 'Pipelines', icon: '📋' },
-  { to: '/monitoring', label: 'Monitor', icon: '📊' },
+  { to: '/', label: 'Home', icon: LayoutDashboard },
+  { to: '/builder', label: 'Builder', icon: Wand2 },
+  { to: '/pipelines', label: 'Pipelines', icon: Workflow },
+  { to: '/monitoring', label: 'Monitor', icon: Activity },
+  { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
 const MobileNav = () => {
@@ -18,22 +20,23 @@ const MobileNav = () => {
 
   return (
     <nav className="fixed inset-x-3 bottom-3 z-50 md:hidden" aria-label="Mobile navigation">
-      <div className="rounded-[1.5rem] border border-white/70 bg-slate-900/90 px-1.5 py-1.5 shadow-[0_20px_60px_-20px_rgba(15,23,42,0.55)] backdrop-blur-xl">
-        <div className="grid grid-cols-4 gap-1">
+      <div className="rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white/90 dark:bg-gray-900/90 px-2 py-1.5 shadow-xl backdrop-blur-xl transition-all">
+        <div className="grid grid-cols-5 gap-1">
           {items.map((item) => {
-            const active = pathname === item.to || (item.to !== '/' && pathname.startsWith(item.to));
+            const Icon = item.icon;
+            const active = item.to === '/' ? pathname === '/' : pathname.startsWith(item.to);
             return (
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex flex-col items-center justify-center rounded-[1rem] px-2 py-2 text-[11px] font-semibold transition ${
-                  active ? 'bg-primary-500 text-white shadow-sm' : 'text-slate-300 hover:bg-white/10'
+                className={`flex flex-col items-center justify-center rounded-xl px-1 py-1.5 text-[11px] font-medium transition-all ${
+                  active
+                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200'
                 }`}
               >
-                <span className="text-lg leading-none" aria-hidden>
-                  {item.icon}
-                </span>
-                {item.label}
+                <Icon className="h-4 w-4 mb-0.5" />
+                <span className="truncate">{item.label}</span>
               </Link>
             );
           })}
@@ -44,3 +47,4 @@ const MobileNav = () => {
 };
 
 export default MobileNav;
+

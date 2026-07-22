@@ -92,7 +92,7 @@ const PipelinesPage: React.FC = () => {
       {/* ── Filters + Search ─────────────────────────── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         {/* Filter tabs */}
-        <div className="flex overflow-x-auto gap-1 rounded-xl border border-gray-100 bg-white p-1 shadow-sm scrollbar-thin">
+        <div className="flex overflow-x-auto flex-nowrap gap-1 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-1 shadow-sm scrollbar-none max-w-full">
           {FILTERS.map((f) => (
             <button
               key={f}

@@ -176,7 +176,7 @@ const TemplatesPage: React.FC = () => {
           hidden: { opacity: 0 },
           visible: { transition: { staggerChildren: 0.05 } },
         }}
-        className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+        className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
       >
         {filtered.map((template) => (
           <motion.div
