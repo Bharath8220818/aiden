@@ -1,0 +1,262 @@
+# ─── AIDEN AI Integration CI/CD ─────────────────────────────────────────
+# Runs on every PR and deploy to ensure the AI stack (HF, Intent Parser,
+# Agent Orchestrator) doesn't regress, models are downloaded during the
+# Docker build itself (not as a separate CI job), and both frontend and
+# backend test suites pass.
+#
+# Model download happens inside `docker build` via HF_TOKEN build arg.
+# Docker layer caching means the ~6 GB model layer only rebuilds when
+# requirements.txt or download_models.py changes.
+#
+# Triggers:
+#   pull_request:      AI test suite + full FE/BE test suite (fast feedback)
+#   push to main:      Same checks + Docker build (models downloaded in image)
+#   schedule (Mon 6AM): Weekly Docker build to refresh model layers
+#   workflow_dispatch:  Manual deploy
+
+name: AI Integration
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - "infrastructure/**"
+
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+
+  schedule:
+    - cron: '0 6 * * 1'
+
+  workflow_dispatch:
+    inputs:
+      deploy_models:
+        description: "Download HF models (takes 10-30 min)"
+        required: true
+        default: false
+        type: boolean
+
+# ─── Environment ────────────────────────────────────────────────────────
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+  HF_CACHE_DIR: "./models/cache"
+
+# ─── Concurrency ────────────────────────────────────────────────────────
+# Cancel in-progress runs for the same branch (PR), but let main complete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+# ══════════════════════════════════════════════════════════════════════════
+jobs:
+
+  # ──────────────────────────────────────────────────────────────────────
+  # 1. BACKEND AI TEST SUITE
+  #    Runs the full AI integration test suite. In CI (no GPU), all tests
+  #    exercise the graceful-fallback path — no HF token is needed.
+  # ──────────────────────────────────────────────────────────────────────
+  backend-ai-tests:
+    name: "Backend AI tests"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Spin up a Qdrant vector DB so the RAG memory tests run against
+    # a real backend (not the in-memory fallback). The service is
+    # reachable at http://qdrant:6333 from the test runner.
+    # Qdrant starts near-instantly and rag_memory has a 2-second
+    # client timeout with graceful fallback, so no health check needed.
+    services:
+      qdrant:
+        image: qdrant/qdrant:latest
+        ports:
+          - 6333:6333
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Create model cache dir
+        run: mkdir -p ${{ env.HF_CACHE_DIR }}
+
+      - name: Run AI integration tests
+        working-directory: backend
+        run: python scripts/test_ai.py --verbose
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN || '' }}
+          HF_CACHE_DIR: ${{ env.HF_CACHE_DIR }}
+          QDRANT_URL: http://qdrant:6333
+
+      - name: Print test output on failure
+        if: failure()
+        run: |
+          echo "::group::AI test suite stdout"
+          cat /tmp/ai-test-output.log 2>/dev/null || echo "(no captured output)"
+          echo "::endgroup::"
+
+  # ──────────────────────────────────────────────────────────────────────
+  # 2. FRONTEND TEST SUITE
+  #    TypeScript type-check + Vitest unit tests + production build.
+  # ──────────────────────────────────────────────────────────────────────
+  frontend-tests:
+    name: "Frontend tests"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: TypeScript type-check
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Run frontend unit tests
+        working-directory: frontend
+        run: npm test
+
+      - name: Production build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Upload build artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/dist
+          retention-days: 7
+
+  # ──────────────────────────────────────────────────────────────────────
+  # 3. DOCKER BUILD & PUSH (push to main or weekly schedule)
+  #    Builds and pushes the backend + frontend Docker images. Models are
+  #    downloaded during the backend build itself (via HF_TOKEN build arg)
+  #    so there is no separate CI job or artifact dance.
+  #    Docker layer cache keeps the ~6 GB model layer cached until
+  #    requirements.txt, download_models.py, or HF_TOKEN changes.
+  # ──────────────────────────────────────────────────────────────────────
+  docker-build:
+    name: "Docker build"
+    if: >
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'schedule')
+    needs: [backend-ai-tests, frontend-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push backend image (models download during build)
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/aiden-backend:latest
+            ${{ secrets.DOCKER_USERNAME }}/aiden-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            HF_TOKEN=${{ secrets.HF_TOKEN }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/aiden-frontend:latest
+            ${{ secrets.DOCKER_USERNAME }}/aiden-frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to Render (webhook trigger)
+        if: false  # Enable once RENDER_DEPLOY_HOOK secret is set
+        run: |
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
+  # ──────────────────────────────────────────────────────────────────────
+  # 4. STATUS CHECK (summary)
+  # ──────────────────────────────────────────────────────────────────────
+  status:
+    name: "Status summary"
+    if: always()
+    needs: [backend-ai-tests, frontend-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all required jobs
+        run: |
+          echo "## AI Integration CI/CD Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          BE_STATUS="${{ needs.backend-ai-tests.result }}"
+          FE_STATUS="${{ needs.frontend-tests.result }}"
+
+          if [ "$BE_STATUS" = "success" ]; then
+            echo "- :white_check_mark: **Backend AI tests** passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- :x: **Backend AI tests** failed ($BE_STATUS)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "$FE_STATUS" = "success" ]; then
+            echo "- :white_check_mark: **Frontend tests** passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- :x: **Frontend tests** failed ($FE_STATUS)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend AI tests | $BE_STATUS |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend tests | $FE_STATUS |" >> $GITHUB_STEP_SUMMARY
+
+          # Fail if any required job failed
+          if [ "$BE_STATUS" != "success" ] || [ "$FE_STATUS" != "success" ]; then
+            exit 1
+          fi
+
+      - name: Notify on failure
+        if: failure() && github.ref == 'refs/heads/main'
+        run: |
+          echo "::warning::AI Integration pipeline failed for ${{ github.sha }}"

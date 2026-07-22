@@ -1,0 +1,42 @@
+# ── Python ──────────────────────────────────────────────────────────
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info
+*.egg-info/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# ── Model cache (HuggingFace downloads, can be GBs) ────────────────
+models/cache/
+
+# ── Node (accidentally in backend) ────────────────────────────────
+node_modules/
+
+# ── Local dev artifacts ─────────────────────────────────────────────
+.env
+*.db
+*.db-shm
+*.db-wal
+backend.log
+nul
+
+# ── IDE / OS ────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Git ─────────────────────────────────────────────────────────────
+.git/
+.gitignore
+
+# ── Documentation (not needed at runtime) ───────────────────────────
+*.md

@@ -1,251 +1,215 @@
 """
-Natural Language → Structured Pipeline Configuration.
-
-Uses a HuggingFace LLM (e.g. Llama 3) to parse free-form user requests into
-structured pipeline definitions. Falls back to rule-based keyword matching
-when the model is unavailable or the response cannot be parsed.
-
-Architecture:
-    User Request
-        │
-        ▼
-    ┌────────────────┐   success   ┌──────────────────┐
-    │  HF Pipeline   │ ──────────▶ │  JSON Extraction │
-    │  (LLaMA 3)     │             └──────────────────┘
-    └────────────────┘                    │
-        │ failure                         ▼
-        ▼                         Parsed Pipeline Config
-    ┌────────────────┐
-    │ Rule-based     │
-    │ Fallback       │
-    └────────────────┘
+Intent Parser – Natural Language → Structured Pipeline Configuration
+Uses HuggingFace LLM with RAG memory and graceful fallback to rule‑based parsing.
 """
 
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Dict, Any, Optional
 
-from app.config import settings
 from app.services.hf_service import hf_service
+from app.core.rag_memory import rag_memory  # RAG memory for context
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 
-SYSTEM_PROMPT = """You are a data engineering assistant. Parse the following user request \
-and extract structured information about the data pipeline they want to build.
-
-Extract the following information and respond in JSON format **only**, with no other text:
-- name: A short name for the pipeline
-- source_type: The type of data source (postgres, snowflake, s3, kafka, etc.)
-- source_config: Any source-specific configuration (table name, file path, etc.)
-- destination_type: The destination system
-- destination_config: Any destination-specific configuration
-- transformations: List of transformations needed (clean, aggregate, join, filter, etc.)
-- schedule: Frequency (daily, hourly, weekly) in cron format
-- data_quality_rules: Any validation rules mentioned
-
-User Request: {query}
-
-JSON:"""
-
-
 class IntentParser:
     """
-    Parse natural language queries into structured pipeline configurations.
+    Natural Language → Structured Pipeline Configuration.
+    Uses HuggingFace LLM with RAG context and graceful fallback to rule‑based parsing.
     """
 
     def __init__(self, model_name: Optional[str] = None):
         self.model_name = model_name or settings.INTENT_MODEL
+        self._use_llm = hf_service.is_available()          # <-- ADDED
+        self._pipeline = None
+        self._rag_enabled = True  # Can be toggled
 
-    # ── Public ──
+        self.base_system_prompt = """
+        You are a data engineering assistant. Parse the following user request
+        and extract structured information about the data pipeline they want to build.
 
-    async def parse(self, query: str) -> Dict[str, Any]:
+        Extract the following information and respond in JSON format:
+        - name: A short name for the pipeline
+        - source_type: The type of data source (postgres, snowflake, s3, kafka, etc.)
+        - source_config: Any source-specific configuration (e.g., table name)
+        - destination_type: The destination system (snowflake, postgres, bigquery, etc.)
+        - destination_config: Any destination-specific configuration (e.g., schema name)
+        - transformations: List of transformations needed (clean, aggregate, join, etc.)
+        - schedule: Frequency in cron format (e.g., "0 6 * * *" for daily at 6am)
+        - data_quality_rules: Any validation rules mentioned
+
+        Respond with JSON only, no other text.
         """
-        Parse a natural-language user request into a structured pipeline definition.
+
+        logger.info(f"IntentParser initialized with LLM: {self._use_llm}")
+
+    async def parse(self, query: str, user_id: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Parse natural language query into structured pipeline definition.
 
         Args:
-            query: The user's natural language request.
+            query: User's natural language request
+            user_id: Optional user ID for RAG scoping
 
         Returns:
-            A dictionary with keys: name, source_type, source_config,
-            destination_type, destination_config, transformations, schedule,
-            data_quality_rules.
+            Structured pipeline configuration
         """
-        if not query or not query.strip():
-            return self._default_response("Empty query")
+        # Try AI parsing (with RAG context) if available
+        if self._use_llm and self._rag_enabled:
+            try:
+                result = await self._try_ai_parse(query, user_id)
+                if result and self._validate(result):
+                    # Store the successful parse in RAG memory
+                    if user_id:
+                        rag_memory.store_pipeline(query, result, user_id)
+                    logger.info(f"LLM parsed successfully: {result.get('name')}")
+                    return result
+            except Exception as e:
+                logger.warning(f"LLM parsing failed: {e}, falling back to rule-based")
 
-        # Try AI-powered parsing first
-        parsed = await self._try_ai_parse(query)
-        if parsed is not None:
-            return parsed
-
-        # Fallback to rule-based parsing
-        logger.info("Falling back to rule-based intent parsing")
+        # Fallback to rule-based
+        logger.info("Using rule-based fallback parser")
         return self._rule_based_parse(query)
 
-    # ── AI Parsing ──
-
-    async def _try_ai_parse(self, query: str) -> Optional[Dict[str, Any]]:
-        """Attempt to parse using the HuggingFace pipeline."""
-        try:
-            if not hf_service.is_available():
-                logger.debug("HF service not available, skipping AI parse")
-                return None
-
-            prompt = SYSTEM_PROMPT.format(query=query)
-            result = hf_service.generate(
-                prompt,
-                model_name=self.model_name,
-                max_new_tokens=512,
-                temperature=0.1,
-            )
-            if result is None:
-                return None
-
-            # Extract JSON block from the generated text
-            json_start = result.find("{")
-            json_end = result.rfind("}") + 1
-
-            if json_start == -1 or json_end <= json_start:
-                logger.warning("No JSON found in AI response")
-                return None
-
-            json_str = result[json_start:json_end]
-            parsed = json.loads(json_str)
-
-            if not self._validate(parsed):
-                logger.warning("AI response did not include a usable pipeline intent")
-                return None
-
-            parsed.setdefault("source_config", {})
-            parsed.setdefault("destination_config", {})
-            parsed.setdefault("transformations", [])
-            parsed.setdefault("schedule", "0 6 * * *")
-            parsed.setdefault("data_quality_rules", [])
-
-            logger.info("AI intent parsed: %s", parsed.get("name"))
-            return parsed
-
-        except Exception as exc:
-            logger.warning("AI intent parsing failed: %s", exc)
+    async def _try_ai_parse(self, query: str, user_id: Optional[int]) -> Optional[Dict[str, Any]]:
+        """Attempt to parse using HuggingFace LLM with RAG context."""
+        prompt = self._build_prompt(query, user_id)
+        response = hf_service.generate(
+            prompt,
+            model_name=self.model_name,
+            max_new_tokens=512,
+            temperature=0.1,
+        )
+        if response is None:
             return None
 
-    @staticmethod
-    def _validate(parsed: Dict[str, Any]) -> bool:
-        return all(parsed.get(field) for field in ("name", "source_type", "destination_type"))
+        # Extract JSON from response
+        json_start = response.find('{')
+        json_end = response.rfind('}') + 1
+        if json_start == -1 or json_end == 0:
+            return None
 
-    # ── Rule-based Fallback ──
+        json_str = response[json_start:json_end]
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parse error: {e}")
+            return None
+
+    def _build_prompt(self, query: str, user_id: Optional[int]) -> str:
+        """Build the prompt with optional RAG context."""
+        rag_context = ""
+        if self._rag_enabled and user_id:
+            similar = rag_memory.search_similar(query, user_id, top_k=settings.RAG_TOP_K)
+            if similar:
+                rag_context = rag_memory.format_context(similar)
+
+        if rag_context:
+            full_prompt = (
+                f"{rag_context}\n\n"
+                f"{self.base_system_prompt}\n\n"
+                f"User Request: {query}"
+            )
+        else:
+            full_prompt = f"{self.base_system_prompt}\n\nUser Request: {query}"
+
+        return full_prompt
+
+    def _validate(self, parsed: Dict[str, Any]) -> bool:
+        """Validate parsed output has required fields."""
+        required = ["name", "source_type", "destination_type"]
+        for field in required:
+            if field not in parsed or not parsed[field]:
+                return False
+        return True
 
     def _rule_based_parse(self, query: str) -> Dict[str, Any]:
-        """Keyword-based parser used when the HF model is unavailable."""
-        q = query.lower()
+        """Rule‑based fallback parser when AI is unavailable."""
+        query_lower = query.lower()
 
-        return {
-            "name": self._extract_name(query),
-            "source_type": self._detect_source(q),
-            "source_config": {},
-            "destination_type": self._detect_destination(q),
-            "destination_config": {},
-            "transformations": self._detect_transforms(q),
-            "schedule": self._detect_schedule(q),
-            "data_quality_rules": self._detect_rules(q),
+        # Detect source type
+        source_type = "unknown"
+        source_config = {}
+        source_map = {
+            "postgres": ["postgres", "postgre", "pg"],
+            "snowflake": ["snowflake", "snow"],
+            "mysql": ["mysql"],
+            "bigquery": ["bigquery", "big query"],
+            "redshift": ["redshift"],
+            "s3": ["s3", "s3 bucket"],
+            "kafka": ["kafka"],
+            "mongodb": ["mongo", "mongodb"],
         }
+        for src, keywords in source_map.items():
+            if any(kw in query_lower for kw in keywords):
+                source_type = src
+                break
 
-    @staticmethod
-    def _extract_name(query: str) -> str:
-        words = query.split()
-        if len(words) > 3:
-            return " ".join(words[:4]).title().replace("  ", " ").strip()
-        return "Data Pipeline"
+        # Detect destination type
+        dest_type = "unknown"
+        dest_config = {}
+        dest_map = {
+            "snowflake": ["snowflake", "snow"],
+            "bigquery": ["bigquery", "big query"],
+            "postgres": ["postgres", "postgre", "pg"],
+            "redshift": ["redshift"],
+            "s3": ["s3", "s3 bucket"],
+            "mongodb": ["mongo", "mongodb"],
+        }
+        for dest, keywords in dest_map.items():
+            if any(kw in query_lower for kw in keywords):
+                dest_type = dest
+                break
 
-    @staticmethod
-    def _detect_source(q: str) -> str:
-        sources = [
-            ("postgres", ("postgresql", "postgres", "postgre")),
-            ("snowflake", ("snowflake",)),
-            ("mysql", ("mysql", "my sql")),
-            ("s3", ("s3", "amazon s3")),
-            ("kafka", ("kafka", "kinesis")),
-            ("mongodb", ("mongodb", "mongo")),
-            ("bigquery", ("bigquery", "big query")),
-            ("csv", ("csv", "flat file")),
-        ]
-        for name, keywords in sources:
-            if any(kw in q for kw in keywords):
-                return name
-        return "postgres"
+        # Schedule
+        schedule = "0 6 * * *"  # default daily at 6am
+        if "hourly" in query_lower:
+            schedule = "0 * * * *"
+        elif "weekly" in query_lower:
+            schedule = "0 0 * * 0"  # Sunday at midnight
 
-    @staticmethod
-    def _detect_destination(q: str) -> str:
-        # Longer / more-specific keywords first to avoid partial-match
-        # priority issues (e.g. "s3" matching before "redshift")
-        destinations = [
-            ("redshift", ("redshift",)),
-            ("snowflake", ("snowflake",)),
-            ("bigquery", ("bigquery", "big query")),
-            ("elasticsearch", ("elasticsearch", "elastic")),
-            ("postgres", ("postgresql", "postgres", "postgre")),
-            ("mongodb", ("mongodb", "mongo")),
-            ("s3", ("s3", "amazon s3")),
-        ]
-        for name, keywords in destinations:
-            if any(kw in q for kw in keywords):
-                return name
-        return "snowflake"
-
-    @staticmethod
-    def _detect_transforms(q: str) -> list:
+        # Transformations
         transforms = []
-        if "clean" in q:
-            transforms.append("clean")
-        if "aggregate" in q or "aggregat" in q:
-            transforms.append("aggregate")
-        if "join" in q:
-            transforms.append("join")
-        if "filter" in q:
-            transforms.append("filter")
-        if "deduplicat" in q or "unique" in q:
-            transforms.append("deduplicate")
-        if "enrich" in q:
-            transforms.append("enrich")
-        return transforms or ["clean", "aggregate"]
+        transform_map = {
+            "clean": ["clean", "cleaning", "remove null", "handle null"],
+            "aggregate": ["aggregate", "summarize", "group by"],
+            "join": ["join", "merge", "combine"],
+            "filter": ["filter", "where", "condition"],
+            "enrich": ["enrich", "enhance", "add column"],
+            "validate": ["validate", "check", "quality"],
+        }
+        for trans, keywords in transform_map.items():
+            if any(kw in query_lower for kw in keywords):
+                transforms.append(trans)
 
-    @staticmethod
-    def _detect_schedule(q: str) -> str:
-        if "hourly" in q or "hour" in q:
-            return "0 * * * *"
-        if "daily" in q or "day" in q:
-            return "0 6 * * *"
-        if "weekly" in q or "week" in q:
-            return "0 6 * * 0"
-        if "monthly" in q or "month" in q:
-            return "0 6 1 * *"
-        return "0 6 * * *"
-
-    @staticmethod
-    def _detect_rules(q: str) -> list:
+        # Quality rules
         rules = []
-        if "null" in q or "missing" in q:
-            rules.append("no_nulls")
-        if "duplicat" in q or "unique" in q:
+        if "null" in query_lower:
+            rules.append("no_null_values")
+        if "duplicate" in query_lower:
             rules.append("no_duplicates")
-        if "range" in q or "valid" in q:
-            rules.append("validate_ranges")
-        if "email" in q:
-            rules.append("email_format")
-        return rules
+        if "positive" in query_lower:
+            rules.append("positive_values")
+        if "format" in query_lower or "valid" in query_lower:
+            rules.append("valid_format")
 
-    # ── Helpers ──
+        # Extract table name if mentioned
+        if "table" in query_lower:
+            parts = query_lower.split("table")
+            if len(parts) > 1:
+                table_part = parts[1].strip().split()[0].strip("'\"")
+                if table_part:
+                    source_config["table"] = table_part
 
-    @staticmethod
-    def _default_response(reason: str) -> Dict[str, Any]:
         return {
-            "name": "Untitled Pipeline",
-            "source_type": "postgres",
-            "source_config": {},
-            "destination_type": "snowflake",
-            "destination_config": {},
-            "transformations": ["clean"],
-            "schedule": "0 6 * * *",
-            "data_quality_rules": [],
+            "name": f"{source_type}_to_{dest_type}_pipeline",
+            "source_type": source_type,
+            "source_config": source_config,
+            "destination_type": dest_type,
+            "destination_config": dest_config,
+            "transformations": transforms,
+            "schedule": schedule,
+            "data_quality_rules": rules,
         }

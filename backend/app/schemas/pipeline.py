@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
@@ -77,15 +77,48 @@ class IntentResponse(BaseModel):
     data_quality_rules: List[str]
 
 
-class DatabaseConnection(BaseModel):
-    host: str
-    port: int
-    database: str
-    user: str
-    password: str
+class RagSearchResult(BaseModel):
+    query: str
+    parsed: Dict[str, Any]
+    score: float
+    pipeline_id: Optional[int] = None
+
+
+class RagSearchResponse(BaseModel):
+    results: List[RagSearchResult]
+    total: int
 
 
 class SampleDataResponse(BaseModel):
     table_name: str
     data: List[Dict[str, Any]]
     total_rows: int
+
+
+class TestConnectionRequest(BaseModel):
+    """Request schema for the ``/test-connection`` endpoint.
+
+    Users provide a connection string and the endpoint validates that the
+    database is reachable by attempting a live connect + ``list_tables()``.
+    """
+    connection_string: str = Field(
+        ...,
+        description="Database connection string. Examples:\n"
+        "- ``postgresql://user:pass@host:5432/db``\n"
+        "- ``sqlite:///./data.db``\n"
+        "- ``bigquery://my-project.my_dataset``",
+        min_length=3,
+    )
+    db_type: Optional[str] = Field(
+        None,
+        description="Optional hint. If omitted, auto-detected from the "
+        "connection string prefix.",
+    )
+
+
+class TestConnectionResponse(BaseModel):
+    """Response from the ``/test-connection`` endpoint."""
+    success: bool
+    db_type: str
+    tables: List[str] = []
+    error: Optional[str] = None

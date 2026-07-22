@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status, BackgroundTasks
@@ -13,12 +14,18 @@ from app.models.execution import ExecutionStatus, PipelineExecution
 from app.models.pipeline import Pipeline, PipelineStatus
 from app.models.user import User
 from app.core.intent_parser import IntentParser
+from app.core.pipeline_executor import PipelineExecutor
+from app.core.rag_memory import rag_memory
 from app.schemas.pipeline import (
     PipelineCreate,
     PipelineExecutionResponse,
     PipelineResponse,
     PipelineUpdate,
     PromptRequest,
+    RagSearchResponse,
+    RagSearchResult,
+    TestConnectionRequest,
+    TestConnectionResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -26,6 +33,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 executions_router = APIRouter()
 intent_parser = IntentParser()
+pipeline_executor = PipelineExecutor()
 
 
 @router.post("/from-prompt", response_model=PipelineResponse)
@@ -86,7 +94,47 @@ async def create_pipeline_from_prompt(
     db.add(new_pipeline)
     await db.commit()
     await db.refresh(new_pipeline)
+
+    # Store in RAG memory for future similarity searches
+    if rag_memory.is_ready() and parsed_intent:
+        rag_memory.store_pipeline(
+            query=prompt,
+            parsed=parsed_intent,
+            user_id=current_user.id,
+            pipeline_id=new_pipeline.id,
+        )
+
     return new_pipeline
+
+
+@router.get("/rag-search", response_model=RagSearchResponse)
+async def search_similar_pipelines(
+    query: str = Query(..., min_length=3, description="Natural language query to match against past pipelines"),
+    top_k: int = Query(3, ge=1, le=20),
+    current_user: User = Depends(get_current_user),
+):
+    """Search for semantically similar past pipeline intents using RAG."""
+    if not rag_memory.is_ready():
+        return RagSearchResponse(results=[], total=0)
+
+    similar = rag_memory.search_similar(
+        query=query,
+        user_id=current_user.id,
+        top_k=top_k,
+        min_score=0.3,
+    )
+
+    results = [
+        RagSearchResult(
+            query=r["query"],
+            parsed=r["parsed"],
+            score=round(r["score"], 3),
+            pipeline_id=r.get("pipeline_id"),
+        )
+        for r in similar
+    ]
+
+    return RagSearchResponse(results=results, total=len(results))
 
 
 @router.post("/", response_model=PipelineResponse)
@@ -207,6 +255,71 @@ async def delete_pipeline(
     return {"status": "deleted", "pipeline_id": pipeline_id}
 
 
+@router.post("/{pipeline_id}/cancel")
+async def cancel_pipeline(
+    pipeline_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Cancel a running pipeline execution.
+
+    Finds the active (RUNNING or PENDING) execution for this pipeline
+    and signals the executor to stop gracefully.  The executor will
+    finish its current stage, set ``ExecutionStatus.CANCELLED``, and
+    emit a final ``pipeline_status`` WebSocket event with status
+    ``"cancelled"``.
+    """
+    result = await db.execute(
+        select(Pipeline).where(
+            Pipeline.id == pipeline_id,
+            Pipeline.user_id == current_user.id,
+            Pipeline.is_active.is_(True),
+        )
+    )
+    pipeline = result.scalar_one_or_none()
+    if not pipeline:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+
+    # Find the running execution
+    active_exec = await db.execute(
+        select(PipelineExecution).where(
+            PipelineExecution.pipeline_id == pipeline_id,
+            PipelineExecution.status.in_([
+                ExecutionStatus.RUNNING,
+                ExecutionStatus.PENDING,
+            ]),
+        ).order_by(PipelineExecution.started_at.desc()).limit(1)
+    )
+    execution = active_exec.scalar_one_or_none()
+    if not execution:
+        raise HTTPException(
+            status_code=404,
+            detail="No active execution found for this pipeline — it may have already completed.",
+        )
+
+    # Signal the executor
+    PipelineExecutor.cancel(execution.id)
+
+    # Emit cancellation-requested event immediately so the frontend
+    # can update the button state without waiting for the executor
+    await manager.broadcast({
+        "type": "pipeline_status",
+        "pipeline_id": pipeline_id,
+        "execution_id": execution.id,
+        "status": "cancelling",
+        "progress": execution.records_processed or 0,
+        "timestamp": datetime.now().isoformat(),
+    })
+
+    logger.info("Cancel signal sent for pipeline %d / execution %d", pipeline_id, execution.id)
+
+    return {
+        "status": "cancelling",
+        "execution_id": execution.id,
+        "message": f"Cancellation signal sent for execution #{execution.id}",
+    }
+
+
 @router.post("/{pipeline_id}/run", response_model=PipelineExecutionResponse)
 async def run_pipeline(
     pipeline_id: int,
@@ -214,7 +327,7 @@ async def run_pipeline(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Create a run execution record for the pipeline."""
+    """Execute a pipeline and run it through the full execution engine."""
     result = await db.execute(
         select(Pipeline).where(
             Pipeline.id == pipeline_id,
@@ -227,24 +340,48 @@ async def run_pipeline(
     if not pipeline:
         raise HTTPException(status_code=404, detail="Pipeline not found")
 
+    # Check for already-running executions
+    running_check = await db.execute(
+        select(PipelineExecution).where(
+            PipelineExecution.pipeline_id == pipeline_id,
+            PipelineExecution.status == ExecutionStatus.RUNNING,
+        )
+    )
+    if running_check.scalar_one_or_none():
+        raise HTTPException(
+            status_code=409,
+            detail="Pipeline is already running. Wait for completion or cancel the active execution.",
+        )
+
+    # Create execution record
     execution = PipelineExecution(
         pipeline_id=pipeline_id,
         user_id=current_user.id,
         status=ExecutionStatus.PENDING,
         triggered_by="manual",
+        logs=[],
     )
     db.add(execution)
+    pipeline.status = PipelineStatus.PENDING
+    db.add(pipeline)
     await db.commit()
     await db.refresh(execution)
 
-    # Emit status update via websocket
+    # Emit initial status
     await manager.broadcast({
         "type": "pipeline_status",
         "pipeline_id": pipeline_id,
         "execution_id": execution.id,
-        "status": "running",
-        "timestamp": datetime.now().isoformat()
+        "status": "pending",
+        "progress": 0,
+        "timestamp": datetime.now().isoformat(),
     })
+
+    # Register cancellation event before launching (closes race window)
+    PipelineExecutor._cancel_requests[execution.id] = asyncio.Event()
+
+    # Kick off execution in the background
+    background_tasks.add_task(pipeline_executor.execute, pipeline, execution)
 
     return execution
 
@@ -293,3 +430,50 @@ async def get_execution_logs_public(
 ):
     """Return logs for an execution using the public executions route."""
     return await get_execution_logs(execution_id, db, current_user)
+
+
+@router.post("/test-connection", response_model=TestConnectionResponse)
+async def test_connection(
+    request: TestConnectionRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Test a database connection without saving a pipeline.
+
+    Accepts a connection string (postgresql://, sqlite://, bigquery://),
+    attempts to connect using the ``DatabaseConnector``, lists available
+    tables, and returns the result.
+
+    Use this endpoint to validate credentials before building a pipeline.
+    The connection is always closed (via the async context manager) before
+    the response is returned.
+    """
+    from app.core.db_connector import DatabaseConnector
+
+    try:
+        async with DatabaseConnector(request.connection_string) as db:
+            try:
+                tables = await db.list_tables()
+            except Exception as exc:
+                logger.warning(
+                    "test-connection: connected to %s but list_tables failed: %s",
+                    db.db_type, exc,
+                )
+                tables = []
+
+            return TestConnectionResponse(
+                success=True,
+                db_type=db.db_type,
+                tables=tables,
+            )
+    except Exception as exc:
+        error_msg = str(exc).split("\n")[0][:300]
+        logger.info(
+            "test-connection failed for %s: %s",
+            request.connection_string.split("://")[0] + "://...",
+            error_msg,
+        )
+        return TestConnectionResponse(
+            success=False,
+            db_type=request.db_type or DatabaseConnector._detect_db_type(request.connection_string),
+            error=error_msg,
+        )
