@@ -29,6 +29,7 @@ interface PipelineNodeData {
   status?: 'idle' | 'running' | 'success' | 'error';
   records?: number;
   duration?: number;
+  config?: Record<string, any>;
 }
 
 interface PipelineNodeProps {

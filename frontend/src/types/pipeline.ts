@@ -41,3 +41,28 @@ export interface PipelineCreateRequest {
   schedule: string;
   config: Record<string, any>;
 }
+
+export interface RagSearchResult {
+  query: string;
+  parsed: Record<string, any>;
+  score: number;
+  pipeline_id: number | null;
+}
+
+export interface RagSearchResponse {
+  results: RagSearchResult[];
+  total: number;
+}
+
+export interface TestConnectionRequest {
+  connection_string: string;
+  db_type?: string;
+  timeout_seconds?: number;
+}
+
+export interface TestConnectionResponse {
+  success: boolean;
+  db_type: string;
+  tables: string[];
+  error?: string | null;
+}

@@ -1,211 +1,463 @@
-import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Sparkles, Send, Paperclip, Mic, Copy, RefreshCw, Save,
+  Loader2, Bot, History, GitBranch,
+  Activity, Clock, Cpu,
+} from 'lucide-react';
 import { usePipelineStore } from '../store/pipelineStore';
-import ChatInterface from '../components/chat/ChatInterface';
+import { useNotificationStore } from '../store/notificationStore';
 import PipelineCanvas from '../components/builder/PipelineCanvas';
 import AgentManagerPanel from '../components/builder/AgentManagerPanel';
 
-type Panel = 'chat' | 'canvas' | 'agents';
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  isStreaming?: boolean;
+  type?: 'success' | 'error' | 'info';
+}
 
-const PipelineBuilderPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  const pipelineId = id ? parseInt(id, 10) : undefined;
-  const { currentPipeline } = usePipelineStore();
+// ── Sub-components ─────────────────────────────────────────────────────────
 
-  const [activePanel, setActivePanel] = useState<Panel>('chat');
-  const [pipelineName, setPipelineName] = useState(
-    currentPipeline?.name || 'New Pipeline'
-  );
-  const [editingName, setEditingName] = useState(false);
-
-  const tabs: { id: Panel; label: string; icon: React.ReactNode }[] = [
-    {
-      id: 'chat',
-      label: 'Chat',
-      icon: (
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-        </svg>
-      ),
-    },
-    {
-      id: 'canvas',
-      label: 'Canvas',
-      icon: (
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-        </svg>
-      ),
-    },
-    {
-      id: 'agents',
-      label: 'Agents',
-      icon: (
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2" />
-        </svg>
-      ),
-    },
+const HistoryPanel: React.FC = () => {
+  const conversations = [
+    { id: '1', title: 'Daily Sales ETL', time: '2 min ago', pinned: true },
+    { id: '2', title: 'Customer 360 Pipeline', time: '1 hour ago', pinned: false },
+    { id: '3', title: 'IoT Data Ingestion', time: '3 hours ago', pinned: false },
   ];
 
-  // Update pipeline name when currentPipeline changes
-  React.useEffect(() => {
-    if (currentPipeline?.name) {
-      setPipelineName(currentPipeline.name);
+  return (
+    <div className="bg-[#111827] rounded-2xl border border-[#1E293B] p-4">
+      <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+        <History size={14} className="text-purple-400" />
+        History
+      </h3>
+      <div className="space-y-1">
+        {conversations.map((conv) => (
+          <button
+            key={conv.id}
+            className="w-full text-left px-3 py-2 rounded-xl hover:bg-white/5 transition-colors group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-200 truncate">{conv.title}</span>
+              {conv.pinned && (
+                <span className="text-[10px] text-amber-400 shrink-0">📌</span>
+              )}
+            </div>
+            <span className="text-xs text-gray-500">{conv.time}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-[#1E293B]">
+        <h4 className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">Templates</h4>
+        {['Daily Sales ETL', 'Customer 360', 'IoT Streaming'].map((t) => (
+          <button
+            key={t}
+            className="w-full text-left text-sm px-3 py-1.5 rounded-xl text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-colors"
+          >
+            {t.startsWith('Daily') && '📊 '}
+            {t.startsWith('Customer') && '📈 '}
+            {t.startsWith('IoT') && '🌐 '}
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {/* Agent activity feed (compact) */}
+      <div className="mt-4 pt-4 border-t border-[#1E293B]">
+        <h4 className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wider flex items-center gap-2">
+          <Activity size={12} className="text-cyan-400" />
+          Agent Activity
+        </h4>
+        <div className="space-y-2">
+          <div className="flex items-start gap-2 text-xs">
+            <Cpu size={12} className="text-purple-400 mt-0.5 shrink-0" />
+            <span className="text-gray-300 font-medium">Intent Parser</span>
+            <span className="text-gray-500">idle</span>
+          </div>
+          <div className="flex items-start gap-2 text-xs">
+            <Cpu size={12} className="text-gray-500 mt-0.5 shrink-0" />
+            <span className="text-gray-300 font-medium">Extraction Agent</span>
+            <span className="text-gray-500">idle</span>
+          </div>
+          <div className="flex items-start gap-2 text-xs">
+            <Cpu size={12} className="text-gray-500 mt-0.5 shrink-0" />
+            <span className="text-gray-300 font-medium">Transformer Agent</span>
+            <span className="text-gray-500">idle</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ActivityLog: React.FC<{ agent: string; message: string; status?: 'running' | 'success' | 'idle' | 'error' }> = ({
+  agent, message, status = 'running',
+}) => {
+  const colors = {
+    running: 'text-purple-400',
+    success: 'text-green-400',
+    idle: 'text-gray-500',
+    error: 'text-red-400',
+  };
+  return (
+    <div className="flex items-start gap-2 text-sm">
+      <Bot size={14} className={`${colors[status]} mt-0.5 shrink-0`} />
+      <div>
+        <span className="font-medium text-gray-200">{agent}</span>
+        <span className="text-gray-400"> {message}</span>
+      </div>
+    </div>
+  );
+};
+
+const SuggestionChip: React.FC<{ children: React.ReactNode; onClick?: () => void }> = ({ children, onClick }) => (
+  <button
+    onClick={onClick}
+    className="px-3 py-1.5 rounded-full bg-[#1E293B] hover:bg-[#2D3748] border border-purple-500/10 text-sm text-gray-400 hover:text-gray-200 transition-all"
+  >
+    {children}
+  </button>
+);
+
+// ── Main Component ─────────────────────────────────────────────────────────
+
+const PipelineBuilderPage: React.FC = () => {
+  const location = useLocation();
+
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      role: 'assistant',
+      content: "Hello! I'm AIDEN, your AI data engineering assistant. Describe the pipeline you need, and I'll build it with you step by step.",
+    },
+  ]);
+  const [input, setInput] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [pipelineData, setPipelineData] = useState<any>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { createFromPrompt } = usePipelineStore();
+  const { addNotification } = useNotificationStore();
+
+  const reusedPipeline = (location.state as any)?.reusedPipeline;
+  const demoPipelineSummary = `✅ Pipeline created successfully!\n\n**Steps completed:**\n1. 🔍 **Extract** — Connected to PostgreSQL, discovered schema\n2. 🔄 **Transform** — Cleaned data, removed duplicates, aggregated by region\n3. 📥 **Load** — Wrote to Snowflake, analytics schema\n\n**Next steps:** View in Pipelines or monitor execution.`;
+
+  const pipelineName = reusedPipeline?.name || 'New Pipeline';
+
+  const handleSend = async () => {
+    if (!input.trim() || isGenerating) return;
+
+    const userMsg: Message = { id: Date.now().toString(), role: 'user', content: input };
+    setMessages((prev) => [...prev, userMsg]);
+    setInput('');
+    setIsGenerating(true);
+
+    // Add streaming assistant message placeholder
+    const assistantId = 'streaming-' + Date.now();
+    setMessages((prev) => [
+      ...prev,
+      { id: assistantId, role: 'assistant', content: '', isStreaming: true },
+    ]);
+
+    // Simulate step-by-step pipeline generation with canvas updates
+    const steps = [
+      { stage: 'extract', label: '🔍 Extracting from PostgreSQL', duration: 1200, nodeId: 'source-1' },
+      { stage: 'transform-1', label: '🔄 Cleaning and standardizing data', duration: 1600, nodeId: 'transform-1' },
+      { stage: 'transform-2', label: '🔄 Aggregating by region', duration: 1400, nodeId: 'transform-2' },
+      { stage: 'load', label: '📥 Loading into Snowflake', duration: 1000, nodeId: 'destination-1' },
+    ];
+
+    let accumulatedContent = '';
+    for (const step of steps) {
+      // Update conversation message
+      accumulatedContent += `⏳ ${step.label}...\n`;
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId ? { ...m, content: accumulatedContent } : m
+        )
+      );
+
+      // Update pipeline canvas nodes
+      setPipelineData((prev: any) => {
+        const existingNodes = prev?.nodes || [];
+        const newNodes = [...existingNodes, { id: step.nodeId, label: step.label.replace(/^.[^\s]+\s/, ''), status: 'running' }].map((n) => ({
+          ...n,
+          status: n.id === step.nodeId ? 'running' : n.status || 'success',
+        }));
+        return { ...prev, nodes: newNodes };
+      });
+
+      await new Promise((r) => setTimeout(r, step.duration));
     }
-  }, [currentPipeline?.name]);
+
+    // Finalize
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === assistantId
+          ? { ...m, content: demoPipelineSummary, isStreaming: false, type: 'success' }
+          : m
+      )
+    );
+
+    // Final canvas state (all done)
+    setPipelineData({
+      nodes: [
+        { id: 'source-1', label: 'PostgreSQL', status: 'success', type: 'source' },
+        { id: 'transform-1', label: 'Clean Data', status: 'success', type: 'transform' },
+        { id: 'transform-2', label: 'Aggregate', status: 'success', type: 'transform' },
+        { id: 'destination-1', label: 'Snowflake', status: 'success', type: 'destination' },
+      ],
+    });
+
+    try {
+      const pipeline = await createFromPrompt(input);
+      addNotification({ type: 'success', message: `Pipeline "${pipeline.name}" created!` });
+    } catch {
+      addNotification({ type: 'error', message: 'Failed to save pipeline to backend' });
+    }
+
+    setIsGenerating(false);
+  };
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const suggestionChips = [
+    { label: 'Build Sales Pipeline', onClick: () => setInput('Build a daily sales ETL from PostgreSQL to Snowflake') },
+    { label: 'IoT Ingestion', onClick: () => setInput('Create a real-time IoT data pipeline from Kafka to BigQuery') },
+    { label: 'Customer 360', onClick: () => setInput('Build a customer 360 pipeline merging 3 sources') },
+    { label: 'Data Quality', onClick: () => setInput('Set up data quality monitoring on all tables') },
+  ];
 
   return (
-    <div className="flex flex-col gap-4 animate-fade-in">
-      {/* ── Builder Header ───────────────────────────── */}
-      <div className="card p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Link
-            to="/pipelines"
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:bg-gray-50 hover:text-gray-900"
-            title="Back to pipelines"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </Link>
-          <div>
-            {editingName ? (
-              <input
-                type="text"
-                value={pipelineName}
-                onChange={(e) => setPipelineName(e.target.value)}
-                onBlur={() => setEditingName(false)}
-                onKeyDown={(e) => e.key === 'Enter' && setEditingName(false)}
-                className="input px-3 py-1 text-sm font-bold"
-                autoFocus
-              />
-            ) : (
-              <button
-                onClick={() => setEditingName(true)}
-                className="flex items-center gap-1.5 group"
-              >
-                <span className="text-sm font-bold text-gray-900 group-hover:text-blue-600">
-                  {pipelineName}
-                </span>
-                <svg className="h-3.5 w-3.5 text-gray-400 opacity-0 transition group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-              </button>
-            )}
-            <p className="text-xs text-gray-500">
-              {pipelineId ? `ID: #${pipelineId}` : 'New pipeline'}
+    <div className="flex h-[calc(100vh-72px)] gap-4 p-4">
+      {/* ═══════════════════════════════════════════════════════════════╗
+          ║  LEFT PANEL — History + Agents                              ║
+          ╚══════════════════════════════════════════════════════════════╝ */}
+      <div className="w-64 flex-shrink-0 overflow-y-auto space-y-4 hidden lg:block">
+        {reusedPipeline && (
+          <div className="rounded-2xl border border-purple-500/20 bg-purple-500/10 p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <GitBranch size={14} className="text-purple-400" />
+              <span className="text-xs font-semibold text-purple-300">
+                Reusing pipeline
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              {reusedPipeline.description || `From execution #${reusedPipeline.executionId || 'past run'}`}
             </p>
+            <div className="flex flex-wrap gap-2 mt-2 text-[11px] text-gray-400">
+              <span className="bg-white/5 px-2 py-0.5 rounded">
+                Source: <strong className="text-gray-200">{reusedPipeline.source_type || '?'}</strong>
+              </span>
+              <span className="bg-white/5 px-2 py-0.5 rounded">
+                Dest: <strong className="text-gray-200">{reusedPipeline.destination_type || '?'}</strong>
+              </span>
+            </div>
+          </div>
+        )}
+
+        <HistoryPanel />
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════╗
+          ║  CENTER PANEL — Chat                                        ║
+          ╚══════════════════════════════════════════════════════════════╝ */}
+      <div className="flex-1 flex flex-col min-w-0 bg-[#111827] rounded-3xl border border-[#1E293B] overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-[#1E293B] shrink-0">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-purple-600 to-cyan-600 shadow-lg shadow-purple-500/25">
+            <Sparkles size={16} className="text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-white">{pipelineName}</p>
+            <p className="text-xs text-gray-400">AI Pipeline Assistant</p>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-500/10 border border-green-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-[11px] text-green-400 font-medium">Online</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <AnimatePresence>
+            {messages.map((msg) => (
+              <motion.div
+                key={msg.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-2xl rounded-2xl px-4 py-3 ${
+                    msg.role === 'user'
+                      ? 'bg-gradient-to-r from-purple-600 to-cyan-600 text-white'
+                      : msg.type === 'success'
+                        ? 'bg-green-500/10 border border-green-500/20 text-gray-100'
+                        : msg.type === 'error'
+                          ? 'bg-red-500/10 border border-red-500/20 text-gray-100'
+                          : 'bg-[#1E293B] border border-[#2D3748] text-gray-100'
+                  }`}
+                >
+                  <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                    {msg.content}
+                    {msg.isStreaming && (
+                      <span className="inline-block w-1.5 h-4 bg-purple-400 animate-pulse ml-1 align-text-bottom" />
+                    )}
+                  </div>
+                  <div className="mt-1 text-[10px] opacity-40">
+                    {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input */}
+        <div className="border-t border-[#1E293B] p-4 shrink-0">
+          <div className="flex items-center gap-3 bg-[#0D1A2A] rounded-2xl border border-[#1E293B] p-2 transition-all duration-200 focus-within:border-purple-500/40 focus-within:shadow-glow-purple">
+            <button className="p-2 hover:bg-[#1E293B] rounded-xl transition-colors" title="Attach file">
+              <Paperclip size={18} className="text-gray-400" />
+            </button>
+            <button className="p-2 hover:bg-[#1E293B] rounded-xl transition-colors" title="Voice input">
+              <Mic size={18} className="text-gray-400" />
+            </button>
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              placeholder="Describe your pipeline in plain English..."
+              className="flex-1 bg-transparent border-none outline-none text-white placeholder-gray-500 py-2 px-1"
+              disabled={isGenerating}
+            />
+            <button
+              onClick={handleSend}
+              disabled={isGenerating || !input.trim()}
+              className="p-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {isGenerating ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Send size={18} />
+              )}
+            </button>
           </div>
 
-          {/* Status badge */}
-          {currentPipeline && (
-            <span className={`ml-2 badge ${
-              currentPipeline.status === 'running' ? 'badge-warning' :
-              currentPipeline.status === 'success' ? 'badge-success' :
-              currentPipeline.status === 'failed' ? 'badge-error' :
-              'badge-gray'
-            }`}>
-              {currentPipeline.status || 'draft'}
-            </span>
+          {/* Suggestion chips */}
+          {!isGenerating && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {suggestionChips.map((chip, i) => (
+                <SuggestionChip key={i} onClick={chip.onClick}>
+                  {chip.label}
+                </SuggestionChip>
+              ))}
+            </div>
           )}
         </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            id="builder-save-btn"
-            className="btn-secondary px-3 py-2 text-xs"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-            </svg>
-            Save
-          </button>
-          <button
-            id="builder-run-btn"
-            className="btn-primary px-3 py-2 text-xs"
-            disabled={!currentPipeline}
-            title={!currentPipeline ? 'Create a pipeline first' : 'Run pipeline'}
-          >
-            <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-            Run
-          </button>
-          <button
-            id="builder-export-btn"
-            className="btn-icon"
-            title="Export"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-          </button>
-        </div>
       </div>
 
-      {/* ── Desktop 3-Panel Layout ───────────────────── */}
-      <div className="hidden xl:grid xl:h-[calc(100vh-200px)] xl:grid-cols-[320px_1fr_280px] xl:gap-4">
-        {/* Left: Chat Panel */}
-        <div className="card flex flex-col overflow-hidden p-0">
-          <div className="flex items-center gap-2 border-b border-gray-100 px-5 py-4">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white">
-              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-gray-900">AIDEN Chat</p>
-              <p className="text-[10px] text-gray-400">AI pipeline assistant</p>
-            </div>
-            <div className="ml-auto flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-              <span className="text-[10px] text-green-600 font-medium">Online</span>
-            </div>
+      {/* ═══════════════════════════════════════════════════════════════╗
+          ║  RIGHT PANEL — Pipeline Preview + Agent Activity            ║
+          ╚══════════════════════════════════════════════════════════════╝ */}
+      <div className="w-96 flex-shrink-0 space-y-4 overflow-y-auto hidden xl:block">
+        {/* Pipeline Flow Canvas Preview */}
+        <div className="bg-[#111827] rounded-2xl border border-[#1E293B] p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium text-white flex items-center gap-2">
+              <GitBranch size={14} className="text-purple-400" />
+              Pipeline Flow
+            </h3>
+            {pipelineData && (
+              <button className="text-xs text-purple-400 hover:text-purple-300 transition-colors">
+                Full View →
+              </button>
+            )}
           </div>
-          <div className="flex-1 overflow-hidden">
-            <ChatInterface />
+          <div
+            className="h-48 rounded-xl overflow-hidden"
+            style={{ background: 'linear-gradient(135deg, #0D1A2A, #111827)' }}
+          >
+            <PipelineCanvas
+              pipeline={pipelineData}
+              interactive={false}
+              compact
+            />
           </div>
         </div>
 
-        {/* Center: Canvas — pass pipelineId */}
-        <div className="card overflow-hidden p-0">
-          <PipelineCanvas pipelineId={pipelineId} />
+        {/* Agent Activity Feed */}
+        <div className="bg-[#111827] rounded-2xl border border-[#1E293B] p-4">
+          <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+            <Cpu size={14} className="text-cyan-400" />
+            Agent Activity
+          </h3>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {isGenerating ? (
+              <>
+                <ActivityLog agent="Intent Parser" message="Parsing user request..." status="running" />
+                <ActivityLog agent="Extraction Agent" message="Connecting to PostgreSQL..." status="running" />
+                <ActivityLog agent="Transformer Agent" message="Generating transformation logic..." status="running" />
+                <ActivityLog agent="Loader Agent" message="Preparing Snowflake schema..." status="running" />
+              </>
+            ) : pipelineData ? (
+              <>
+                <ActivityLog agent="Intent Parser" message="Pipeline intent parsed" status="success" />
+                <ActivityLog agent="Extraction Agent" message="Data extracted from PostgreSQL" status="success" />
+                <ActivityLog agent="Transformer Agent" message="Transformation complete" status="success" />
+                <ActivityLog agent="Loader Agent" message="Loaded to Snowflake" status="success" />
+              </>
+            ) : (
+              <p className="text-sm text-gray-500 flex items-center gap-2">
+                <Clock size={14} />
+                Waiting for pipeline request...
+              </p>
+            )}
+          </div>
         </div>
 
-        {/* Right: Agents */}
-        <div className="card overflow-hidden p-0">
-          <AgentManagerPanel />
-        </div>
-      </div>
-
-      {/* ── Mobile Tab Layout ────────────────────────── */}
-      <div className="xl:hidden">
-        {/* Tab Switcher */}
-        <div className="mb-3 flex overflow-x-auto gap-1 rounded-xl border border-gray-100 bg-white p-1 shadow-sm">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              id={`builder-tab-${tab.id}`}
-              onClick={() => setActivePanel(tab.id)}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all whitespace-nowrap ${
-                activePanel === tab.id
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {tab.icon}
-              {tab.label}
+        {/* Quick Actions */}
+        <div className="bg-[#111827] rounded-2xl border border-[#1E293B] p-4">
+          <h3 className="text-sm font-medium text-white mb-3">Quick Actions</h3>
+          <div className="grid grid-cols-2 gap-2">
+            <button className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-[#1E293B] rounded-xl text-sm text-gray-300 hover:text-white hover:bg-[#2D3748] transition-colors">
+              <Save size={14} /> Save
             </button>
-          ))}
+            <button
+              className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-xl text-sm font-medium text-white hover:opacity-90 transition-opacity"
+              disabled={!pipelineData}
+            >
+              <Send size={14} /> Deploy
+            </button>
+            <button className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-[#1E293B] rounded-xl text-sm text-gray-300 hover:text-white hover:bg-[#2D3748] transition-colors">
+              <Copy size={14} /> Copy
+            </button>
+            <button className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-[#1E293B] rounded-xl text-sm text-gray-300 hover:text-white hover:bg-[#2D3748] transition-colors">
+              <RefreshCw size={14} /> Reset
+            </button>
+          </div>
         </div>
+      </div>
 
-        {/* Panel Content */}
-        <div className="card p-0 h-[calc(100vh-280px)] min-h-[400px] overflow-hidden">
-          {activePanel === 'chat' && <ChatInterface />}
-          {activePanel === 'canvas' && <PipelineCanvas pipelineId={pipelineId} />}
-          {activePanel === 'agents' && <AgentManagerPanel />}
-        </div>
+      {/* Mobile tab bar */}
+      <div className="xl:hidden fixed bottom-0 left-0 right-0 bg-[#050816] border-t border-[#1E293B] p-2 flex gap-1 z-50">
+        {['Chat', 'Canvas', 'Agents'].map((tab) => (
+          <button
+            key={tab}
+            className="flex-1 py-2 px-3 rounded-xl text-xs font-medium text-gray-400 hover:text-white hover:bg-[#1E293B] transition-colors"
+          >
+            {tab}
+          </button>
+        ))}
       </div>
     </div>
   );

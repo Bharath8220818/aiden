@@ -5,16 +5,17 @@ import { formatDistanceToNow } from 'date-fns';
 
 import { PageSkeleton } from '../components/ui/Skeleton';
 
-const FILTERS = ['all', 'running', 'success', 'failed', 'draft', 'pending', 'paused'] as const;
+const FILTERS = ['all', 'running', 'success', 'failed', 'cancelled', 'draft', 'pending', 'paused'] as const;
 type Filter = (typeof FILTERS)[number];
 
 const STATUS_META: Record<string, { label: string; badge: string; dot: string }> = {
-  draft:   { label: 'Draft',   badge: 'badge-gray',    dot: 'bg-gray-400' },
-  pending: { label: 'Pending', badge: 'badge-warning',  dot: 'bg-yellow-500' },
-  running: { label: 'Running', badge: 'badge-info',     dot: 'bg-blue-500' },
-  success: { label: 'Success', badge: 'badge-success',  dot: 'bg-green-500' },
-  failed:  { label: 'Failed',  badge: 'badge-error',    dot: 'bg-red-500' },
-  paused:  { label: 'Paused',  badge: 'badge-gray',     dot: 'bg-gray-400' },
+  draft:     { label: 'Draft',     badge: 'badge-gray',    dot: 'bg-gray-400' },
+  pending:   { label: 'Pending',   badge: 'badge-warning',  dot: 'bg-yellow-500' },
+  running:   { label: 'Running',   badge: 'badge-info',     dot: 'bg-blue-500' },
+  success:   { label: 'Success',   badge: 'badge-success',  dot: 'bg-green-500' },
+  failed:    { label: 'Failed',    badge: 'badge-error',    dot: 'bg-red-500' },
+  paused:    { label: 'Paused',    badge: 'badge-gray',     dot: 'bg-gray-400' },
+  cancelled: { label: 'Cancelled', badge: 'badge-gray',     dot: 'bg-gray-400' },
 };
 
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
@@ -28,7 +29,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
 };
 
 const PipelinesPage: React.FC = () => {
-  const { pipelines, isLoading, fetchPipelines, deletePipeline, runPipeline } = usePipelineStore();
+  const { pipelines, isLoading, fetchPipelines, deletePipeline, runPipeline, cancelPipeline } = usePipelineStore();
   const [selectedFilter, setSelectedFilter] = useState<Filter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -65,6 +66,12 @@ const PipelinesPage: React.FC = () => {
   const handleRun = async (id: number) => {
     await runPipeline(id);
   };
+
+  const handleCancel = async (id: number) => {
+    await cancelPipeline(id);
+  };
+
+  const isRunning = (status: string) => status === 'running' || status === 'pending';
 
   if (isLoading && pipelines.length === 0) {
     return <PageSkeleton />;
@@ -241,15 +248,27 @@ const PipelinesPage: React.FC = () => {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
                           </Link>
-                          <button
-                            onClick={() => handleRun(pipeline.id)}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-green-200 bg-green-50 text-green-600 transition-all hover:bg-green-100 hover:shadow-sm"
-                            title="Run pipeline"
-                          >
-                            <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M8 5v14l11-7z" />
-                            </svg>
-                          </button>
+                          {isRunning(pipeline.status) ? (
+                            <button
+                              onClick={() => handleCancel(pipeline.id)}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-300 bg-red-50 text-red-600 transition-all hover:bg-red-100 hover:shadow-sm animate-pulse"
+                              title="Cancel running pipeline"
+                            >
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleRun(pipeline.id)}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-green-200 bg-green-50 text-green-600 transition-all hover:bg-green-100 hover:shadow-sm"
+                              title="Run pipeline"
+                            >
+                              <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z" />
+                              </svg>
+                            </button>
+                          )}
                           <button
                             onClick={() => handleDelete(pipeline.id, pipeline.name)}
                             className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-500 transition-all hover:bg-red-100 hover:shadow-sm"
@@ -297,13 +316,23 @@ const PipelinesPage: React.FC = () => {
                   <StatusBadge status={pipeline.status} />
                 </div>
                 <div className="mt-3 flex justify-end gap-2 border-t border-gray-50 pt-3">
-                  <button
-                    onClick={() => handleRun(pipeline.id)}
-                    className="flex items-center gap-1.5 rounded-lg bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100"
-                  >
-                    <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-                    Run
-                  </button>
+                  {isRunning(pipeline.status) ? (
+                    <button
+                      onClick={() => handleCancel(pipeline.id)}
+                      className="flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-100 animate-pulse"
+                    >
+                      <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      Cancel
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleRun(pipeline.id)}
+                      className="flex items-center gap-1.5 rounded-lg bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100"
+                    >
+                      <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                      Run
+                    </button>
+                  )}
                   <Link
                     to={`/pipelines/${pipeline.id}`}
                     className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100"

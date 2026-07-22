@@ -1,9 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { usePipelineStore } from '../../store/pipelineStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import SuggestionChips from './SuggestionChips';
+import RagDiffView from './RagDiffView';
+import { Lightbulb, Sparkles, ArrowRight } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -25,8 +27,11 @@ const ChatInterface: React.FC = () => {
     },
   ]);
   const [isLoading, setIsLoading] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const [selectedRagResult, setSelectedRagResult] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { createFromPrompt } = usePipelineStore();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { createFromPrompt, ragSearch, ragResults, clearRagResults } = usePipelineStore();
   const { addNotification } = useNotificationStore();
 
   const suggestions = [
@@ -37,7 +42,29 @@ const ChatInterface: React.FC = () => {
     'Create a pipeline that cleans and aggregates log data',
   ];
 
+  // Debounced RAG search when user types
+  const handleInputChange = useCallback((value: string) => {
+    setInputValue(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (value.trim().length < 3) {
+      clearRagResults();
+      return;
+    }
+    debounceRef.current = setTimeout(() => {
+      ragSearch(value.trim());
+    }, 500);
+  }, [ragSearch, clearRagResults]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
   const handleSendMessage = async (text: string) => {
+    clearRagResults();
+    setSelectedRagResult(null);
+    setInputValue('');
     const userMessage: Message = {
       id: Date.now().toString(),
       text,
@@ -62,6 +89,12 @@ const ChatInterface: React.FC = () => {
 
     try {
       const pipeline = await createFromPrompt(text);
+      
+      // Auto-populate canvas with pipeline nodes from the created pipeline
+      const autoPopulate = (window as any).__autoPopulateCanvas;
+      if (autoPopulate) {
+        autoPopulate(pipeline);
+      }
       
       // Remove typing indicator
       setMessages((prev) => prev.filter((m) => m.id !== typingId));
@@ -123,18 +156,58 @@ const ChatInterface: React.FC = () => {
   return (
     <div className="flex flex-col h-full bg-gray-50">
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* RAG Suggestion Banner */}
+        {ragResults && ragResults.length > 0 && inputValue.trim().length >= 3 && !selectedRagResult && (
+          <div className="rounded-xl border border-purple-100 bg-purple-50 p-3 shadow-sm dark:border-purple-900/30 dark:bg-purple-950/20">
+            <div className="flex items-center gap-2 mb-2">
+              <Lightbulb size={14} className="text-purple-600" />
+              <span className="text-xs font-semibold text-purple-700 dark:text-purple-300">
+                We found similar pipelines you created earlier
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {ragResults.slice(0, 3).map((result, i) => (
+                <button
+                  key={i}
+                  onClick={() => setSelectedRagResult(result)}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-purple-700 shadow-sm transition-all hover:bg-purple-100 hover:shadow-md active:scale-95 dark:bg-gray-800 dark:text-purple-300 dark:hover:bg-purple-900/30"
+                >
+                  <Sparkles size={12} />
+                  <span className="truncate max-w-[140px]">{result.query}</span>
+                  <span className="text-[10px] text-gray-400 ml-1">
+                    {Math.round(result.score * 100)}%
+                  </span>
+                  <ArrowRight size={10} />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Diff View for selected RAG result */}
+        {selectedRagResult && (
+          <RagDiffView
+            matchedPipeline={selectedRagResult}
+            onUseMatch={() => {
+              const prompt = `Build a pipeline like "${selectedRagResult.query}" - source: ${selectedRagResult.parsed?.source_type || 'postgres'}, destination: ${selectedRagResult.parsed?.destination_type || 'snowflake'}`;
+              handleSendMessage(prompt);
+            }}
+            onDismiss={() => setSelectedRagResult(null)}
+          />
+        )}
+
         <MessageList messages={messages} />
         <div ref={messagesEndRef} />
       </div>
       
-      {messages.length === 1 && (
+      {messages.length === 1 && !inputValue && (
         <div className="px-4 pb-2">
           <SuggestionChips suggestions={suggestions} onSelect={handleSuggestionSelect} />
         </div>
       )}
       
       <div className="border-t border-gray-200 p-4 bg-white">
-        <MessageInput onSend={handleSendMessage} isLoading={isLoading} />
+        <MessageInput onSend={handleSendMessage} isLoading={isLoading} externalValue={inputValue} onExternalChange={handleInputChange} />
       </div>
     </div>
   );

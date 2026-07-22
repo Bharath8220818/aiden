@@ -3,16 +3,33 @@ import React, { useState, useRef, useEffect } from 'react';
 interface MessageInputProps {
   onSend: (message: string) => void;
   isLoading: boolean;
+  externalValue?: string;
+  onExternalChange?: (value: string) => void;
 }
 
-const MessageInput: React.FC<MessageInputProps> = ({ onSend, isLoading }) => {
+const MessageInput: React.FC<MessageInputProps> = ({ onSend, isLoading, externalValue, onExternalChange }) => {
   const [input, setInput] = useState('');
+
+  const isControlled = externalValue !== undefined;
+  const displayValue = isControlled ? externalValue : input;
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const v = e.target.value;
+    if (isControlled && onExternalChange) {
+      onExternalChange(v);
+    } else {
+      setInput(v);
+    }
+  };
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = () => {
-    if (input.trim() && !isLoading) {
-      onSend(input.trim());
-      setInput('');
+    const value = isControlled ? displayValue : input;
+    if (value.trim() && !isLoading) {
+      onSend(value.trim());
+      if (!isControlled) {
+        setInput('');
+      }
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
@@ -31,7 +48,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSend, isLoading }) => {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
     }
-  }, [input]);
+  }, [displayValue]);
 
   return (
     <div className="flex items-end gap-2">
@@ -52,8 +69,8 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSend, isLoading }) => {
         <textarea
           ref={textareaRef}
           id="chat-message-input"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
+          value={displayValue}
+          onChange={handleChange}
           onKeyDown={handleKeyDown}
           placeholder="Describe the pipeline you need... (Enter to send)"
           className="w-full resize-none overflow-hidden rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 pr-10 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 disabled:opacity-50"
@@ -61,7 +78,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSend, isLoading }) => {
           disabled={isLoading}
         />
         {/* Character hint */}
-        {input.length > 0 && (
+        {displayValue.length > 0 && (
           <p className="absolute -bottom-4 right-1 text-[9px] text-gray-400">
             Shift+Enter for new line
           </p>
@@ -72,7 +89,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSend, isLoading }) => {
       <button
         id="chat-send-btn"
         onClick={handleSubmit}
-        disabled={isLoading || !input.trim()}
+        disabled={isLoading || !displayValue.trim()}
         className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-40 active:scale-95"
         title="Send message"
       >

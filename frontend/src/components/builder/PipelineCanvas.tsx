@@ -17,54 +17,187 @@ import type {
   ReactFlowInstance,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { Database, LayoutPanelTop, GitBranch, Cpu, Sparkles, Activity } from 'lucide-react';
 import { usePipelineStore } from '../../store/pipelineStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useAgentStore } from '../../store/agentStore';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import PipelineNode from './PipelineNode';
 import NodeDetailsModal from './NodeDetailsModal';
+import NodePropertiesPanel from './NodePropertiesPanel';
+import NodePalette from './NodePalette';
 import CanvasControls from './CanvasControls';
 import type { PipelineNodeData } from './PipelineNode';
+import type { PaletteItem } from './NodePalette';
 import LoadingSpinner from '../common/LoadingSpinner';
 
 const nodeTypes: NodeTypes = {
   pipelineNode: PipelineNode,
 };
 
+let nodeCounter = 0;
+const generateNodeId = (type: string): string => {
+  nodeCounter += 1;
+  return `${type}-${nodeCounter}-${Date.now()}`;
+};
+
 interface PipelineCanvasProps {
   pipelineId?: number;
   className?: string;
+  /** Pre-built pipeline with nodes/edges (used by the compact preview in the AI Workspace) */
+  pipeline?: { nodes?: Array<{ id: string; label: string; status?: string; type?: string }>; edges?: Array<{ source: string; target: string }> };
+  /** Compact mode for the right-panel preview (non-interactive, no toolbar) */
+  interactive?: boolean;
+  compact?: boolean;
 }
 
 const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
   pipelineId,
   className = '',
+  pipeline: pipelineProp,
+  interactive = true,
+  compact = false,
 }) => {
   const {
     currentPipeline,
     fetchPipeline,
     isLoading,
     error,
-    updatePipeline,
   } = usePipelineStore();
   const { addNotification } = useNotificationStore();
   const { addActivity } = useAgentStore();
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [selectedNode, setSelectedNode] = useState<Node<PipelineNodeData> | null>(null);
+  const [showProperties, setShowProperties] = useState(false);
+  const [showPalette, setShowPalette] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [codePreview, setCodePreview] = useState<string | null>(null);
   const reactFlowRef = useRef<ReactFlowInstance | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
 
+  // ── Compact mode: render nodes/edges from the pipeline prop ──────────
+
+  const compactNodes: Node[] = useMemo(() => {
+    if (!pipelineProp?.nodes || pipelineProp.nodes.length === 0) return [];
+    return pipelineProp.nodes.map((n: any, idx: number) => ({
+      id: n.id || `node-${idx}`,
+      type: 'pipelineNode',
+      position: { x: 50 + idx * 160, y: 30 + (idx % 2 === 0 ? 0 : 20) },
+      data: {
+        label: n.label || 'Step',
+        type: n.type || 'transform',
+        description: n.status === 'running' ? 'In progress...' : n.status === 'success' ? 'Complete' : 'Waiting',
+        status: n.status || 'idle',
+      },
+    }));
+  }, [pipelineProp?.nodes]);
+
+  const compactEdges: Edge[] = useMemo(() => {
+    if (!pipelineProp?.nodes || pipelineProp.nodes.length < 2) return [];
+    const result: Edge[] = [];
+    for (let i = 0; i < pipelineProp.nodes.length - 1; i++) {
+      const nextNode = pipelineProp.nodes[i + 1];
+      result.push({
+        id: `edge-c-${i}`,
+        source: pipelineProp.nodes[i].id || `node-${i}`,
+        target: nextNode.id || `node-${i + 1}`,
+        type: 'smoothstep',
+        animated: nextNode?.status === 'running',
+        style: { stroke: nextNode?.status === 'running' ? '#7C3AED' : '#374151', strokeWidth: nextNode?.status === 'running' ? 2.5 : 1.5 },
+      });
+    }
+    return result;
+  }, [pipelineProp?.nodes]);
+
+  // ── Auto-populate from pipeline prop ──
+
+  const autoPopulateFromPipeline = useCallback(
+    (pipeline: any) => {
+      const config = pipeline.config || {};
+      const src = pipeline.source_type || 'postgres';
+      const dst = pipeline.destination_type || 'snowflake';
+      const transforms: string[] = config.transformations || [];
+
+      const gapX = 220;
+      const startX = 80;
+
+      const newNodes: Node<PipelineNodeData>[] = [
+        {
+          id: generateNodeId('source'),
+          type: 'pipelineNode',
+          position: { x: startX, y: 120 },
+          data: {
+            label: src.charAt(0).toUpperCase() + src.slice(1),
+            type: 'source',
+            description: config.source_config?.table
+              ? `Table: ${config.source_config.table}`
+              : `${src} Data Source`,
+            status: 'idle',
+          },
+        },
+      ];
+
+      transforms.forEach((t: string, i: number) => {
+        newNodes.push({
+          id: generateNodeId('transform'),
+          type: 'pipelineNode',
+          position: { x: startX + (i + 1) * gapX, y: 120 + (i % 2 === 0 ? 0 : 80) },
+          data: {
+            label: t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+            type: 'transform',
+            description: `Step ${i + 1} of ${transforms.length}`,
+            status: 'idle',
+          },
+        });
+      });
+
+      newNodes.push({
+        id: generateNodeId('destination'),
+        type: 'pipelineNode',
+        position: { x: startX + (transforms.length + 1) * gapX, y: 120 },
+        data: {
+          label: dst.charAt(0).toUpperCase() + dst.slice(1),
+          type: 'destination',
+          description: config.destination_config?.schema
+            ? `Schema: ${config.destination_config.schema}`
+            : `${dst} Destination`,
+          status: 'idle',
+        },
+      });
+
+      const newEdges: Edge[] = [];
+      for (let i = 0; i < newNodes.length - 1; i++) {
+        newEdges.push({
+          id: `edge-auto-${i}-${Date.now()}`,
+          source: newNodes[i].id,
+          target: newNodes[i + 1].id,
+          type: 'smoothstep',
+          animated: false,
+          style: { stroke: '#A78BFA', strokeWidth: 2 },
+        });
+      }
+
+      setNodes(newNodes);
+      setEdges(newEdges);
+      addActivity('Pipeline Builder', `Auto-populated ${newNodes.length} nodes from pipeline`);
+    },
+    [setNodes, setEdges, addActivity],
+  );
+
+  useEffect(() => {
+    (window as any).__autoPopulateCanvas = autoPopulateFromPipeline;
+    return () => {
+      delete (window as any).__autoPopulateCanvas;
+    };
+  }, [autoPopulateFromPipeline]);
+
   // ── WebSocket ──
 
   const { isConnected, subscribe } = useWebSocket({
-    url: `${
-      import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
-    }/ws/pipeline-${pipelineId || 'default'}`,
+    url: `${import.meta.env.VITE_WS_URL || 'ws://localhost:8000'}/ws/pipeline-${pipelineId || 'default'}`,
     onMessage: (data) => handleWebSocketMessage(data),
     reconnectInterval: 3000,
     maxReconnectAttempts: 5,
@@ -73,7 +206,6 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
   const handleWebSocketMessage = useCallback(
     (data: any) => {
       const { type, payload } = data;
-
       switch (type) {
         case 'pipeline_status': {
           const { stage, status, records, duration } = payload || {};
@@ -87,13 +219,9 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
                   data: {
                     ...node.data,
                     status:
-                      status === 'running'
-                        ? 'running'
-                        : status === 'success'
-                          ? 'success'
-                          : status === 'error'
-                            ? 'error'
-                            : 'idle',
+                      status === 'running' ? 'running' :
+                      status === 'success' ? 'success' :
+                      status === 'error' ? 'error' : 'idle',
                     records: records ?? node.data.records,
                     duration: duration ?? node.data.duration,
                   },
@@ -102,242 +230,130 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
               return node;
             }),
           );
-          addNotification({
-            type:
-              status === 'error'
-                ? 'error'
-                : status === 'running'
-                  ? 'info'
-                  : 'success',
-            message: `Pipeline ${stage}: ${status}`,
-          });
           break;
         }
-
         case 'pipeline_complete': {
-          addNotification({
-            type: 'success',
-            message: `Pipeline ${payload?.name} completed! 🎉`,
-          });
+          addNotification({ type: 'success', message: `Pipeline ${payload?.name} completed! 🎉` });
           if (pipelineId) fetchPipeline(pipelineId);
           break;
         }
-
         case 'pipeline_failed': {
-          addNotification({
-            type: 'error',
-            message: `Pipeline ${payload?.name} failed: ${payload?.error}`,
-          });
+          addNotification({ type: 'error', message: `Pipeline ${payload?.name} failed: ${payload?.error}` });
           break;
         }
-
-        case 'node_update': {
-          setNodes((nds) =>
-            nds.map((node) =>
-              node.id === payload?.node_id
-                ? { ...node, data: { ...node.data, ...payload?.data } }
-                : node,
-            ),
-          );
-          break;
-        }
-
-        default:
-          break;
+        default: break;
       }
     },
     [pipelineId, fetchPipeline, addNotification],
   );
 
-  // Fetch pipeline when ID changes
   useEffect(() => {
-    if (pipelineId) {
-      fetchPipeline(pipelineId);
-    }
+    if (pipelineId) fetchPipeline(pipelineId);
   }, [pipelineId, fetchPipeline]);
 
-  // Subscribe to WebSocket updates
   useEffect(() => {
-    if (isConnected && pipelineId) {
-      subscribe('pipeline_updates', { pipeline_id: pipelineId });
-    }
+    if (isConnected && pipelineId) subscribe('pipeline_updates', { pipeline_id: pipelineId });
   }, [isConnected, pipelineId, subscribe]);
 
-  // Transform pipeline config into React Flow nodes and edges
   useEffect(() => {
-    if (!currentPipeline) {
-      setNodes([]);
-      setEdges([]);
-      setCodePreview(null);
-      return;
+    if (currentPipeline && nodes.length === 0 && !compact) {
+      autoPopulateFromPipeline(currentPipeline);
+      if (currentPipeline.code) setCodePreview(currentPipeline.code);
     }
+  }, [currentPipeline]);
 
-    const config = currentPipeline.config || {};
-    const sourceType = currentPipeline.source_type || 'Unknown';
-    const destinationType = currentPipeline.destination_type || 'Unknown';
-    const transformations = config.transformations || [];
-    const status = currentPipeline.status || 'draft';
-    const isRunning = status === 'running';
+  // ── Drag-and-Drop ──
 
-    if (isRunning) {
-      addActivity('System', `Pipeline "${currentPipeline.name}" is running`);
-    }
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }, []);
 
-    const nodeStatus: PipelineNodeData['status'] =
-      status === 'running'
-        ? 'running'
-        : status === 'success'
-          ? 'success'
-          : status === 'failed'
-            ? 'error'
-            : 'idle';
-
-    const nodeWidth = 200;
-    const startX = 50;
-
-    const newNodes: Node<PipelineNodeData>[] = [
-      {
-        id: 'source',
-        type: 'pipelineNode',
-        position: { x: startX, y: 80 },
-        data: {
-          label:
-            sourceType.charAt(0).toUpperCase() + sourceType.slice(1),
-          type: 'source',
-          description: config.source_config?.table
-            ? `Table: ${config.source_config.table}`
-            : 'Data Source',
-          status: nodeStatus,
-          records: 1250000,
-        },
-      },
-    ];
-
-    (transformations as any[]).forEach(
-      (transform: string | any, index: number) => {
-        const transformLabel =
-          typeof transform === 'string'
-            ? transform
-            : transform.name || `step-${index}`;
-        newNodes.push({
-          id: `transform-${index}`,
-          type: 'pipelineNode',
-          position: {
-            x: startX + (index + 1) * nodeWidth,
-            y: 80 + (index % 2 === 0 ? 0 : 60),
-          },
-          data: {
-            label: transformLabel
-              .replace(/_/g, ' ')
-              .replace(/\b\w/g, (c: string) => c.toUpperCase()),
-            type: 'transform',
-            description:
-              typeof transform === 'object'
-                ? transform.description || `Step ${index + 1}`
-                : `Step ${index + 1} of ${transformations.length}`,
-            status: nodeStatus,
-            duration: Math.floor(Math.random() * 30) + 10,
-          },
-        });
-      },
-    );
-
-    const lastIndex = transformations.length;
-    newNodes.push({
-      id: 'destination',
-      type: 'pipelineNode',
-      position: {
-        x: startX + (lastIndex + 1) * nodeWidth,
-        y: 80,
-      },
-      data: {
-        label:
-          destinationType.charAt(0).toUpperCase() +
-          destinationType.slice(1),
-        type: 'destination',
-        description: config.destination_config?.schema
-          ? `Schema: ${config.destination_config.schema}`
-          : 'Data Destination',
-        status: nodeStatus,
-        records: 980000,
-      },
-    });
-
-    const newEdges: Edge[] = [];
-    for (let i = 0; i < newNodes.length - 1; i++) {
-      newEdges.push({
-        id: `edge-${i}`,
-        source: newNodes[i].id,
-        target: newNodes[i + 1].id,
-        type: 'smoothstep',
-        animated: isRunning,
-        style: {
-          stroke: isRunning ? '#2563EB' : '#94A3B8',
-          strokeWidth: 2,
-        },
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+      const raw = event.dataTransfer.getData('application/json');
+      if (!raw) return;
+      let item: PaletteItem;
+      try { item = JSON.parse(raw); } catch { return; }
+      const position = reactFlowRef.current?.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
       });
-    }
-
-    setNodes(newNodes);
-    setEdges(newEdges);
-
-    if (currentPipeline.code) {
-      setCodePreview(currentPipeline.code);
-    }
-
-    addActivity(
-      'Pipeline Builder',
-      `Visualized ${newNodes.length} pipeline nodes`,
-    );
-  }, [currentPipeline, addActivity]);
-
-  // ── Interaction Handlers ──
+      if (!position) return;
+      const newNode: Node<PipelineNodeData> = {
+        id: generateNodeId(item.type),
+        type: 'pipelineNode',
+        position,
+        data: {
+          label: item.label,
+          type: item.type as 'source' | 'transform' | 'destination',
+          description: item.description,
+          status: 'idle',
+          config: item.defaultConfig || {},
+        },
+      };
+      setNodes((nds) => [...nds, newNode]);
+      addNotification({ type: 'info', message: `Added "${item.label}" node to canvas` });
+    },
+    [setNodes, addNotification],
+  );
 
   const onConnect = useCallback(
     (params: Connection) => {
-      setEdges((eds) => addEdge(params, eds));
-      addNotification({ type: 'info', message: 'Connection added' });
+      setEdges((eds) => addEdge({
+        ...params,
+        type: 'smoothstep',
+        animated: true,
+        style: { stroke: '#A78BFA', strokeWidth: 2 },
+      }, eds));
     },
-    [setEdges, addNotification],
+    [setEdges],
   );
 
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node<PipelineNodeData>) => {
       setSelectedNode(node);
-      setIsModalOpen(true);
+      setShowProperties(true);
     },
     [],
   );
 
-  const onNodeDoubleClick = useCallback(
-    (_event: React.MouseEvent, node: Node<PipelineNodeData>) => {
-      setSelectedNode(node);
-      setIsModalOpen(true);
+  const onPaneClick = useCallback(() => {
+    setSelectedNode(null);
+    setShowProperties(false);
+  }, []);
+
+  const handleNodeUpdate = useCallback(
+    (nodeId: string, data: Partial<PipelineNodeData>) => {
+      setNodes((nds) =>
+        nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n)),
+      );
+      addNotification({ type: 'success', message: `Node updated` });
     },
-    [],
+    [setNodes, addNotification],
   );
 
-  const onNodeDragStop = useCallback(
-    (_event: React.MouseEvent, node: Node<PipelineNodeData>) => {
-      addNotification({
-        type: 'info',
-        message: `Moved "${node.data.label}" to (${Math.round(node.position.x)}, ${Math.round(node.position.y)})`,
-      });
+  const handleNodeDelete = useCallback(
+    (nodeId: string) => {
+      setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+      setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
+      setSelectedNode(null);
+      setShowProperties(false);
+      addNotification({ type: 'info', message: `Deleted node` });
     },
-    [addNotification],
+    [setNodes, setEdges, addNotification],
   );
 
-  const onEdgesDelete = useCallback(
-    (deletedEdges: Edge[]) => {
-      addNotification({
-        type: 'info',
-        message: `Removed ${deletedEdges.length} connection${deletedEdges.length > 1 ? 's' : ''}`,
-      });
+  const onNodesDelete = useCallback(
+    (deleted: Node[]) => {
+      if (selectedNode && deleted.some((n) => n.id === selectedNode.id)) {
+        setSelectedNode(null);
+        setShowProperties(false);
+      }
     },
-    [addNotification],
+    [selectedNode],
   );
-
-  // ── View Controls ──
 
   const onFitView = useCallback(() => {
     reactFlowRef.current?.fitView({ padding: 0.2, duration: 300 });
@@ -348,16 +364,12 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
     setZoom(1);
   }, []);
 
-  // ── Export PNG ──
-
   const onExportImage = useCallback(async () => {
     if (!canvasContainerRef.current) return;
     try {
-      const { default: html2canvas } = await import(
-        /* @vite-ignore */ 'html2canvas'
-      );
+      const { default: html2canvas } = await import('html2canvas');
       const canvas = await html2canvas(canvasContainerRef.current, {
-        backgroundColor: '#F9FAFB',
+        backgroundColor: '#0D1A2A',
         scale: 2,
         useCORS: true,
         logging: false,
@@ -366,81 +378,60 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
       link.download = `pipeline-${currentPipeline?.name || 'canvas'}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
-      addNotification({
-        type: 'success',
-        message: 'Pipeline exported as PNG! 📸',
-      });
-    } catch (error) {
-      console.error('Export failed:', error);
-      addNotification({
-        type: 'error',
-        message: 'Failed to export image. Install html2canvas: npm install html2canvas',
-      });
+      addNotification({ type: 'success', message: 'Pipeline exported as PNG! 📸' });
+    } catch {
+      addNotification({ type: 'error', message: 'Failed to export image' });
     }
   }, [currentPipeline, addNotification]);
 
-  // ── Save Layout ──
+  const stats = useMemo(() => ({
+    nodeCount: compact ? compactNodes.length : nodes.length,
+    edgeCount: compact ? compactEdges.length : edges.length,
+    running: currentPipeline?.status === 'running',
+  }), [nodes, edges, compactNodes, compactEdges, currentPipeline]);
 
-  const saveNodePositions = useCallback(async () => {
-    if (!currentPipeline || !pipelineId) return;
-    const positions = nodes.map((node) => ({
-      id: node.id,
-      x: node.position.x,
-      y: node.position.y,
-    }));
-    try {
-      await updatePipeline(pipelineId, {
-        config: { ...currentPipeline.config, node_positions: positions },
-      });
-      addNotification({
-        type: 'success',
-        message: 'Layout saved! 💾',
-      });
-    } catch {
-      addNotification({
-        type: 'error',
-        message: 'Failed to save layout',
-      });
+  // ── Compact Preview Mode ────────────────────────────────────────────
+
+  if (compact) {
+    if (!pipelineProp?.nodes || pipelineProp.nodes.length === 0) {
+      return (
+        <div className="flex items-center justify-center h-full text-gray-500 text-sm">
+          <div className="text-center">
+            <GitBranch size={24} className="mx-auto text-gray-600 mb-2" />
+            <p>No pipeline generated yet</p>
+            <p className="text-xs text-gray-600 mt-1">Describe your pipeline in the chat</p>
+          </div>
+        </div>
+      );
     }
-  }, [nodes, currentPipeline, pipelineId, updatePipeline, addNotification]);
 
-  // ── Keyboard Shortcuts ──
+    return (
+      <div className="w-full h-full" style={{ background: 'transparent' }}>
+        <ReactFlow
+          nodes={compactNodes}
+          edges={compactEdges}
+          fitView
+          fitViewOptions={{ padding: 0.3 }}
+          zoomOnScroll={false}
+          panOnScroll={false}
+          nodesDraggable={false}
+          elementsSelectable={false}
+          nodeTypes={nodeTypes}
+        >
+          <Background color="#1E293B" gap={20} size={1} />
+        </ReactFlow>
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        saveNodePositions();
-      }
-      if (e.key === 'f' && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        onFitView();
-      }
-      if (e.key === 'Escape' && isModalOpen) {
-        setIsModalOpen(false);
-        setSelectedNode(null);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [saveNodePositions, onFitView, isModalOpen]);
-
-  // ── Stats ──
-
-  const stats = useMemo(() => {
-    const nodeCount = nodes.length;
-    const running = currentPipeline?.status === 'running';
-    return { nodeCount, running, edgeCount: edges.length };
-  }, [nodes, edges, currentPipeline]);
-
-  // ── Render ──
+  // ── Loading / Error / Empty States ──
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full min-h-[300px]">
         <div className="text-center">
           <LoadingSpinner size="lg" />
-          <p className="mt-3 text-sm text-gray-500">Loading pipeline...</p>
+          <p className="mt-3 text-sm text-gray-400">Loading pipeline...</p>
         </div>
       </div>
     );
@@ -450,209 +441,172 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-gray-500">
         <div className="text-5xl mb-3">😕</div>
-        <p className="text-sm font-medium text-gray-700">
-          Failed to load pipeline
-        </p>
-        <p className="text-xs text-gray-400 mt-1 mb-4 max-w-xs text-center">
-          {error}
-        </p>
-        <button
-          onClick={() => pipelineId && fetchPipeline(pipelineId)}
-          className="btn-secondary text-sm px-4 py-2"
-        >
+        <p className="text-sm font-medium text-gray-300">Failed to load pipeline</p>
+        <p className="text-xs text-gray-500 mt-1 mb-4 max-w-xs text-center">{error}</p>
+        <button onClick={() => pipelineId && fetchPipeline(pipelineId)} className="btn-secondary text-sm px-4 py-2">
           Retry
         </button>
       </div>
     );
   }
 
-  if (!currentPipeline) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-gray-400">
-        <div className="text-5xl mb-3">📋</div>
-        <p className="text-sm font-medium text-gray-500">
-          No pipeline selected
-        </p>
-        <p className="text-xs text-gray-400 mt-1">
-          Select or create a pipeline to visualize
-        </p>
-      </div>
-    );
-  }
+  // ── Full Interactive Mode ──
 
   return (
-    <div
-      ref={canvasContainerRef}
-      className={`flex flex-col h-full overflow-hidden ${className}`}
-    >
-      {/* ReactFlow Canvas */}
-      <div className="flex-1 min-h-[250px]">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onEdgesDelete={onEdgesDelete}
-          onNodeClick={onNodeClick}
-          onNodeDoubleClick={onNodeDoubleClick}
-          onNodeDragStop={onNodeDragStop}
-          onInit={(instance) => {
-            reactFlowRef.current = instance;
-          }}
-          onMoveEnd={(_event, viewport) => {
-            setZoom(viewport.zoom);
-          }}
-          nodeTypes={nodeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.25 }}
-          attributionPosition="bottom-right"
-          minZoom={0.2}
-          maxZoom={2.5}
-          snapToGrid
-          snapGrid={[15, 15]}
-          deleteKeyCode={['Backspace', 'Delete']}
-          multiSelectionKeyCode="Shift"
-        >
-          <Background
-            color="#E2E8F0"
-            gap={20}
-            size={1}
-            variant={BackgroundVariant.Dots}
-          />
-          <Controls
-            showInteractive={false}
-            position="bottom-right"
-            className="!rounded-xl !border !border-gray-200 !bg-white !shadow-md"
-          />
-          <MiniMap
-            position="bottom-left"
-            className="!rounded-xl !border !border-gray-200 !bg-white !shadow-md"
-            nodeColor={(node) => {
-              const t =
-                (node.data as PipelineNodeData)?.type || 'default';
-              const colors: Record<string, string> = {
-                source: '#93C5FD',
-                transform: '#C4B5FD',
-                destination: '#86EFAC',
-                default: '#E5E7EB',
-              };
-              return colors[t] || colors.default;
-            }}
-            nodeBorderRadius={8}
-          />
-
-          {/* Top Status Panel */}
-          <Panel
-            position="top-center"
-            className="!bg-white/90 backdrop-blur-sm !px-4 !py-2 !rounded-xl !shadow-sm !text-xs"
+    <div ref={canvasContainerRef} className={`flex flex-col h-full overflow-hidden ${className}`}>
+      {/* Toolbar */}
+      <div className="flex items-center justify-between border-b border-[#1E293B] bg-[#111827] px-3 py-2 shrink-0">
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setShowPalette(!showPalette)}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+              showPalette
+                ? 'bg-purple-600/20 text-purple-300'
+                : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+            }`}
           >
-            <div className="flex items-center gap-3">
-              <span className="font-medium text-gray-700">
-                {currentPipeline.name}
-              </span>
-              <span
-                className={`px-2 py-0.5 rounded-full font-medium ${
-                  currentPipeline.status === 'running'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : currentPipeline.status === 'success'
-                      ? 'bg-green-100 text-green-800'
-                      : currentPipeline.status === 'failed'
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-gray-100 text-gray-600'
-                }`}
-              >
-                {currentPipeline.status || 'draft'}
-              </span>
-              <span className="text-gray-400">
-                {stats.nodeCount} nodes · {stats.edgeCount} connections
-              </span>
-              <span
-                className={`flex items-center gap-1 ${
-                  isConnected ? 'text-green-600' : 'text-red-600'
-                }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full inline-block ${
-                    isConnected ? 'bg-green-500' : 'bg-red-500'
-                  }`}
-                />
-                {isConnected ? 'Live' : 'Offline'}
-              </span>
-            </div>
-          </Panel>
-
-          {/* Bottom Center Controls */}
-          <Panel position="bottom-center" className="!mb-4">
-            <CanvasControls
-              onFitView={onFitView}
-              onResetZoom={onResetZoom}
-              onExportImage={onExportImage}
-              zoom={zoom}
-            />
-          </Panel>
-
-          {/* Save Layout Button */}
-          <Panel position="bottom-right" className="!mb-20">
+            <LayoutPanelTop size={14} />
+            Nodes
+          </button>
+          <div className="w-px h-4 bg-[#1E293B] mx-1" />
+          <span className="text-xs text-gray-500">
+            {stats.nodeCount} nodes · {stats.edgeCount} edges
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {selectedNode && (
             <button
-              onClick={saveNodePositions}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 hover:shadow-md"
+              onClick={() => setShowProperties(!showProperties)}
+              className={`text-xs font-medium px-2 py-1 rounded-lg transition ${
+                showProperties
+                  ? 'bg-purple-600/20 text-purple-300'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
             >
-              <svg
-                className="h-3.5 w-3.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
-                />
-              </svg>
-              Save Layout
+              {showProperties ? 'Hide Properties' : 'Properties'}
             </button>
-          </Panel>
-        </ReactFlow>
+          )}
+          <CanvasControls
+            onFitView={onFitView}
+            onResetZoom={onResetZoom}
+            onExportImage={onExportImage}
+            zoom={zoom}
+          />
+        </div>
       </div>
 
-      {/* Code Preview Footer */}
+      {/* Main content */}
+      <div className="flex flex-1 min-h-0 bg-[#0D1A2A]">
+        {showPalette && (
+          <div className="w-[200px] border-r border-[#1E293B] bg-[#111827] shrink-0 overflow-hidden">
+            <NodePalette />
+          </div>
+        )}
+
+        <div className="flex-1 min-w-0">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={onNodeClick}
+            onNodeDoubleClick={(_e, node) => { setSelectedNode(node); setShowProperties(true); }}
+            onPaneClick={onPaneClick}
+            onNodesDelete={onNodesDelete}
+            onDragOver={onDragOver}
+            onDrop={onDrop}
+            onInit={(instance) => { reactFlowRef.current = instance; }}
+            onMoveEnd={(_event, viewport) => setZoom(viewport.zoom)}
+            nodeTypes={nodeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.25 }}
+            attributionPosition="bottom-right"
+            minZoom={0.2}
+            maxZoom={2.5}
+            snapToGrid
+            snapGrid={[15, 15]}
+            deleteKeyCode={['Backspace', 'Delete']}
+            multiSelectionKeyCode="Shift"
+          >
+            <Background color="#1E293B" gap={20} size={1} variant={BackgroundVariant.Dots} />
+            <Controls showInteractive={false} position="bottom-right" className="!rounded-xl !border !border-[#1E293B] !bg-[#111827] !shadow-md" />
+            <MiniMap
+              position="bottom-left"
+              className="!rounded-xl !border !border-[#1E293B] !bg-[#111827] !shadow-md"
+              nodeColor={(node) => {
+                const t = (node.data as PipelineNodeData)?.type || 'default';
+                const colors: Record<string, string> = {
+                  source: '#A78BFA',
+                  transform: '#C4B5FD',
+                  destination: '#86EFAC',
+                  default: '#374151',
+                };
+                return colors[t] || colors.default;
+              }}
+              nodeBorderRadius={8}
+            />
+
+            {currentPipeline && (
+              <Panel position="top-center" className="!bg-[#111827]/90 backdrop-blur-sm !px-4 !py-2 !rounded-xl !shadow-sm !text-xs">
+                <div className="flex items-center gap-3">
+                  <span className="font-medium text-gray-200">{currentPipeline.name}</span>
+                  <span className={`px-2 py-0.5 rounded-full font-medium ${
+                    currentPipeline.status === 'running' ? 'bg-yellow-500/20 text-yellow-400' :
+                    currentPipeline.status === 'success' ? 'bg-green-500/20 text-green-400' :
+                    currentPipeline.status === 'failed' ? 'bg-red-500/20 text-red-400' :
+                    'bg-white/5 text-gray-400'
+                  }`}>
+                    {currentPipeline.status || 'draft'}
+                  </span>
+                  <span className={`flex items-center gap-1 ${isConnected ? 'text-green-400' : 'text-red-400'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full inline-block ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                    {isConnected ? 'Live' : 'Offline'}
+                  </span>
+                </div>
+              </Panel>
+            )}
+
+            {nodes.length === 0 && (
+              <Panel position="top-center" className="pointer-events-none !mt-20">
+                <div className="text-center">
+                  <Database size={32} className="mx-auto text-gray-600 mb-2" />
+                  <p className="text-sm text-gray-400 font-medium">Drop nodes here</p>
+                  <p className="text-xs text-gray-500 mt-1">Drag from the palette or type a prompt in chat</p>
+                </div>
+              </Panel>
+            )}
+          </ReactFlow>
+        </div>
+
+        {showProperties && selectedNode && (
+          <div className="w-[260px] shrink-0 overflow-hidden">
+            <NodePropertiesPanel
+              node={selectedNode}
+              isOpen={true}
+              onClose={() => { setShowProperties(false); setSelectedNode(null); }}
+              onUpdate={handleNodeUpdate}
+              onDelete={handleNodeDelete}
+            />
+          </div>
+        )}
+      </div>
+
       {codePreview && (
-        <div className="border-t border-gray-200 bg-gray-50 shrink-0">
+        <div className="border-t border-[#1E293B] bg-[#111827] shrink-0">
           <div className="flex items-center justify-between px-4 py-2">
             <div className="flex items-center gap-2">
-              <svg
-                className="h-3.5 w-3.5 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-                />
-              </svg>
-              <p className="text-xs font-medium text-gray-600">
-                Generated Code
-              </p>
+              <Sparkles size={14} className="text-purple-400" />
+              <p className="text-xs font-medium text-gray-400">Generated Code</p>
             </div>
             <button
-              onClick={() => {
-                navigator.clipboard.writeText(codePreview);
-                addNotification({
-                  type: 'success',
-                  message: 'Code copied to clipboard!',
-                });
-              }}
-              className="rounded-lg bg-gray-200 px-2.5 py-1 text-[11px] font-medium text-gray-700 transition hover:bg-gray-300"
+              onClick={() => { navigator.clipboard.writeText(codePreview); addNotification({ type: 'success', message: 'Code copied!' }); }}
+              className="rounded-lg bg-white/10 px-2.5 py-1 text-[11px] font-medium text-gray-300 transition hover:bg-white/20"
             >
               Copy
             </button>
           </div>
-          <div className="max-h-28 overflow-auto bg-gray-950 px-4 py-3 scrollbar-thin">
+          <div className="max-h-20 overflow-auto bg-[#050816] px-4 py-2">
             <pre className="font-mono text-[11px] leading-relaxed text-green-400 whitespace-pre-wrap">
               {codePreview}
             </pre>
@@ -660,62 +614,14 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
         </div>
       )}
 
-      {/* Stats Footer */}
-      <div className="border-t border-gray-200 bg-white px-4 py-3 shrink-0">
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { label: 'Pipeline ID', value: `#${currentPipeline.id}` },
-            {
-              label: 'Status',
-              value: currentPipeline.status,
-              color:
-                currentPipeline.status === 'running'
-                  ? 'text-yellow-600'
-                  : currentPipeline.status === 'success'
-                    ? 'text-green-600'
-                    : currentPipeline.status === 'failed'
-                      ? 'text-red-600'
-                      : 'text-gray-600',
-            },
-            {
-              label: 'Schedule',
-              value: currentPipeline.schedule || 'Manual',
-            },
-          ].map((stat) => (
-            <div key={stat.label} className="text-center">
-              <p className="text-[10px] text-gray-500">{stat.label}</p>
-              <p
-                className={`text-sm font-bold ${stat.color || 'text-gray-900'}`}
-              >
-                {stat.value}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Node Details Modal */}
       <NodeDetailsModal
         node={selectedNode}
         isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setSelectedNode(null);
-        }}
-        onUpdate={(nodeId, data) => {
-          setNodes((nds) =>
-            nds.map((node) =>
-              node.id === nodeId ? { ...node, data } : node,
-            ),
-          );
-          addNotification({
-            type: 'success',
-            message: `Node "${data.label}" updated`,
-          });
-        }}
+        onClose={() => { setIsModalOpen(false); }}
       />
     </div>
   );
 };
 
 export default PipelineCanvas;
+export type { PipelineCanvasProps };

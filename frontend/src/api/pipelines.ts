@@ -1,5 +1,5 @@
 import api from './index';
-import type { Pipeline, PipelineExecution, PipelineCreateRequest } from '../types/pipeline';
+import type { Pipeline, PipelineExecution, PipelineCreateRequest, RagSearchResponse, TestConnectionRequest, TestConnectionResponse } from '../types/pipeline';
 
 export const pipelineApi = {
   // Create pipeline from prompt
@@ -43,6 +43,12 @@ export const pipelineApi = {
     return response.data;
   },
 
+  // Cancel a running pipeline execution
+  cancel: async (id: number): Promise<{ status: string; execution_id: number; message: string }> => {
+    const response = await api.post(`/api/v1/pipelines/${id}/cancel`);
+    return response.data;
+  },
+
   // Get executions
   getExecutions: async (id: number, limit = 50): Promise<PipelineExecution[]> => {
     const response = await api.get(`/api/v1/pipelines/${id}/executions?limit=${limit}`);
@@ -52,6 +58,20 @@ export const pipelineApi = {
   // Get execution logs
   getExecutionLogs: async (executionId: number): Promise<string[]> => {
     const response = await api.get(`/api/v1/executions/${executionId}/logs`);
+    return response.data;
+  },
+
+  // RAG search: find semantically similar past pipelines
+  ragSearch: async (query: string, topK = 3): Promise<RagSearchResponse> => {
+    const response = await api.get(`/api/v1/pipelines/rag-search`, {
+      params: { query, top_k: topK },
+    });
+    return response.data;
+  },
+
+  // Test a database connection without saving a pipeline
+  testConnection: async (data: TestConnectionRequest): Promise<TestConnectionResponse> => {
+    const response = await api.post('/api/v1/pipelines/test-connection', data);
     return response.data;
   },
 };

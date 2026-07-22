@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { pipelineApi } from '../api/pipelines';
-import type { Pipeline, PipelineExecution } from '../types/pipeline';
+import type { Pipeline, PipelineExecution, RagSearchResult } from '../types/pipeline';
 
 interface PipelineState {
   pipelines: Pipeline[];
@@ -8,6 +8,8 @@ interface PipelineState {
   executions: PipelineExecution[];
   isLoading: boolean;
   error: string | null;
+  ragResults: RagSearchResult[];
+  ragLoading: boolean;
 
   fetchPipelines: () => Promise<void>;
   fetchPipeline: (id: number) => Promise<void>;
@@ -16,7 +18,10 @@ interface PipelineState {
   updatePipeline: (id: number, data: any) => Promise<Pipeline>;
   deletePipeline: (id: number) => Promise<void>;
   runPipeline: (id: number) => Promise<PipelineExecution>;
+  cancelPipeline: (id: number) => Promise<void>;
   fetchExecutions: (id: number) => Promise<void>;
+  ragSearch: (query: string) => Promise<RagSearchResult[]>;
+  clearRagResults: () => void;
   setCurrentPipeline: (pipeline: Pipeline | null) => void;
   clearError: () => void;
 }
@@ -120,9 +125,41 @@ export const usePipelineStore = create<PipelineState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const execution = await pipelineApi.run(id);
+      // Optimistically update pipeline status locally
+      set((state) => ({
+        pipelines: state.pipelines.map((p) =>
+          p.id === id ? { ...p, status: 'running' as const } : p
+        ),
+        currentPipeline:
+          state.currentPipeline?.id === id
+            ? { ...state.currentPipeline, status: 'running' as const }
+            : state.currentPipeline,
+      }));
       return execution;
     } catch (error: any) {
       set({ error: error.response?.data?.detail || 'Failed to run pipeline' });
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  cancelPipeline: async (id: number) => {
+    set({ isLoading: true, error: null });
+    try {
+      await pipelineApi.cancel(id);
+      // Optimistically update pipeline status locally
+      set((state) => ({
+        pipelines: state.pipelines.map((p) =>
+          p.id === id ? { ...p, status: 'cancelled' as const } : p
+        ),
+        currentPipeline:
+          state.currentPipeline?.id === id
+            ? { ...state.currentPipeline, status: 'cancelled' as const }
+            : state.currentPipeline,
+      }));
+    } catch (error: any) {
+      set({ error: error.response?.data?.detail || 'Failed to cancel pipeline' });
       throw error;
     } finally {
       set({ isLoading: false });
@@ -144,6 +181,25 @@ export const usePipelineStore = create<PipelineState>((set) => ({
   setCurrentPipeline: (pipeline: Pipeline | null) => {
     set({ currentPipeline: pipeline });
   },
+
+  ragResults: [] as RagSearchResult[],
+  ragLoading: false,
+
+  ragSearch: async (query: string) => {
+    set({ ragLoading: true, error: null });
+    try {
+      const response = await pipelineApi.ragSearch(query);
+      set({ ragResults: response.results });
+      return response.results;
+    } catch (error: any) {
+      set({ ragResults: [] });
+      return [];
+    } finally {
+      set({ ragLoading: false });
+    }
+  },
+
+  clearRagResults: () => set({ ragResults: [] }),
 
   clearError: () => set({ error: null }),
 }));

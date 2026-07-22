@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { usePipelineStore } from '../store/pipelineStore';
 import { useNotificationStore } from '../store/notificationStore';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import { BadgeAlert, BadgeCheck, BadgeInfo, BadgeX, Clock, Play, RotateCw, Eye, ArrowLeft, Zap, Database, Calendar, BarChart3 } from 'lucide-react';
+import { BadgeAlert, BadgeCheck, BadgeInfo, BadgeX, Clock, Play, RotateCw, Eye, ArrowLeft, Zap, Database, Calendar, BarChart3, GitBranch } from 'lucide-react';
 
 const STATUS_META: Record<string, { label: string; badge: string; dot: string; icon: React.ReactNode }> = {
   draft:   { label: 'Draft',   badge: 'badge-gray',    dot: 'bg-gray-400',    icon: <BadgeInfo size={12} /> },
@@ -16,6 +16,7 @@ const STATUS_META: Record<string, { label: string; badge: string; dot: string; i
 
 const PipelineDetailsPage: React.FC = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { currentPipeline, executions, isLoading, fetchPipeline, fetchExecutions, runPipeline } = usePipelineStore();
   const { addNotification } = useNotificationStore();
   const [isRunning, setIsRunning] = useState(false);
@@ -48,7 +49,6 @@ const PipelineDetailsPage: React.FC = () => {
     try {
       await runPipeline(pipelineId);
       addNotification({ type: 'success', message: `Pipeline "${currentPipeline.name}" started!` });
-      // Start polling
       setTimeout(() => {
         fetchPipeline(pipelineId);
         fetchExecutions(pipelineId);
@@ -61,6 +61,23 @@ const PipelineDetailsPage: React.FC = () => {
     } finally {
       setIsRunning(false);
     }
+  };
+
+  const handleReuse = (execution: any) => {
+    if (!currentPipeline) return;
+    navigate('/builder', {
+      state: {
+        reusedPipeline: {
+          name: currentPipeline.name,
+          source_type: currentPipeline.source_type,
+          destination_type: currentPipeline.destination_type,
+          schedule: currentPipeline.schedule,
+          config: currentPipeline.config,
+          description: currentPipeline.description,
+          executionId: execution.id,
+        },
+      },
+    });
   };
 
   if (isLoading && !currentPipeline) {
@@ -145,33 +162,44 @@ const PipelineDetailsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Run Button */}
-        <button
-          onClick={handleRun}
-          disabled={isRunning || isActiveRun}
-          className={`inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold shadow-sm transition-all ${
-            isActiveRun
-              ? 'bg-amber-100 text-amber-700 cursor-not-allowed dark:bg-amber-950/30 dark:text-amber-400'
-              : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md active:scale-[0.98]'
-          }`}
-        >
-          {isActiveRun ? (
-            <>
-              <RotateCw size={16} className="animate-spin" />
-              Running...
-            </>
-          ) : isRunning ? (
-            <>
-              <RotateCw size={16} className="animate-spin" />
-              Starting...
-            </>
-          ) : (
-            <>
-              <Play size={16} />
-              Run Pipeline
-            </>
-          )}
-        </button>
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => handleReuse(executions[0] || {})}
+            disabled={!executions.length}
+            className="inline-flex items-center gap-2 rounded-xl border border-purple-200 px-4 py-3 text-sm font-semibold text-purple-700 shadow-sm transition-all hover:bg-purple-50 hover:shadow-md active:scale-[0.98] dark:border-purple-800 dark:text-purple-300 dark:hover:bg-purple-950/30 disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Open this pipeline's config in the Builder to modify or branch"
+          >
+            <GitBranch size={16} />
+            Reuse
+          </button>
+          <button
+            onClick={handleRun}
+            disabled={isRunning || isActiveRun}
+            className={`inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold shadow-sm transition-all ${
+              isActiveRun
+                ? 'bg-amber-100 text-amber-700 cursor-not-allowed dark:bg-amber-950/30 dark:text-amber-400'
+                : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md active:scale-[0.98]'
+            }`}
+          >
+            {isActiveRun ? (
+              <>
+                <RotateCw size={16} className="animate-spin" />
+                Running...
+              </>
+            ) : isRunning ? (
+              <>
+                <RotateCw size={16} className="animate-spin" />
+                Starting...
+              </>
+            ) : (
+              <>
+                <Play size={16} />
+                Run Pipeline
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* ── Progress Bar (when running) ── */}
@@ -215,7 +243,6 @@ const PipelineDetailsPage: React.FC = () => {
       {/* ── Tab: Overview ── */}
       {activeTab === 'overview' && (
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* Pipeline Config */}
           <div className="card dark:bg-gray-900/60">
             <h2 className="text-base font-bold text-gray-900 dark:text-white mb-4">Configuration</h2>
             <div className="space-y-3">
@@ -243,7 +270,6 @@ const PipelineDetailsPage: React.FC = () => {
             )}
           </div>
 
-          {/* Transformations */}
           <div className="card dark:bg-gray-900/60">
             <h2 className="text-base font-bold text-gray-900 dark:text-white mb-4">Transformations</h2>
             {p.config?.transformations && p.config.transformations.length > 0 ? (
@@ -281,11 +307,7 @@ const PipelineDetailsPage: React.FC = () => {
               <div className="text-4xl mb-3">🕐</div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">No executions yet</h3>
               <p className="text-sm text-gray-500 mt-1">Run this pipeline to see execution history.</p>
-              <button
-                onClick={handleRun}
-                disabled={isRunning || isActiveRun}
-                className="btn-primary mt-4"
-              >
+              <button onClick={handleRun} disabled={isRunning || isActiveRun} className="btn-primary mt-4">
                 Run Pipeline
               </button>
             </div>
@@ -300,7 +322,7 @@ const PipelineDetailsPage: React.FC = () => {
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Records</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Trigger</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Error</th>
-                    <th className="px-5 py-3 w-10" />
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
@@ -328,17 +350,26 @@ const PipelineDetailsPage: React.FC = () => {
                           {exec.error_message || '-'}
                         </td>
                         <td className="px-5 py-4">
-                          <button
-                            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
-                            title="View logs"
-                            onClick={() => {
-                              if (exec.logs && exec.logs.length > 0) {
-                                addNotification({ type: 'info', message: exec.logs.slice(0, 3).join(' | ') });
-                              }
-                            }}
-                          >
-                            <Eye size={14} />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+                              title="View logs"
+                              onClick={() => {
+                                if (exec.logs && exec.logs.length > 0) {
+                                  addNotification({ type: 'info', message: exec.logs.slice(0, 3).join(' | ') });
+                                }
+                              }}
+                            >
+                              <Eye size={14} />
+                            </button>
+                            <button
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-950/30"
+                              title="Reuse this pipeline config in the Builder"
+                              onClick={() => handleReuse(exec)}
+                            >
+                              <GitBranch size={14} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -404,7 +435,6 @@ const PipelineDetailsPage: React.FC = () => {
   );
 };
 
-// ─── Detail Row Component ───────────────────────────────────────────────
 const DetailRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div className="flex items-center justify-between py-1.5">
     <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
