@@ -1,7 +1,15 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { authApi } from '../api/auth';
+import { api } from '../api';
 import type { User } from '../types/auth';
+
+const getStoredToken = (): string | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return localStorage.getItem('auth_token');
+};
 
 interface AuthState {
   user: User | null;
@@ -26,71 +34,75 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       user: null,
-      token: localStorage.getItem('auth_token'),
-      isAuthenticated: !!localStorage.getItem('auth_token'),
+      token: getStoredToken(),
+      isAuthenticated: !!getStoredToken(),
       isLoading: false,
       error: null,
 
-      // ── LOGIN ──
       login: async (email: string, password: string) => {
         set({ isLoading: true, error: null });
         try {
-          const response = await authApi.login({
-            username: email, // Backend expects 'username' field
-            password,
+          const params = new URLSearchParams();
+          params.append('username', email);
+          params.append('password', password);
+
+          const response = await api.post('/api/v1/auth/login', params.toString(), {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           });
 
-          const token = response.access_token;
-          localStorage.setItem('auth_token', token);
-          set({ token, isAuthenticated: true, isLoading: false });
+          const token = response.data.access_token;
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('auth_token', token);
+          }
+
+          set({ token, isAuthenticated: true });
           await get().getCurrentUser();
         } catch (error: any) {
-          const message =
-            error.response?.data?.detail || 'Login failed. Please check your credentials.';
-          set({ error: message, isLoading: false });
-          throw new Error(message);
+          const message = error.response?.data?.detail || 'Login failed';
+          set({ error: message });
+          throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
-      // ── SIGNUP ──
       signup: async (data) => {
         set({ isLoading: true, error: null });
         try {
-          await authApi.signup({
+          await api.post('/api/v1/auth/signup', {
             username: data.username,
             email: data.email,
             full_name: data.full_name,
             password: data.password,
           });
 
-          // Auto-login after successful signup
           await get().login(data.email, data.password);
         } catch (error: any) {
-          const message =
-            error.response?.data?.detail || 'Signup failed. Please try again.';
-          set({ error: message, isLoading: false });
-          throw new Error(message);
+          const message = error.response?.data?.detail || 'Signup failed';
+          set({ error: message });
+          throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
-      // ── LOGOUT ──
       logout: () => {
-        localStorage.removeItem('auth_token');
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('auth_token');
+        }
+
         set({ user: null, token: null, isAuthenticated: false, error: null });
       },
 
-      // ── GET CURRENT USER ──
       getCurrentUser: async () => {
         try {
-          const user = await authApi.getCurrentUser();
-          set({ user });
+          const response = await api.get('/api/v1/auth/me');
+          set({ user: response.data });
         } catch {
-          // Token invalid — clear auth state
           get().logout();
         }
       },
 
-      // ── CLEAR ERROR ──
       clearError: () => set({ error: null }),
     }),
     {
