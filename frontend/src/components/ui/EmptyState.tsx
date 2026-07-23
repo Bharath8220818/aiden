@@ -1,87 +1,48 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { cn } from '../../utils/cn';
 import { Inbox } from 'lucide-react';
 
-export interface EmptyStateProps {
-  title: string;
-  description: string;
+interface EmptyStateProps {
   icon?: React.ReactNode;
-  action?: { label: string; onClick: () => void; variant?: 'primary' | 'secondary' };
+  title: string;
+  description?: string;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
   className?: string;
-  size?: 'sm' | 'md' | 'lg';
 }
 
-const sizes = {
-  sm: { icon: 'text-3xl', title: 'text-base', padding: 'p-8' },
-  md: { icon: 'text-5xl', title: 'text-lg', padding: 'p-12' },
-  lg: { icon: 'text-7xl', title: 'text-xl', padding: 'p-16' },
-};
-
 export const EmptyState: React.FC<EmptyStateProps> = ({
+  icon,
   title,
   description,
-  icon,
   action,
   className,
-  size = 'md',
 }) => {
-  const s = sizes[size];
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: 'easeOut' }}
+    <div
       className={cn(
-        'flex flex-col items-center justify-center text-center',
-        'rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700',
-        'bg-white dark:bg-gray-800/50',
-        s.padding,
+        'flex flex-col items-center justify-center py-16 px-6 text-center',
         className
       )}
     >
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ type: 'spring', damping: 15, stiffness: 200, delay: 0.1 }}
-        className={cn(
-          'flex items-center justify-center',
-          'rounded-2xl bg-gray-100 dark:bg-gray-700/50',
-          'w-20 h-20 mb-4',
-          s.icon
-        )}
-      >
-        {icon || <Inbox className="w-10 h-10 text-gray-400 dark:text-gray-500" />}
-      </motion.div>
-
-      <h3 className={cn(
-        'font-bold text-gray-900 dark:text-white',
-        s.title
-      )}>
-        {title}
-      </h3>
-
-      <p className="mt-2 max-w-sm text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-        {description}
-      </p>
-
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0D1A2A] border border-[#1E293B] mb-4">
+        {icon || <Inbox size={28} className="text-gray-500" />}
+      </div>
+      <h3 className="text-lg font-semibold text-white mb-1">{title}</h3>
+      {description && (
+        <p className="text-sm text-gray-400 max-w-md mb-6">{description}</p>
+      )}
       {action && (
-        <motion.button
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.97 }}
+        <button
           onClick={action.onClick}
-          className={cn(
-            'mt-6 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold shadow-sm transition-all',
-            action.variant === 'secondary'
-              ? 'border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600'
-              : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md'
-          )}
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-xl text-white text-sm font-medium hover:scale-[1.02] transition-all shadow-lg shadow-purple-600/25"
         >
           {action.label}
-        </motion.button>
+        </button>
       )}
-    </motion.div>
+    </div>
   );
 };
 

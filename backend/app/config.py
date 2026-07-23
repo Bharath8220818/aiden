@@ -41,7 +41,22 @@ class Settings(BaseSettings):
     @classmethod
     def parse_cors_origins(cls, value):
         if isinstance(value, str):
-            origins = [o.strip() for o in value.split(",") if o.strip()]
+            raw = value.strip()
+            # Try JSON array format: '["http://a.com","http://b.com"]'
+            if raw.startswith("[") and raw.endswith("]"):
+                import json
+                try:
+                    result = json.loads(raw)
+                    if isinstance(result, list):
+                        return result
+                except json.JSONDecodeError:
+                    pass
+            # Comma-separated list: "http://a.com,http://b.com"
+            origins = [
+                o.strip().strip('"').strip("'")
+                for o in raw.split(",")
+                if o.strip()
+            ]
             return origins
         if isinstance(value, list):
             return value

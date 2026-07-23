@@ -18,20 +18,11 @@ export type { SkeletonProps } from './Skeleton';
 export { EmptyState } from './EmptyState';
 export type { EmptyStateProps } from './EmptyState';
 
-export { Progress } from './Progress';
-export type { ProgressProps } from './Progress';
-
 export { Dropdown } from './Dropdown';
 export type { DropdownProps, DropdownItem } from './Dropdown';
 
-export { Tooltip } from './Tooltip';
-export type { TooltipProps } from './Tooltip';
-
 export { Toggle } from './Toggle';
 export type { ToggleProps } from './Toggle';
-
-export { BottomSheet } from './BottomSheet';
-export type { BottomSheetProps } from './BottomSheet';
 
 export { PageTransition } from './PageTransition';
 export type { PageTransitionProps } from './PageTransition';

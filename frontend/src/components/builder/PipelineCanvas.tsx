@@ -17,7 +17,7 @@ import type {
   ReactFlowInstance,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Database, LayoutPanelTop, GitBranch, Cpu, Sparkles, Activity } from 'lucide-react';
+import { Database, LayoutPanelTop, GitBranch, Sparkles } from 'lucide-react';
 import { usePipelineStore } from '../../store/pipelineStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useAgentStore } from '../../store/agentStore';
@@ -47,7 +47,6 @@ interface PipelineCanvasProps {
   /** Pre-built pipeline with nodes/edges (used by the compact preview in the AI Workspace) */
   pipeline?: { nodes?: Array<{ id: string; label: string; status?: string; type?: string }>; edges?: Array<{ source: string; target: string }> };
   /** Compact mode for the right-panel preview (non-interactive, no toolbar) */
-  interactive?: boolean;
   compact?: boolean;
 }
 
@@ -55,7 +54,6 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
   pipelineId,
   className = '',
   pipeline: pipelineProp,
-  interactive = true,
   compact = false,
 }) => {
   const {

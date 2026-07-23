@@ -1,0 +1,31 @@
+# ── Node ────────────────────────────────────────────────────────────
+node_modules/
+dist/
+.cache/
+.npm/
+
+# ── Git ─────────────────────────────────────────────────────────────
+.git/
+.gitignore
+
+# ── IDE / OS ────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Test / Lint artifacts ──────────────────────────────────────────
+coverage/
+.nyc_output/
+__pycache__/
+
+# ── Environment ─────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Documentation (not needed at runtime) ───────────────────────────
+*.md

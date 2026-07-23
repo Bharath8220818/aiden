@@ -36,5 +36,8 @@ api.interceptors.response.use(
 
 export { authApi } from './auth';
 export { pipelineApi } from './pipelines';
+export { analyticsApi } from './analytics';
+export { approvalsApi } from './approvals';
+export { auditApi } from './audit';
 
 export default api;

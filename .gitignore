@@ -24,6 +24,13 @@ backend/venv/
 *.db-wal
 
 # ---------------------------
+# Python Testing / Coverage
+# ---------------------------
+.coverage
+.coverage.*
+.pytest_cache/
+
+# ---------------------------
 # Logs
 # ---------------------------
 logs/
@@ -58,6 +65,7 @@ models/cache/
 # ---------------------------
 node_modules/
 frontend/dist/
+frontend/.vercel/
 dist-ssr/
 *.tsbuildinfo
 
