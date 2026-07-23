@@ -198,7 +198,7 @@ const DashboardPage: React.FC = () => {
         <div className="pointer-events-none absolute -right-32 -top-32 h-[500px] w-[500px] rounded-full bg-purple-500/10 blur-[120px]" />
         <div className="pointer-events-none absolute -bottom-32 left-1/4 h-[400px] w-[400px] rounded-full bg-cyan-500/8 blur-[100px]" />
 
-        <div className="relative px-6 py-14 lg:px-12 lg:py-20">
+        <div className="relative px-4 py-8 sm:px-6 sm:py-10 lg:px-12 lg:py-12">
           <div className="relative mx-auto max-w-3xl text-center">
             {/* Eyebrow */}
             <motion.p
