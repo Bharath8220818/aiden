@@ -1,51 +1,46 @@
-import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
-import { Home, Sparkles, GitBranch, Activity, Settings } from 'lucide-react';
 
-const navItems = [
-  { icon: Home, label: 'Home', path: '/' },
-  { icon: Sparkles, label: 'Builder', path: '/builder' },
-  { icon: GitBranch, label: 'Pipelines', path: '/pipelines' },
-  { icon: Activity, label: 'Monitor', path: '/monitoring' },
-  { icon: Settings, label: 'Settings', path: '/settings' },
+const items = [
+  { to: '/', label: 'Home', icon: '🏠' },
+  { to: '/builder', label: 'Build', icon: '✨' },
+  { to: '/pipelines', label: 'Pipelines', icon: '📋' },
+  { to: '/monitoring', label: 'Monitor', icon: '📊' },
 ];
 
-export const MobileNav: React.FC = () => {
-  const location = useLocation();
+const MobileNav = () => {
+  const { pathname } = useLocation();
   const { isAuthenticated } = useAuthStore();
 
-  if (!isAuthenticated || ['/login', '/signup'].includes(location.pathname)) {
+  if (!isAuthenticated || pathname === '/login' || pathname === '/signup') {
     return null;
   }
 
-  const isActive = (path: string) => {
-    if (path === '/') return location.pathname === '/';
-    return location.pathname.startsWith(path);
-  };
-
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0D1A2A]/90 backdrop-blur-[20px] border-t border-[#1E293B] px-2 py-1 flex justify-around items-center safe-area-bottom">
-      {navItems.map((item) => {
-        const active = isActive(item.path);
-        return (
-          <Link
-            key={item.path}
-            to={item.path}
-            className={`
-              flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all duration-200 min-w-0
-              ${active ? 'text-purple-400' : 'text-gray-500 hover:text-gray-300'}
-            `}
-          >
-            <item.icon size={20} className={active ? 'text-purple-400' : ''} />
-            <span className={`text-[9px] font-medium ${active ? 'text-purple-400' : 'text-gray-500'}`}>
-              {item.label}
-            </span>
-          </Link>
-        );
-      })}
+    <nav className="fixed inset-x-3 bottom-3 z-50 md:hidden" aria-label="Mobile navigation">
+      <div className="rounded-[1.5rem] border border-white/70 bg-slate-900/90 px-1.5 py-1.5 shadow-[0_20px_60px_-20px_rgba(15,23,42,0.55)] backdrop-blur-xl">
+        <div className="grid grid-cols-4 gap-1">
+          {items.map((item) => {
+            const active = pathname === item.to || (item.to !== '/' && pathname.startsWith(item.to));
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`flex flex-col items-center justify-center rounded-[1rem] px-2 py-2 text-[11px] font-semibold transition ${
+                  active ? 'bg-primary-500 text-white shadow-sm' : 'text-slate-300 hover:bg-white/10'
+                }`}
+              >
+                <span className="text-lg leading-none" aria-hidden>
+                  {item.icon}
+                </span>
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
     </nav>
   );
 };
 
-MobileNav.displayName = 'MobileNav';
+export default MobileNav;

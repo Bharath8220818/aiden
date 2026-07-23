@@ -1,112 +1,117 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../utils/cn';
-import { ChevronDown } from 'lucide-react';
 
-export interface DropdownOption {
-  value: string;
+export interface DropdownItem {
   label: string;
   icon?: React.ReactNode;
+  onClick: () => void;
+  danger?: boolean;
   disabled?: boolean;
+  divider?: boolean;
 }
 
-interface DropdownProps {
-  options: DropdownOption[];
-  value?: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  label?: string;
-  error?: string;
-  className?: string;
+export interface DropdownProps {
+  trigger: React.ReactNode;
+  items: DropdownItem[];
   align?: 'left' | 'right';
+  className?: string;
+  menuClassName?: string;
 }
 
 export const Dropdown: React.FC<DropdownProps> = ({
-  options,
-  value,
-  onChange,
-  placeholder = 'Select...',
-  label,
-  error,
-  className,
+  trigger,
+  items,
   align = 'left',
+  className,
+  menuClassName,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  const selected = options.find((o) => o.value === value);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscape);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen]);
 
   return (
-    <div ref={ref} className={cn('relative', className)}>
-      {label && <label className="block text-sm font-medium text-gray-400 mb-1.5">{label}</label>}
-      <button
-        type="button"
+    <div ref={dropdownRef} className={cn('relative inline-block', className)}>
+      <div
         onClick={() => setIsOpen(!isOpen)}
-        className={cn(
-          'w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl border transition-all duration-200',
-          'bg-[#0D1A2A] text-white placeholder-gray-500',
-          error ? 'border-red-500' : 'border-[#1E293B] hover:border-purple-500/40',
-          'focus:outline-none focus:ring-2 focus:ring-purple-500/20'
-        )}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsOpen(!isOpen); } }}
+        role="button"
+        tabIndex={0}
+        aria-haspopup="true"
+        aria-expanded={isOpen}
+        className="cursor-pointer"
       >
-        <div className="flex items-center gap-2">
-          {selected?.icon && <span className="text-gray-400">{selected.icon}</span>}
-          <span className={selected ? 'text-white' : 'text-gray-500'}>
-            {selected?.label || placeholder}
-          </span>
-        </div>
-        <ChevronDown
-          size={16}
-          className={cn(
-            'text-gray-500 transition-transform duration-200',
-            isOpen && 'rotate-180'
-          )}
-        />
-      </button>
-      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+        {trigger}
+      </div>
 
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -8, scale: 0.95 }}
+            initial={{ opacity: 0, y: -8, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.95 }}
-            transition={{ duration: 0.15 }}
+            exit={{ opacity: 0, y: -8, scale: 0.96 }}
+            transition={{ duration: 0.12 }}
             className={cn(
-              'absolute z-50 mt-1 w-full min-w-[200px] rounded-xl border border-[#1E293B] bg-[#111827] shadow-xl shadow-black/30 overflow-hidden',
-              align === 'right' && 'right-0'
+              'absolute top-full mt-1 w-48 py-1 z-50',
+              'bg-white dark:bg-gray-800 rounded-xl shadow-lg',
+              'border border-gray-200 dark:border-gray-700',
+              'animate-dropdown-in',
+              align === 'left' ? 'left-0' : 'right-0',
+              menuClassName
             )}
           >
-            {options.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                disabled={option.disabled}
-                onClick={() => {
-                  onChange(option.value);
-                  setIsOpen(false);
-                }}
-                className={cn(
-                  'w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors',
-                  option.value === value
-                    ? 'bg-purple-500/10 text-purple-400'
-                    : 'text-gray-300 hover:bg-[#1E293B] hover:text-white',
-                  option.disabled && 'opacity-50 cursor-not-allowed'
+            {items.map((item, i) => (
+              <React.Fragment key={i}>
+                {item.divider ? (
+                  <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+                ) : (
+                  <button
+                    onClick={() => {
+                      if (!item.disabled) {
+                        item.onClick();
+                        setIsOpen(false);
+                      }
+                    }}
+                    disabled={item.disabled}
+                    className={cn(
+                      'w-full px-4 py-2 text-sm flex items-center gap-2.5 transition-colors',
+                      'hover:bg-gray-100 dark:hover:bg-gray-700',
+                      item.danger
+                        ? 'text-red-600 dark:text-red-400'
+                        : 'text-gray-700 dark:text-gray-200',
+                      item.disabled && 'opacity-40 cursor-not-allowed'
+                    )}
+                  >
+                    {item.icon && (
+                      <span className="w-4 h-4 flex items-center justify-center shrink-0">
+                        {item.icon}
+                      </span>
+                    )}
+                    <span className="truncate">{item.label}</span>
+                  </button>
                 )}
-              >
-                {option.icon && <span className="text-gray-400">{option.icon}</span>}
-                {option.label}
-              </button>
+              </React.Fragment>
             ))}
           </motion.div>
         )}

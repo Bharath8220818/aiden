@@ -30,9 +30,10 @@ const variantStyles: Record<Variant, { gradient: string; shadow: string }> = {
 const AnimatedValue: React.FC<{ value: number; duration?: number }> = ({ value, duration = 600 }) => {
   const [display, setDisplay] = useState(0);
   const startRef = useRef<number | null>(null);
-  const rafRef = useRef<number>(0);
+  const rafRef = useRef<number>();
 
   useEffect(() => {
+    const startTime = performance.now();
     const from = 0;
     const delta = value - from;
 

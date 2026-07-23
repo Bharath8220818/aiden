@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import { usePipelineStore } from '../store/pipelineStore';
 import { useNotificationStore } from '../store/notificationStore';
 import AmbientFlow from '../components/common/AmbientFlow';
-import RecentActivity from '../components/dashboard/RecentActivity';
 import { StatsCardSkeleton } from '../components/ui/Skeleton';
 import { Sparkles, ArrowRight, BarChart3, Activity, Zap, Database, Shield } from 'lucide-react';
 
@@ -119,6 +118,14 @@ const PieChart: React.FC<{ success: number; running: number; failed: number }> =
       </text>
     </svg>
   );
+};
+
+// ─── Activity Item meta ─────────────────────────────────────────────────────────
+const statusMeta: Record<string, { bg: string; dot: string; label: string }> = {
+  success: { bg: 'bg-green-500/10', dot: 'bg-green-500', label: 'Completed' },
+  running: { bg: 'bg-purple-500/10', dot: 'bg-purple-500', label: 'Running' },
+  failed: { bg: 'bg-red-500/10', dot: 'bg-red-500', label: 'Failed' },
+  draft: { bg: 'bg-white/5', dot: 'bg-gray-400', label: 'Draft' },
 };
 
 // ─── Main Dashboard ─────────────────────────────────────────────────────────────
@@ -447,8 +454,45 @@ const DashboardPage: React.FC = () => {
             </Link>
           </div>
 
-          <div className="mt-4">
-            <RecentActivity pipelines={recentActivity} isLoading={isLoading} />
+          <div className="mt-4 space-y-3">
+            {recentActivity.length > 0 ? (
+              recentActivity.map((pipeline) => {
+                const meta = statusMeta[pipeline.status] || statusMeta.draft;
+                return (
+                  <Link
+                    key={pipeline.id}
+                    to={`/pipelines/${pipeline.id}`}
+                    className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all hover:bg-white/5 ${meta.bg}`}
+                  >
+                    <div className={`h-2 w-2 rounded-full ${meta.dot} shrink-0`} />
+                    <span className="flex-1 truncate text-sm font-medium text-gray-100">
+                      {pipeline.name}
+                    </span>
+                    <span className="text-xs text-gray-400 shrink-0">
+                      {pipeline.updated_at
+                        ? new Date(pipeline.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : 'just now'}
+                    </span>
+                    <span className={`shrink-0 badge ${
+                      pipeline.status === 'success' ? 'badge-success'
+                      : pipeline.status === 'running' ? 'badge-info'
+                      : pipeline.status === 'failed' ? 'badge-error'
+                      : 'badge-gray'
+                    }`}>
+                      {meta.label}
+                    </span>
+                  </Link>
+                );
+              })
+            ) : (
+              <div className="rounded-xl border-2 border-dashed border-white/10 p-8 text-center">
+                <div className="text-3xl">🚀</div>
+                <p className="mt-2 text-sm text-gray-400">No activity yet. Create your first pipeline!</p>
+                <Link to="/builder" className="mt-3 inline-block text-sm font-semibold text-purple-400 hover:text-purple-300">
+                  Describe a pipeline →
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </motion.section>
