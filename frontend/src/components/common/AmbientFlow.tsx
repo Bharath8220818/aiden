@@ -60,6 +60,8 @@ const AmbientFlow: React.FC<AmbientFlowProps> = ({
     };
 
     resize();
+    const resizeObserver = new ResizeObserver(resize);
+    if (canvas.parentElement) resizeObserver.observe(canvas.parentElement);
     window.addEventListener('resize', resize);
 
     // Track mouse for interactive response
@@ -71,9 +73,10 @@ const AmbientFlow: React.FC<AmbientFlowProps> = ({
       };
     };
     canvas.addEventListener('mousemove', handleMouse);
-    canvas.addEventListener('mouseleave', () => {
+    const handleMouseLeave = () => {
       mouseRef.current = { x: -1000, y: -1000 };
-    });
+    };
+    canvas.addEventListener('mouseleave', handleMouseLeave);
 
     // Initialize particles
     const initParticles = () => {
@@ -216,16 +219,17 @@ const AmbientFlow: React.FC<AmbientFlowProps> = ({
 
     return () => {
       cancelAnimationFrame(animFrameRef.current);
+      resizeObserver.disconnect();
       window.removeEventListener('resize', resize);
       canvas.removeEventListener('mousemove', handleMouse);
-      canvas.removeEventListener('mouseleave', handleMouse);
+      canvas.removeEventListener('mouseleave', handleMouseLeave);
     };
   }, [density, color]);
 
   return (
     <canvas
       ref={canvasRef}
-      className={`ambient-flow-bg ${className}`}
+      className={`ambient-flow-bg pointer-events-none absolute inset-0 h-full w-full ${className}`}
       aria-hidden="true"
     />
   );
