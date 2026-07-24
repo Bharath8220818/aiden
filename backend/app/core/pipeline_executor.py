@@ -28,6 +28,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from app.api.v1.websocket import manager
 from app.core.db_connector import DatabaseConnector
+from app.core.self_healing import self_healing_engine
 from app.models.execution import ExecutionStatus, PipelineExecution
 from app.models.pipeline import Pipeline, PipelineStatus
 from app.database import AsyncSessionLocal
@@ -717,6 +718,58 @@ class PipelineExecutor:
             await self._broadcast(
                 pipeline.id, execution.id, "failed", 100, error=str(exc),
             )
+
+            # ── Self-Healing ─────────────────────────────────────────
+            # After persisting the failure, invoke the healing engine to
+            # diagnose the root cause and propose / apply a fix.
+            try:
+                healing_result = await self_healing_engine.diagnose_and_heal(
+                    pipeline, execution, str(exc)
+                )
+                if healing_result.auto_applied:
+                    emit_log(
+                        f"🩺 Self-healing: LOW-risk fix auto-applied. "
+                        f"{healing_result.diagnosis.summary}"
+                    )
+                    emit_task(
+                        "healing", "auto_fix", "success", 100,
+                        f"Auto-applied: {healing_result.fix.description if healing_result.fix else 'N/A'}"
+                    )
+                elif healing_result.approval_id:
+                    emit_log(
+                        f"🩺 Self-healing: {healing_result.risk.value}-risk fix "
+                        f"requires approval #{healing_result.approval_id}. "
+                        f"{healing_result.diagnosis.summary}"
+                    )
+                    emit_task(
+                        "healing", "approval_created", "info", 100,
+                        f"Approval #{healing_result.approval_id}: {healing_result.diagnosis.category.value}"
+                    )
+                else:
+                    emit_log(
+                        f"🩺 Self-healing: diagnosis complete, no fix available. "
+                        f"[{healing_result.diagnosis.category.value}] "
+                        f"{healing_result.diagnosis.summary}"
+                    )
+                    emit_task(
+                        "healing", "diagnosis", "info", 100,
+                        healing_result.diagnosis.summary
+                    )
+
+                # Re-persist after healing (log messages added)
+                execution.logs = logs
+                try:
+                    async with AsyncSessionLocal() as heal_db:
+                        heal_db.add(execution)
+                        await heal_db.commit()
+                except Exception as persist_exc:
+                    logger.warning(
+                        "Failed to persist healing logs: %s", persist_exc
+                    )
+
+            except Exception as heal_exc:
+                logger.warning("Self-healing engine itself failed: %s", heal_exc)
+                emit_log(f"⚠ Self-healing engine error: {heal_exc}")
 
             return {
                 "status": "failed",

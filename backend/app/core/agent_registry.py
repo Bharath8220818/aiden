@@ -70,10 +70,12 @@ def _register_builtins():
     from app.agents.extraction_agent import ExtractionAgent
     from app.agents.analysis_agent import AnalysisAgent
     from app.agents.pipeline_builder_agent import PipelineBuilderAgent
+    from app.agents.self_healing_agent import SelfHealingAgent
 
     AgentRegistry.register("extraction", ExtractionAgent)
     AgentRegistry.register("analysis", AnalysisAgent)
     AgentRegistry.register("builder", PipelineBuilderAgent)
+    AgentRegistry.register("self_healing", SelfHealingAgent)
 
 
 # Auto-register on import

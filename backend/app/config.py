@@ -82,7 +82,7 @@ class Settings(BaseSettings):
 
     # ── RAG Settings ──
     RAG_TOP_K: int = 3
-    RAG_MIN_SCORE: float = 0.5
+    RAG_MIN_SCORE: float = 0.4
     QDRANT_COLLECTION: str = "pipeline_intents"
 
     # Supabase Settings
