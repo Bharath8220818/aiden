@@ -230,6 +230,6 @@ mlruns/
 # ============================================================
 # Keep Required Empty Directories
 # ============================================================
-!backend/models/.gitkeep
-!backend/logs/.gitkeep
-!backend/uploads/.gitkeep
+backend/models/.gitkeep
+backend/logs/.gitkeep
+backend/uploads/.gitkeep
