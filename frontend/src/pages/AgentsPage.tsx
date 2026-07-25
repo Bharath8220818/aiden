@@ -12,7 +12,7 @@ import AgentDetailModal from '../components/agents/AgentDetailModal';
 const StatsIndicator: React.FC<{
   label: string;
   value: number;
-  icon: React.FC<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; size?: number }>;
   active?: boolean;
 }> = ({ label, value, icon: Icon, active = false }) => (
   <div className={`flex items-center gap-2 rounded-lg border ${active ? 'border-green-500/30 bg-green-500/5' : 'border-[#1E293B]/40 bg-[#0D1A2A]'} px-4 py-2`}>
@@ -139,7 +139,7 @@ const AgentsPage: React.FC = () => {
           layout
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
         >
           {filtered.map((agent) => (
             <AgentCard key={agent.name} agent={agent} onSelect={selectAgent} />
