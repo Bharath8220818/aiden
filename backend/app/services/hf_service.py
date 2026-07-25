@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__)
 # ── Conditional imports ────────────────────────────────────────────────
 try:
     import torch
-    from peft import PeftModel
     from sentence_transformers import SentenceTransformer
     from transformers import (
         AutoModelForCausalLM,
@@ -38,10 +37,18 @@ try:
     HF_AVAILABLE = True
 except ImportError as exc:
     torch = None
-    PeftModel = SentenceTransformer = None
+    SentenceTransformer = None
     AutoModelForCausalLM = AutoTokenizer = BitsAndBytesConfig = hf_pipeline = None
     HF_AVAILABLE = False
     HF_IMPORT_ERROR = exc
+
+# peft is optional — only needed for loading fine-tuned (LoRA) models
+try:
+    from peft import PeftModel, PeftConfig
+    PEFT_AVAILABLE = True
+except ImportError:
+    PeftModel = PeftConfig = None
+    PEFT_AVAILABLE = False
 
 
 class HuggingFaceService:
@@ -158,8 +165,11 @@ class HuggingFaceService:
                 os.path.isdir(model_name) and os.path.exists(os.path.join(model_name, "adapter_config.json"))
             )
             if is_peft:
-                from peft import PeftConfig
-
+                if not PEFT_AVAILABLE:
+                    raise RuntimeError(
+                        "Cannot load PEFT/LoRA model — peft is not installed. "
+                        "Install it with: pip install peft"
+                    )
                 config = PeftConfig.from_pretrained(model_name)
                 base_model = AutoModelForCausalLM.from_pretrained(
                     config.base_model_name_or_path,

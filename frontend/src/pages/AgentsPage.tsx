@@ -16,7 +16,7 @@ const StatsIndicator: React.FC<{
   active?: boolean;
 }> = ({ label, value, icon: Icon, active = false }) => (
   <div className={`flex items-center gap-2 rounded-lg border ${active ? 'border-green-500/30 bg-green-500/5' : 'border-[#1E293B]/40 bg-[#0D1A2A]'} px-4 py-2`}>
-    <Icon size={14} className={active ? 'text-green-400' : 'text-gray-500'} />
+    <Icon className={`w-3.5 h-3.5 ${active ? 'text-green-400' : 'text-gray-500'}`} />
     <span className="font-mono text-sm font-bold text-white">{value}</span>
     <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-gray-400">{label}</span>
   </div>

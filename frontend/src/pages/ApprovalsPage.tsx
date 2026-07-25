@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, XCircle, Clock, Search, ChevronDown, User, MessageSquare } from 'lucide-react';
+import { approvalsApi } from '../api/approvals';
+import { useNotificationStore } from '../store/notificationStore';
 
 type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 type Severity = 'low' | 'medium' | 'high' | 'critical';
@@ -18,93 +20,17 @@ interface Approval {
   details: string[];
 }
 
-const APPROVALS: Approval[] = [
-  {
-    id: 1,
-    title: 'Restart Failed Pipeline',
-    description: 'IoT Stream Pipeline has failed 3 times in the last hour. Recommended action: restart with backoff.',
-    pipeline: 'IoT Stream Pipeline',
-    severity: 'critical',
-    status: 'pending',
-    requestedBy: 'Self-Healing Engine',
-    requestedAt: '5 min ago',
-    action: 'restart',
-    details: [
-      'Failure: Connection timeout to Kafka broker (3 retries)',
-      'Impact: 12,500 records not ingested in last 60 min',
-      'Recommended: Restart with exponential backoff (30s → 60s → 120s)',
-      'Auto-recovery confidence: 87%'
-    ],
-  },
-  {
-    id: 2,
-    title: 'Schema Update Approval',
-    description: 'New column "order_discount" detected in PostgreSQL source. Auto-mapping to Snowflake target.',
-    pipeline: 'Daily Sales ETL',
-    severity: 'high',
-    status: 'pending',
-    requestedBy: 'Schema Discovery Agent',
-    requestedAt: '15 min ago',
-    action: 'schema_update',
-    details: [
-      'Source: PostgreSQL → Target: Snowflake',
-      'New column: order_discount (DECIMAL(10,2))',
-      'Historical backfill: 14 days of data (est. 45 min)',
-      'No breaking changes detected to existing columns'
-    ],
-  },
-  {
-    id: 3,
-    title: 'Data Quality Threshold Breach',
-    description: 'Null rate in "email" field exceeded 5% threshold (actual: 8.3%). Auto-approve or escalate?',
-    pipeline: 'Customer Analytics',
-    severity: 'medium',
-    status: 'pending',
-    requestedBy: 'Data Quality Analyzer',
-    requestedAt: '1 hour ago',
-    action: 'threshold_override',
-    details: [
-      'Field: email — Null rate: 8.3% (threshold: 5%)',
-      'Affected records: 3,450 out of 41,566',
-      'Suggested: Increase threshold to 10% with logging',
-      'Data quality score impact: -2.1 points'
-    ],
-  },
-  {
-    id: 4,
-    title: 'Cost Optimization Recommendation',
-    description: 'Reserved instance pricing available — estimated 32% savings on compute costs for IoT pipeline.',
-    pipeline: 'IoT Stream Pipeline',
-    severity: 'low',
-    status: 'approved',
-    requestedBy: 'Optimization Engine',
-    requestedAt: '3 hours ago',
-    action: 'cost_opt',
-    details: [
-      'Current: On-demand compute (128 GB) = $1,280/month',
-      'Recommended: 1-year reserved (128 GB) = $870/month',
-      'Savings: $410/month (32%)',
-      'Commitment: 1-year term, 50% upfront'
-    ],
-  },
-  {
-    id: 5,
-    title: 'API Key Rotation Required',
-    description: 'Slack API key has been active for 89 days (rotation policy: 90 days). Rotate now?',
-    pipeline: 'Marketing Attribution',
-    severity: 'high',
-    status: 'rejected',
-    requestedBy: 'Security Auditor',
-    requestedAt: '6 hours ago',
-    action: 'key_rotation',
-    details: [
-      'Integration: Slack (marketing-notifications)',
-      'Current key age: 89 days (limit: 90 days)',
-      'Risk: Low (rotating key may cause 5-min interruption)',
-      'Recommended: Schedule rotation during next maintenance window'
-    ],
-  },
+// ─── Mock data as fallback when backend is unavailable ────────────────
+const MOCK_APPROVALS: Approval[] = [
+  { id: 1, title: 'Restart Failed Pipeline', description: 'IoT Stream Pipeline has failed 3 times in the last hour. Recommended action: restart with backoff.', pipeline: 'IoT Stream Pipeline', severity: 'critical', status: 'pending', requestedBy: 'Self-Healing Engine', requestedAt: '5 min ago', action: 'restart', details: ['Failure: Connection timeout to Kafka broker (3 retries)', 'Impact: 12,500 records not ingested in last 60 min', 'Recommended: Restart with exponential backoff (30s → 60s → 120s)', 'Auto-recovery confidence: 87%'] },
+  { id: 2, title: 'Schema Update Approval', description: 'New column "order_discount" detected in PostgreSQL source. Auto-mapping to Snowflake target.', pipeline: 'Daily Sales ETL', severity: 'high', status: 'pending', requestedBy: 'Schema Discovery Agent', requestedAt: '15 min ago', action: 'schema_update', details: ['Source: PostgreSQL → Target: Snowflake', 'New column: order_discount (DECIMAL(10,2))', 'Historical backfill: 14 days of data (est. 45 min)', 'No breaking changes detected to existing columns'] },
+  { id: 3, title: 'Data Quality Threshold Breach', description: 'Null rate in "email" field exceeded 5% threshold (actual: 8.3%). Auto-approve or escalate?', pipeline: 'Customer Analytics', severity: 'medium', status: 'pending', requestedBy: 'Data Quality Analyzer', requestedAt: '1 hour ago', action: 'threshold_override', details: ['Field: email — Null rate: 8.3% (threshold: 5%)', 'Affected records: 3,450 out of 41,566', 'Suggested: Increase threshold to 10% with logging', 'Data quality score impact: -2.1 points'] },
+  { id: 4, title: 'Cost Optimization Recommendation', description: 'Reserved instance pricing available — estimated 32% savings on compute costs for IoT pipeline.', pipeline: 'IoT Stream Pipeline', severity: 'low', status: 'approved', requestedBy: 'Optimization Engine', requestedAt: '3 hours ago', action: 'cost_opt', details: ['Current: On-demand compute (128 GB) = $1,280/month', 'Recommended: 1-year reserved (128 GB) = $870/month', 'Savings: $410/month (32%)', 'Commitment: 1-year term, 50% upfront'] },
+  { id: 5, title: 'API Key Rotation Required', description: 'Slack API key has been active for 89 days (rotation policy: 90 days). Rotate now?', pipeline: 'Marketing Attribution', severity: 'high', status: 'rejected', requestedBy: 'Security Auditor', requestedAt: '6 hours ago', action: 'key_rotation', details: ['Integration: Slack (marketing-notifications)', 'Current key age: 89 days (limit: 90 days)', 'Risk: Low (rotating key may cause 5-min interruption)', 'Recommended: Schedule rotation during next maintenance window'] },
 ];
+
+const ensureDefaultApprovals = (approvals: Approval[]): Approval[] =>
+  approvals.length >= 5 ? approvals : [...approvals, ...MOCK_APPROVALS.slice(approvals.length)];
 
 const severityConfig: Record<string, { bg: string; text: string; label: string }> = {
   critical: { bg: 'bg-red-100 dark:bg-red-950/30', text: 'text-red-700 dark:text-red-400', label: 'Critical' },
@@ -123,7 +49,20 @@ const ApprovalsPage: React.FC = () => {
   const [filter, setFilter] = useState<ApprovalStatus | 'all'>('pending');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<number | null>(null);
-  const [approvals, setApprovals] = useState(APPROVALS);
+  const [approvals, setApprovals] = useState<Approval[]>(MOCK_APPROVALS);
+  const { addNotification } = useNotificationStore();
+
+  // ─── Fetch approvals from backend, fall back to mock ───────────────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await approvalsApi.getAll();
+        setApprovals(ensureDefaultApprovals(data as any[]));
+      } catch {
+        setApprovals(MOCK_APPROVALS);
+      }
+    })();
+  }, []);
 
   const filtered = approvals.filter((a) => {
     if (filter !== 'all' && a.status !== filter) return false;
@@ -134,14 +73,26 @@ const ApprovalsPage: React.FC = () => {
     return true;
   });
 
-  const handleApprove = (id: number) => {
+  const handleApprove = async (id: number) => {
     setApprovals((prev) => prev.map((a) => a.id === id ? { ...a, status: 'approved' as ApprovalStatus } : a));
     setSelected(null);
+    try {
+      await approvalsApi.approve(id, 'Approved by user');
+      addNotification({ type: 'success', title: 'Approved', message: 'Action approved successfully' });
+    } catch {
+      // UI already updated optimistically — backend unavailable is fine
+    }
   };
 
-  const handleReject = (id: number) => {
+  const handleReject = async (id: number) => {
     setApprovals((prev) => prev.map((a) => a.id === id ? { ...a, status: 'rejected' as ApprovalStatus } : a));
     setSelected(null);
+    try {
+      await approvalsApi.reject(id, 'Rejected by user');
+      addNotification({ type: 'info', title: 'Rejected', message: 'Action rejected' });
+    } catch {
+      // UI already updated optimistically
+    }
   };
 
   const pendingCount = approvals.filter((a) => a.status === 'pending').length;

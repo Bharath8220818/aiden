@@ -148,8 +148,8 @@ class RAGMemory:
         self,
         query: str,
         user_id: Optional[int] = None,
-        top_k: int = 3,
-        min_score: float = 0.5,
+        top_k: int = settings.RAG_TOP_K,
+        min_score: float = settings.RAG_MIN_SCORE,
     ) -> List[Dict[str, Any]]:
         """
         Retrieve the top-k most semantically similar past intents.

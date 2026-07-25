@@ -110,18 +110,39 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - Health: [http://localhost:8000/health](http://localhost:8000/health) → `{"status":"healthy","service":"AIDEN"}`
 - API docs: [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger UI)
 
-**Test authentication:**
-```bash
-# Create a test user
-curl -s -X POST http://localhost:8000/api/v1/auth/signup \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"TestPass123","name":"Test User"}'
+**Test authentication (using auto-seeded users):**
 
-# Login
+The backend auto-creates two default users on first startup:
+
+```
+Admin: admin@example.com / Admin123!   ← superuser (full access)
+Demo:  demo@example.com / demo1234      ← regular user (limited access)
+```
+
+Test login via curl:
+```bash
 curl -s -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=test@example.com&password=TestPass123"
+  -d "username=demo@example.com&password=demo1234"
 ```
+
+**Expected response:**
+```json
+{"access_token":"eyJ...","token_type":"bearer"}
+```
+
+Or test signup (create your own user):
+```bash
+curl -s -X POST http://localhost:8000/api/v1/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"yourname@company.com","username":"yourname","full_name":"Your Name","password":"YourPass123!"}'
+```
+
+> **Tip:** Override seed credentials via environment variables:
+> ```bash
+> SEED_ADMIN_EMAIL=ops@company.com SEED_ADMIN_PASSWORD=StrongP@ss! uvicorn app.main:app
+> ```
+> Or disable seeding entirely: `SKIP_DB_SEED=true`
 
 ---
 
@@ -218,6 +239,20 @@ docker compose up --build
 ```
 
 This builds and starts **all services** (Postgres, Redis, Qdrant, MinIO, backend, frontend). The frontend is served on [http://localhost](http://localhost) via Nginx.
+
+**On first startup, the backend automatically:**
+1. Creates database tables (via `Base.metadata.create_all`)
+2. Runs Alembic migrations (via `docker-entrypoint.sh`)
+3. Seeds default users:
+   - `admin@example.com` / `Admin123!` (superuser)
+   - `demo@example.com` / `demo1234` (demo user)
+
+> You can override seed credentials via environment variables in `docker-compose.yml`:
+> ```yaml
+> SEED_ADMIN_EMAIL: ops@company.com
+> SEED_ADMIN_PASSWORD: S3cur3P@ss!
+> SKIP_DB_SEED: "true"   # disable seeding entirely
+> ```
 
 ---
 

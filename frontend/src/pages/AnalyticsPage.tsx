@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -87,8 +88,13 @@ const CostDonutChart: React.FC<{ data: any[] }> = ({ data }) => {
 const AnalyticsPage: React.FC = () => {
   const {
     period, trendData, costBreakdown, pipelineMetrics, aiInsights,
-    setPeriod, exportCsv, exportPdf,
+    fetchDashboard, setPeriod, exportCsv, exportPdf,
   } = useAnalyticsStore();
+
+  // ─── Fetch real data from backend on mount, fall back to mock ──────
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
 
   const handleInsightAction = (action: string) => {
     if (action === 'view-costs') {
