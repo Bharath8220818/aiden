@@ -9,7 +9,6 @@ import {
 import { usePipelineStore } from '../store/pipelineStore';
 import { useNotificationStore } from '../store/notificationStore';
 import PipelineCanvas from '../components/builder/PipelineCanvas';
-import AgentManagerPanel from '../components/builder/AgentManagerPanel';
 
 interface Message {
   id: string;

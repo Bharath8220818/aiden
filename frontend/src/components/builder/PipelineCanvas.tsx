@@ -17,7 +17,7 @@ import type {
   ReactFlowInstance,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Database, LayoutPanelTop, GitBranch, Cpu, Sparkles, Activity } from 'lucide-react';
+import { Database, LayoutPanelTop, GitBranch, Sparkles } from 'lucide-react';
 import { usePipelineStore } from '../../store/pipelineStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useAgentStore } from '../../store/agentStore';
@@ -55,7 +55,7 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
   pipelineId,
   className = '',
   pipeline: pipelineProp,
-  interactive = true,
+  interactive: _interactive = true,
   compact = false,
 }) => {
   const {

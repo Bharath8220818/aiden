@@ -2,7 +2,7 @@ export interface Pipeline {
   id: number;
   name: string;
   description?: string;
-  status: 'draft' | 'pending' | 'running' | 'success' | 'failed' | 'paused';
+  status: 'draft' | 'pending' | 'running' | 'success' | 'failed' | 'paused' | 'cancelled';
   schedule?: string;
   source_type: string;
   destination_type: string;
