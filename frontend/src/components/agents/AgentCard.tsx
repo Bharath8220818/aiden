@@ -14,12 +14,8 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, onSelect }) => {
   const isError = agent.status === 'error';
   const isIdle = agent.status === 'idle' || agent.status === 'success';
 
-  // Transparent outer border for running agents so the data pulse overlay shows cleanly
-  const cardBorder = isRunning
-    ? 'border-transparent'
-    : isError
-      ? 'border-red-500/40'
-      : 'border-[#1E293B]/40';
+  // Keep the card boundary neutral; status is communicated by the dot and label.
+  const cardBorder = isError ? 'border-red-500/40' : 'border-[#1E293B]/40';
 
   const errorStrip = isError ? 'border-l-2 border-l-red-500' : '';
 
@@ -36,25 +32,9 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, onSelect }) => {
       layout
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`group cursor-pointer rounded-xl transition-all duration-200 hover:shadow-glow-purple ${cardBorder} ${errorStrip}`}
+      className={`group relative cursor-pointer rounded-xl border bg-[#0D1A2A] shadow-sm transition-all duration-200 hover:shadow-glow-purple ${cardBorder} ${errorStrip}`}
       onClick={() => onSelect(agent)}
-      style={{ background: '#0D1A2A' }}
     >
-      {/* Data pulse border overlay — only on running agents */}
-      {isRunning && (
-        <div
-          className="pointer-events-none absolute inset-0 rounded-xl"
-          style={{
-            padding: 2,
-            background: 'linear-gradient(90deg, #06B6D4, #22C55E, #06B6D4) 0 0 / 300% 100%',
-            WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-            WebkitMaskComposite: 'xor',
-            maskComposite: 'exclude',
-            animation: 'gradientX 3s linear infinite',
-          }}
-        />
-      )}
-
       <div className="relative p-4">
         {/* Header: icon, name, status */}
         <div className="flex items-center justify-between gap-2">

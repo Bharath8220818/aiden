@@ -1,4 +1,4 @@
-export type PipelineStatus = 'draft' | 'pending' | 'running' | 'success' | 'failed' | 'paused';
+export type PipelineStatus = 'draft' | 'pending' | 'running' | 'success' | 'failed' | 'paused' | 'cancelled';
 
 export interface Pipeline {
   id: number;

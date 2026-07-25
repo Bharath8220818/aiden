@@ -77,7 +77,6 @@ const PIPELINE_METRICS: PipelineMetric[] = [
 
 function computeInsights(pipelines: PipelineMetric[]): AiInsight[] {
   const worstPipeline = pipelines.reduce((w, p) => (p.successRate < w.successRate ? p : w), pipelines[0]);
-  const totalRuns = pipelines.reduce((s, p) => s + p.runs, 0);
   const totalCost = pipelines.reduce((s, p) => s + parseFloat(p.cost.replace('$', '')), 0);
   const bestPipeline = pipelines.reduce((b, p) => (p.successRate > b.successRate ? p : b), pipelines[0]);
 

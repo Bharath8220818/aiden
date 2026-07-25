@@ -44,8 +44,8 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon, trend, variant 
     <div className={`${styles.card} p-5 transition-all duration-300 hover:border-purple-500/30 hover:shadow-glow-purple hover:-translate-y-0.5`}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">{title}</p>
-          <p className="mt-2 text-3xl font-bold text-white">{value}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{title}</p>
+          <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{value}</p>
           {trend && (
             <span className={`mt-2 ${trend.up ? styles.trend.up : styles.trend.down} text-xs`}>
               {trend.up ? '↑' : '↓'} {trend.value}
@@ -70,7 +70,7 @@ interface SuggestionChipProps {
 const SuggestionChip: React.FC<SuggestionChipProps> = ({ icon, label, onClick }) => (
   <button
     onClick={onClick}
-    className="group inline-flex items-center gap-2 rounded-full border border-purple-500/20 bg-white/5 px-4 py-2 text-sm font-medium text-gray-300 shadow-sm transition-all duration-200 hover:border-purple-400/40 hover:bg-purple-500/10 hover:text-purple-300 hover:shadow-glow-purple"
+    className="group inline-flex items-center gap-2 rounded-full border border-purple-500/20 bg-white/70 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-purple-400/40 hover:bg-purple-500/10 hover:text-purple-700 hover:shadow-glow-purple dark:bg-white/5 dark:text-gray-300 dark:hover:text-purple-300"
   >
     <span className="text-base">{icon}</span>
     <span>{label}</span>
@@ -376,7 +376,7 @@ const DashboardPage: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6 }}
       >
-        <h2 className="mb-4 text-lg font-bold text-white">Quick Actions</h2>
+        <h2 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">Quick Actions</h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
             { to: '/builder', label: 'New Pipeline', desc: 'Build with AI', color: 'from-purple-600 to-purple-500 shadow-purple-500/30', icon: Sparkles },
@@ -395,8 +395,8 @@ const DashboardPage: React.FC = () => {
                   <Icon size={20} className="text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-100">{action.label}</p>
-                  <p className="mt-0.5 text-xs text-gray-400">{action.desc}</p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{action.label}</p>
+                  <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">{action.desc}</p>
                 </div>
               </Link>
             );
@@ -415,8 +415,8 @@ const DashboardPage: React.FC = () => {
       >
         {/* Pipeline Status */}
         <div className="glass-card p-5">
-          <h2 className="text-lg font-bold text-white">Pipeline Status</h2>
-          <p className="mt-0.5 text-xs text-gray-400">Distribution across all pipelines</p>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Pipeline Status</h2>
+          <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">Distribution across all pipelines</p>
 
           <div className="mt-6 flex items-center gap-6">
             <div className="h-40 w-40 shrink-0">
@@ -434,8 +434,8 @@ const DashboardPage: React.FC = () => {
               ].map((item) => (
                 <div key={item.label} className="flex items-center gap-2.5">
                   <div className={`h-2.5 w-2.5 rounded-full ${item.color}`} />
-                  <span className="text-sm text-gray-400">{item.label}</span>
-                  <span className="ml-auto text-sm font-semibold text-white">{item.pct}%</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">{item.label}</span>
+                  <span className="ml-auto text-sm font-semibold text-gray-900 dark:text-white">{item.pct}%</span>
                 </div>
               ))}
             </div>
@@ -446,8 +446,8 @@ const DashboardPage: React.FC = () => {
         <div className="glass-card p-5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-bold text-white">Recent Activity</h2>
-              <p className="mt-0.5 text-xs text-gray-400">Latest pipeline runs</p>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Recent Activity</h2>
+              <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">Latest pipeline runs</p>
             </div>
             <Link to="/pipelines" className="text-xs font-semibold text-purple-400 hover:text-purple-300">
               View all →
@@ -465,10 +465,10 @@ const DashboardPage: React.FC = () => {
                     className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all hover:bg-white/5 ${meta.bg}`}
                   >
                     <div className={`h-2 w-2 rounded-full ${meta.dot} shrink-0`} />
-                    <span className="flex-1 truncate text-sm font-medium text-gray-100">
+                    <span className="flex-1 truncate text-sm font-medium text-gray-900 dark:text-gray-100">
                       {pipeline.name}
                     </span>
-                    <span className="text-xs text-gray-400 shrink-0">
+                    <span className="shrink-0 text-xs text-gray-600 dark:text-gray-400">
                       {pipeline.updated_at
                         ? new Date(pipeline.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                         : 'just now'}
@@ -487,7 +487,7 @@ const DashboardPage: React.FC = () => {
             ) : (
               <div className="rounded-xl border-2 border-dashed border-white/10 p-8 text-center">
                 <div className="text-3xl">🚀</div>
-                <p className="mt-2 text-sm text-gray-400">No activity yet. Create your first pipeline!</p>
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">No activity yet. Create your first pipeline!</p>
                 <Link to="/builder" className="mt-3 inline-block text-sm font-semibold text-purple-400 hover:text-purple-300">
                   Describe a pipeline →
                 </Link>
