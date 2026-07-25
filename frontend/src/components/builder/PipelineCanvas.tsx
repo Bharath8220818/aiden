@@ -55,6 +55,10 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
   pipelineId,
   className = '',
   pipeline: pipelineProp,
+<<<<<<< HEAD
+  interactive: _interactive = true,
+=======
+>>>>>>> 72e7d724ec4e401eeac5269ea0dff29dc1d33539
   compact = false,
 }) => {
   const {

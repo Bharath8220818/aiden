@@ -74,7 +74,7 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-[#050816]/95 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-black/5 bg-white/90 text-gray-900 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-[#050816]/95 dark:text-gray-100">
       {/* ── Signature: Flowing pipeline animation ── */}
       <div className="absolute bottom-0 left-0 right-0 h-px overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500/30 to-transparent animate-pulse-soft" />
@@ -92,12 +92,12 @@ const Header: React.FC = () => {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5 shrink-0 group">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-purple-600 to-cyan-600 shadow-lg shadow-purple-500/25 transition-all duration-300 group-hover:shadow-purple-500/40 group-hover:scale-105">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-purple-600 to-cyan-600 shadow-lg shadow-purple-500/25 transition-all duration-300 group-hover:scale-105 group-hover:shadow-purple-500/40">
             <span className="text-base font-bold text-white">A</span>
           </div>
           <div className="hidden flex-col leading-none sm:flex">
-            <span className="text-sm font-bold text-white tracking-tight">AIDEN</span>
-            <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400">AI Studio</span>
+            <span className="text-sm font-bold tracking-tight text-gray-900 dark:text-white">AIDEN</span>
+            <span className="bg-gradient-to-r from-purple-600 to-cyan-600 bg-clip-text text-[10px] font-medium uppercase tracking-[0.15em] text-transparent dark:from-purple-400 dark:to-cyan-400">AI Studio</span>
           </div>
         </Link>
 
@@ -110,10 +110,10 @@ const Header: React.FC = () => {
                 <Link
                   key={item.to}
                   to={item.to}
-                  className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 ${
+                  className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-all duration-200 ${
                     active
-                      ? 'bg-purple-600/20 text-purple-300 border border-purple-500/20'
-                      : 'text-gray-400 hover:text-gray-200 hover:bg-white/5 border border-transparent'
+                      ? 'border border-purple-500/20 bg-purple-600/10 text-purple-700 dark:bg-purple-600/20 dark:text-purple-300'
+                      : 'border-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200'
                   }`}
                 >
                   {item.icon}
@@ -130,12 +130,12 @@ const Header: React.FC = () => {
           {isAuthenticated && (
             <button
               onClick={triggerCommandPalette}
-              className="hidden sm:flex h-9 items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-gray-400 shadow-sm transition-all hover:bg-white/10 hover:text-gray-200"
+              className="hidden h-9 items-center gap-1.5 rounded-xl border border-gray-200 bg-white/80 px-3 text-xs text-gray-600 shadow-sm transition-all hover:bg-gray-100 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200 sm:flex"
               aria-label="Command palette"
             >
               <Command size={14} />
               <span className="hidden lg:inline">Search</span>
-              <kbd className="ml-1 rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-medium text-gray-500">
+              <kbd className="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-medium text-gray-500 dark:bg-white/10 dark:text-gray-400">
                 ⌘K
               </kbd>
             </button>
@@ -146,7 +146,7 @@ const Header: React.FC = () => {
           {/* Notifications */}
           {isAuthenticated && (
             <button
-              className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-gray-400 shadow-sm transition-all hover:bg-white/10 hover:text-gray-200"
+              className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white/80 text-gray-600 shadow-sm transition-all hover:bg-gray-100 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200"
               aria-label="Notifications"
               onClick={() => navigate('/notifications')}
             >
@@ -163,11 +163,11 @@ const Header: React.FC = () => {
           {isAuthenticated && user ? (
             <Dropdown
               trigger={
-                <button className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 pl-2 pr-3 py-1.5 shadow-sm transition-all hover:bg-white/10">
+                <button className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white/80 pl-2 pr-3 py-1.5 shadow-sm transition-all hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10">
                   <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-cyan-600 text-[11px] font-bold text-white">
                     {getInitials(user.full_name || user.username || 'U')}
                   </div>
-                  <span className="hidden text-sm font-semibold text-gray-200 lg:inline max-w-[100px] truncate">
+                  <span className="hidden max-w-[100px] truncate text-sm font-semibold text-gray-700 dark:text-gray-200 lg:inline">
                     {user.full_name || user.username}
                   </span>
                 </button>
@@ -178,7 +178,7 @@ const Header: React.FC = () => {
             />
           ) : !isAuthenticated ? (
             <div className="flex items-center gap-2">
-              <Link to="/login" className="text-sm font-medium text-gray-400 transition-colors hover:text-gray-200 px-3 py-2">
+              <Link to="/login" className="px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200">
                 Log In
               </Link>
               <Link to="/signup" className="btn-primary btn-sm">
@@ -190,7 +190,7 @@ const Header: React.FC = () => {
           {/* Mobile menu toggle */}
           {isAuthenticated && (
             <button
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-gray-400 shadow-sm transition-all md:hidden hover:bg-white/10 hover:text-gray-200"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white/80 text-gray-600 shadow-sm transition-all hover:bg-gray-100 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200 md:hidden"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label="Toggle menu"
             >
@@ -204,7 +204,7 @@ const Header: React.FC = () => {
 
       {/* Mobile menu */}
       {isAuthenticated && mobileMenuOpen && (
-        <div className="border-t border-white/5 bg-[#050816] px-4 pb-4 pt-2 md:hidden animate-slide-down">
+        <div className="animate-slide-down border-t border-gray-200 bg-white/95 px-4 pb-4 pt-2 dark:border-white/5 dark:bg-[#050816] md:hidden">
           <nav className="flex flex-col gap-1">
             {navItems.map((item) => {
               const active = isActive(item.to);
@@ -215,8 +215,8 @@ const Header: React.FC = () => {
                   onClick={() => setMobileMenuOpen(false)}
                   className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
                     active
-                      ? 'bg-purple-600/20 text-purple-300 border border-purple-500/20'
-                      : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+                      ? 'border border-purple-500/20 bg-purple-600/10 text-purple-700 dark:bg-purple-600/20 dark:text-purple-300'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200'
                   }`}
                 >
                   {item.icon}
@@ -224,7 +224,7 @@ const Header: React.FC = () => {
                 </Link>
               );
             })}
-            <div className="my-2 h-px bg-white/5" />
+            <div className="my-2 h-px bg-gray-200 dark:bg-white/5" />
             <button
               onClick={() => { triggerCommandPalette(); setMobileMenuOpen(false); }}
               className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-gray-400 transition-all hover:bg-white/5 hover:text-gray-200"
