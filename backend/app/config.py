@@ -41,7 +41,22 @@ class Settings(BaseSettings):
     @classmethod
     def parse_cors_origins(cls, value):
         if isinstance(value, str):
-            origins = [o.strip() for o in value.split(",") if o.strip()]
+            raw = value.strip()
+            # Try JSON array format: '["http://a.com","http://b.com"]'
+            if raw.startswith("[") and raw.endswith("]"):
+                import json
+                try:
+                    result = json.loads(raw)
+                    if isinstance(result, list):
+                        return result
+                except json.JSONDecodeError:
+                    pass
+            # Comma-separated list: "http://a.com,http://b.com"
+            origins = [
+                o.strip().strip('"').strip("'")
+                for o in raw.split(",")
+                if o.strip()
+            ]
             return origins
         if isinstance(value, list):
             return value
@@ -67,7 +82,7 @@ class Settings(BaseSettings):
 
     # ── RAG Settings ──
     RAG_TOP_K: int = 3
-    RAG_MIN_SCORE: float = 0.5
+    RAG_MIN_SCORE: float = 0.4
     QDRANT_COLLECTION: str = "pipeline_intents"
 
     # Supabase Settings

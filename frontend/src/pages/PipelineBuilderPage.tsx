@@ -388,7 +388,6 @@ const PipelineBuilderPage: React.FC = () => {
           >
             <PipelineCanvas
               pipeline={pipelineData}
-              interactive={false}
               compact
             />
           </div>

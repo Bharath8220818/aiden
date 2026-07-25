@@ -29,10 +29,10 @@ logger = logging.getLogger(__name__)
 
 # ── Import smolagents conditionally ────────────────────────────────────
 try:
-    from smolagents import CodeAgent, ToolCallingAgent, Tool, HfApiModel, ManagedAgent
+    from smolagents import CodeAgent, ToolCallingAgent, Tool, ApiModel, ManagedAgent
     SMOLAGENTS_AVAILABLE = True
 except ImportError:
-    CodeAgent = ToolCallingAgent = Tool = HfApiModel = ManagedAgent = None
+    CodeAgent = ToolCallingAgent = Tool = ApiModel = ManagedAgent = None
     SMOLAGENTS_AVAILABLE = False
     logger.warning("smolagents not installed — agent orchestration disabled")
 
@@ -200,7 +200,7 @@ class AgentOrchestrator:
 
         # Initialize HuggingFace model for agents
         try:
-            self.model = HfApiModel(model_id=settings.AGENT_MODEL, token=settings.HF_TOKEN)
+            self.model = ApiModel(model_id=settings.AGENT_MODEL, token=settings.HF_TOKEN or None)
         except Exception as exc:
             logger.warning("Could not initialize HF model for agents: %s", exc)
             return
