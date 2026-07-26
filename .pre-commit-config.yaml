@@ -1,0 +1,99 @@
+# ─────────────────────────────────────────────────────────────────────────
+# AIDEN — Pre-Commit Configuration
+# Run `pre-commit install` to set up git hooks.
+# Run `pre-commit run --all-files` to manually check everything.
+# ─────────────────────────────────────────────────────────────────────────
+# docs: https://pre-commit.com
+
+repos:
+  # ── Python: Ruff (linter + formatter) ──────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.8
+    hooks:
+      # Lint (auto-fix safe issues)
+      - id: ruff
+        name: ruff-lint
+        args:
+          - --fix
+          - --exit-non-zero-on-fix
+        types_or: [python, pyi]
+      # Format
+      - id: ruff-format
+        name: ruff-format
+        types_or: [python, pyi]
+
+  # ── Python: Built-in checks ────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        name: trim-trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+        exclude: |
+          (?x)^(
+            backend/data/|
+            backend/.cache/|
+            .*\.jsonl$
+          )
+      - id: end-of-file-fixer
+        name: fix-end-of-files
+        exclude: |
+          (?x)^(
+            backend/data/|
+            backend/.cache/|
+            .*\.jsonl$
+          )
+      - id: check-yaml
+        name: check-yaml
+      - id: check-json
+        name: check-json
+        exclude: |
+          (?x)^(
+            .*\.jsonl$
+          )
+      - id: check-toml
+        name: check-toml
+      - id: check-added-large-files
+        name: check-large-files
+        args: [--maxkb=500]
+        exclude: |
+          (?x)^(
+            backend/data/|
+            backend/models/|
+            .*\.(png|jpg|jpeg|gif|svg|ico|pdf)$
+          )
+      - id: check-merge-conflict
+        name: check-merge-conflicts
+      - id: detect-private-key
+        name: detect-private-keys
+      - id: mixed-line-ending
+        name: fix-line-endings
+        args: [--fix=lf]
+
+  # ── TypeScript / JavaScript: oxlint (project uses oxlint, not ESLint) ──
+  - repo: local
+    hooks:
+      - id: oxlint
+        name: oxlint-frontend
+        language: system
+        entry: npx --prefix frontend oxlint@0.15.0 --fix
+        files: ^frontend/src/.*\.(js|jsx|ts|tsx)$
+        types: [file]
+        pass_filenames: false
+
+  # ── Secrets: Detect hard-coded credentials ─────────────────────────
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        name: detect-secrets
+        args:
+          - --baseline
+          - .secrets.baseline
+        exclude: |
+          (?x)^(
+            backend/.env|
+            backend/.env.example|
+            .*\.jsonl$|
+            tests/.*
+          )

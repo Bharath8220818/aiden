@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
@@ -323,7 +323,6 @@ async def cancel_pipeline(
 @router.post("/{pipeline_id}/run", response_model=PipelineExecutionResponse)
 async def run_pipeline(
     pipeline_id: int,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -381,7 +380,13 @@ async def run_pipeline(
     PipelineExecutor._cancel_requests[execution.id] = asyncio.Event()
 
     # Kick off execution in the background
-    background_tasks.add_task(pipeline_executor.execute, pipeline, execution)
+    # NOTE: Must use asyncio.create_task() — BackgroundTasks.add_task() does NOT support async functions
+    task = asyncio.create_task(pipeline_executor.execute(pipeline, execution))
+
+    # Store the task so it doesn't get garbage-collected before completion
+    # _active_tasks is initialized in PipelineExecutor.__init__
+    pipeline_executor._active_tasks.add(task)
+    task.add_done_callback(pipeline_executor._active_tasks.discard)
 
     return execution
 
@@ -420,6 +425,43 @@ async def get_execution_logs(
     if not execution:
         raise HTTPException(status_code=404, detail="Execution not found")
     return execution.logs or []
+
+
+@executions_router.get("/")
+async def list_executions(
+    skip: int = 0,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List all executions for the current user."""
+    result = await db.execute(
+        select(PipelineExecution)
+        .where(PipelineExecution.user_id == current_user.id)
+        .order_by(PipelineExecution.id.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    return result.scalars().all()
+
+
+@executions_router.get("/{execution_id}")
+async def get_execution(
+    execution_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get a single execution by ID."""
+    result = await db.execute(
+        select(PipelineExecution).where(
+            PipelineExecution.id == execution_id,
+            PipelineExecution.user_id == current_user.id,
+        )
+    )
+    execution = result.scalar_one_or_none()
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+    return execution
 
 
 @executions_router.get("/{execution_id}/logs")

@@ -1,6 +1,16 @@
 from pydantic_settings import BaseSettings
 from pydantic import field_validator
 from typing import List, Optional
+import logging
+
+logger = logging.getLogger(__name__)
+
+# ── CUDA availability check (cached once at import time) ────────────────
+try:
+    import torch
+    _CUDA_AVAILABLE = torch.cuda.is_available()
+except ImportError:
+    _CUDA_AVAILABLE = False
 
 
 class Settings(BaseSettings):
@@ -27,7 +37,7 @@ class Settings(BaseSettings):
 
     # LLM (Ollama)
     LLM_BASE_URL: str = "http://localhost:11434"
-    LLM_MODEL: str = "llama3"
+    LLM_MODEL: str = "llama3.2:1b"
 
     # JWT
     JWT_SECRET_KEY: str = "your-jwt-secret-key"
@@ -68,7 +78,7 @@ class Settings(BaseSettings):
     USE_4BIT_QUANTIZATION: bool = True
 
     # Model Selection
-    INTENT_MODEL: str = "meta-llama/Llama-3.2-3B-Instruct"
+    INTENT_MODEL: str = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
     AGENT_MODEL: str = "HuggingFaceTB/SmolAgent"
     CODE_MODEL: str = "HuggingFaceH4/starchat-beta"
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
@@ -84,6 +94,32 @@ class Settings(BaseSettings):
     RAG_TOP_K: int = 3
     RAG_MIN_SCORE: float = 0.4
     QDRANT_COLLECTION: str = "pipeline_intents"
+
+    # ── Multimodal Settings (auto-disabled on CPU-only machines) ──
+    MULTIMODAL_ENABLED: bool = False
+    MULTIMODAL_MODEL: str = "llava-hf/llava-v1.6-mistral-7b-hf"
+    MULTIMODAL_ADAPTER_PATH: str = "./models/adapters/multimodal"
+    MULTIMODAL_REMOTE_URL: Optional[str] = None
+
+    @field_validator("MULTIMODAL_ENABLED", mode="before")
+    @classmethod
+    def enforce_cuda_requirement(cls, value):
+        """
+        Force MULTIMODAL_ENABLED to False when CUDA is unavailable.
+        The 7B LLaVA model requires too much RAM on CPU-only machines.
+        A user can still force-enable by passing MULTIMODAL_ENABLED=True
+        as an env var at process start, but this validator guards against
+        accidental loading on CPU.
+        """
+        if not _CUDA_AVAILABLE:
+            if value is True or (isinstance(value, str) and value.lower() in ("true", "1", "yes")):
+                logger.warning(
+                    "CUDA is not available — forcing MULTIMODAL_ENABLED=False. "
+                    "Multimodal inference (LLaVA 7B) requires a GPU. "
+                    "Set the env var at process start to override."
+                )
+            return False
+        return value
 
     # Supabase Settings
     SUPABASE_URL: str = ""

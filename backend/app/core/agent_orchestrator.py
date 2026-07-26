@@ -337,3 +337,171 @@ class AgentOrchestrator:
                 "status": "failed",
                 "error": str(exc),
             }
+
+    # ── Sequential agent orchestration ─────────────────────────────────
+
+    async def run(
+        self,
+        prompt: str,
+        user_id: int,
+        intent: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Run the full sequential agent pipeline: IntentParser → RAG →
+        Extraction → Analysis → Builder → Pipeline creation → RAG update.
+        Emits WebSocket agent_step events for frontend visualization.
+
+        Args:
+            prompt: User's natural-language pipeline description.
+            user_id: ID of the user making the request.
+            intent: Pre-parsed intent (optional — skips IntentParser if given).
+
+        Returns:
+            Dict with the created pipeline and execution metadata.
+        """
+        from app.core.intent_parser import IntentParser
+        from app.core.pipeline_builder import PipelineBuilder
+        from app.core.agent_registry import AgentRegistry
+        from app.core.rag_memory import rag_memory
+        from app.api.v1.websocket import manager
+
+        logger.info("Orchestrator.run — prompt=%s... user_id=%d", prompt[:80], user_id)
+
+        async def emit_agent_step(agent: str, status: str, detail: str):
+            """Emit a WebSocket event for each agent step."""
+            try:
+                await manager.broadcast({
+                    "type": "agent_step",
+                    "agent": agent,
+                    "status": status,
+                    "detail": detail,
+                    "user_id": user_id,
+                })
+            except Exception:
+                pass
+
+        # ── 1. Parse intent ───────────────────────────────────────────
+        parser = IntentParser()
+        if intent is None:
+            await emit_agent_step("intent_parser", "running", "Parsing pipeline description...")
+            intent = await parser.parse(prompt)
+            await emit_agent_step("intent_parser", "success", f"Parsed: {intent.get('name', 'unnamed')}")
+        logger.info("Intent parsed: %s", intent.get("name", "unnamed"))
+
+        # ── Multimodal integration ────────────────────────────────────
+        if "diagram" in intent.get("attachments", []):
+            await emit_agent_step("multimodal", "running", "Analyzing pipeline diagram...")
+            try:
+                from app.services.multimodal_service import multimodal_service
+                analysis = await multimodal_service.analyze_diagram(intent["diagram"])
+                if analysis.get("success"):
+                    intent["diagram_analysis"] = analysis["analysis"]
+                    await emit_agent_step("multimodal", "success", "Diagram analysis complete")
+                else:
+                    await emit_agent_step("multimodal", "warning", "Diagram analysis unavailable")
+            except Exception as exc:
+                logger.warning("Multimodal analysis skipped: %s", exc)
+                await emit_agent_step("multimodal", "skipped", str(exc)[:80])
+
+        # ── 2. Retrieve similar intents from RAG ─────────────────────
+        try:
+            similar = rag_memory.search_similar(prompt, user_id=user_id, top_k=3)
+            if similar:
+                intent["examples"] = similar
+                logger.info("Retrieved %d similar examples from RAG", len(similar))
+        except Exception as exc:
+            logger.warning("RAG search failed (continuing without examples): %s", exc)
+
+        # ── 3. Sequential agent execution ────────────────────────────
+        # Agent 1: Extraction — discover schema
+        await emit_agent_step("extraction", "running", "Discovering source schema...")
+        try:
+            extraction_cls = AgentRegistry.get("extraction")
+            if extraction_cls:
+                extraction = extraction_cls()
+                source_config = intent.get("source_config", {})
+                source_config["type"] = intent.get("source_type", "postgres")
+                schema = await extraction.run(source_config)
+                n_tables = len(schema.get("tables", []))
+                logger.info("Extraction complete: %d tables", n_tables)
+                await emit_agent_step("extraction", "success", f"Found {n_tables} tables, {schema.get('total_columns', 0)} columns")
+            else:
+                schema = {"tables": [], "columns": {}, "error": "No extraction agent registered"}
+                await emit_agent_step("extraction", "warning", "Extraction agent not registered")
+        except Exception as exc:
+            logger.error("Extraction agent failed: %s", exc)
+            schema = {"tables": [], "columns": {}, "error": str(exc)}
+            await emit_agent_step("extraction", "failed", str(exc)[:80])
+
+        # Agent 2: Analysis — profile data quality
+        await emit_agent_step("analysis", "running", "Profiling data quality...")
+        try:
+            analysis_cls = AgentRegistry.get("analysis")
+            if analysis_cls:
+                analysis = analysis_cls()
+                quality_report = await analysis.run(schema)
+                n_issues = len(quality_report.get("issues", []))
+                logger.info("Analysis complete: %d issues found", n_issues)
+                await emit_agent_step("analysis", "success", f"Analysed {quality_report.get('tables_analysed', 0)} tables, {n_issues} issues")
+            else:
+                quality_report = {"issues": [], "suggestions": [], "overall_quality": "unknown"}
+                await emit_agent_step("analysis", "warning", "Analysis agent not registered")
+        except Exception as exc:
+            logger.error("Analysis agent failed: %s", exc)
+            quality_report = {"issues": [], "suggestions": [], "overall_quality": "unknown", "error": str(exc)}
+            await emit_agent_step("analysis", "failed", str(exc)[:80])
+
+        # Agent 3: Pipeline Builder — generate code
+        await emit_agent_step("pipeline_builder", "running", "Generating pipeline code...")
+        try:
+            builder_cls = AgentRegistry.get("builder")
+            if builder_cls:
+                builder = builder_cls()
+                code = await builder.run(intent, schema, quality_report)
+                logger.info("Code generation complete: %s", code.get("summary", ""))
+                await emit_agent_step("pipeline_builder", "success", code.get("summary", "Code generated"))
+            else:
+                code = {"dag_code": "", "dbt_code": "", "tests": [], "summary": "No builder agent registered"}
+                await emit_agent_step("pipeline_builder", "warning", "Builder agent not registered")
+        except Exception as exc:
+            logger.error("Builder agent failed: %s", exc)
+            code = {"dag_code": "", "dbt_code": "", "tests": [], "summary": str(exc), "error": str(exc)}
+            await emit_agent_step("pipeline_builder", "failed", str(exc)[:80])
+
+        # ── 4. Build pipeline object via PipelineBuilder ────────────
+        builder_module = PipelineBuilder()
+        try:
+            pipeline = await builder_module.create_pipeline(
+                name=intent.get("name", "Untitled Pipeline"),
+                source=intent.get("source_type", "postgres"),
+                destination=intent.get("destination_type", "snowflake"),
+                schedule=intent.get("schedule", "0 6 * * *"),
+                code=code.get("dag_code", ""),
+                user_id=user_id,
+            )
+            logger.info("Pipeline created: %s (id=%s)", pipeline.get("name", ""), pipeline.get("id", ""))
+        except Exception as exc:
+            logger.error("Pipeline creation failed: %s", exc)
+            pipeline = {"id": None, "name": intent.get("name", "Untitled"), "error": str(exc)}
+
+        # ── 5. Store in RAG for future context ──────────────────────
+        try:
+            rag_memory.store_pipeline(
+                query=prompt,
+                parsed=intent,
+                user_id=user_id,
+                pipeline_id=pipeline.get("id"),
+            )
+            logger.info("Intent stored in RAG memory")
+        except Exception as exc:
+            logger.warning("RAG store failed: %s", exc)
+
+        return {
+            "status": "success",
+            "pipeline": pipeline,
+            "intent": intent,
+            "schema": schema,
+            "quality_report": quality_report,
+            "code": code,
+            "agents_used": ["extraction", "analysis", "builder"],
+        }

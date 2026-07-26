@@ -295,6 +295,8 @@ class PipelineExecutor:
                 os.path.join(os.path.dirname(__file__), "..", "templates")
             )
         )
+        # Track active background tasks to prevent garbage collection
+        self._active_tasks: set[asyncio.Task] = set()
 
     # ── Public API ────────────────────────────────────────────────────────
 

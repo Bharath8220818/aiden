@@ -34,6 +34,7 @@ const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const GettingStartedPage = lazy(() => import('./pages/GettingStartedPage'));
 const TemplatesPage = lazy(() => import('./pages/TemplatesPage'));
+const MultimodalPage = lazy(() => import('./pages/MultimodalPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -80,6 +81,7 @@ function AppShell() {
                 <Route path="/settings" element={<ProtectedRoute><PageTransition><SettingsPage /></PageTransition></ProtectedRoute>} />
                 <Route path="/getting-started" element={<ProtectedRoute><PageTransition><GettingStartedPage /></PageTransition></ProtectedRoute>} />
                 <Route path="/templates" element={<ProtectedRoute><PageTransition><TemplatesPage /></PageTransition></ProtectedRoute>} />
+                <Route path="/multimodal" element={<ProtectedRoute><PageTransition><MultimodalPage /></PageTransition></ProtectedRoute>} />
 
                 {/* Catch-all */}
                 <Route path="*" element={<NotFoundPage />} />

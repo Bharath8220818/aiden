@@ -11,6 +11,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const menuItems = [
     { label: 'Chat', icon: '💬', href: '/' },
     { label: 'Pipelines', icon: '⚙️', href: '/pipelines' },
+    { label: 'Multimodal', icon: '🔮', href: '/multimodal' },
   ];
 
   return (

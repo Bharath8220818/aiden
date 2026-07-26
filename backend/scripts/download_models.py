@@ -31,10 +31,10 @@ logger = logging.getLogger(__name__)
 
 MODELS = {
     "intent": {
-        "id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "id": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
         "type": "causal_lm",
-        "size": "~14 GB",
-        "info": "Mistral 7B Instruct — intent parser model (no gating required)",
+        "size": "~2.2 GB",
+        "info": "TinyLlama 1.1B Chat — intent parser model (no gating required)",
     },
     "embedding": {
         "id": "sentence-transformers/all-MiniLM-L6-v2",
@@ -54,6 +54,13 @@ MODELS = {
         "type": "causal_lm",
         "size": "~800 MB",
         "info": "SmolAgents — agent orchestration model",
+    },
+    "multimodal": {
+        "id": "llava-hf/llava-v1.6-mistral-7b-hf",
+        "type": "multimodal",
+        "size": "~7 GB",
+        "info": "LLaVA-Next-Mistral-7B — vision-language model for multimodal diagram analysis",
+        "optional": True,
     },
 }
 
@@ -143,6 +150,39 @@ class Downloader:
             logger.error("  ✗ Failed to download %s: %s", model_id, exc)
             return False
 
+    def download_multimodal(self, model_id: str) -> bool:
+        """Download a multimodal vision-language model (LLaVA / Qwen-VL)."""
+        try:
+            from transformers import LlavaNextForConditionalGeneration, AutoProcessor
+
+            logger.info("  -> Downloading multimodal model: %s", model_id)
+            processor = AutoProcessor.from_pretrained(
+                model_id,
+                cache_dir=self.cache_dir,
+                trust_remote_code=True,
+            )
+            logger.info("  -> Processor downloaded")
+
+            model = LlavaNextForConditionalGeneration.from_pretrained(
+                model_id,
+                cache_dir=self.cache_dir,
+                trust_remote_code=True,
+                device_map="auto",
+            )
+            logger.info("  -> Model downloaded (files saved to %s)", self.cache_dir)
+
+            logger.info("  -> Sanity check: model type = %s", model.config.model_type)
+            logger.info("  -> Multimodal model downloaded successfully")
+            return True
+
+        except ImportError as e:
+            logger.error("  -> Missing dependency: %s", e)
+            logger.error("  -> Run: pip install transformers torch accelerate pillow")
+            return False
+        except Exception as exc:
+            logger.error("  -> Failed to download %s: %s", model_id, exc)
+            return False
+
     def download_embedding(self, model_id: str) -> bool:
         """Download a sentence-transformers embedding model."""
         try:
@@ -183,6 +223,8 @@ class Downloader:
 
         if info["type"] == "embedding":
             return self.download_embedding(info["id"])
+        elif info["type"] == "multimodal":
+            return self.download_multimodal(info["id"])
         else:
             return self.download_causal_lm(info["id"])
 
