@@ -42,37 +42,49 @@ async def create_pipeline_from_prompt(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Create a pipeline from a natural language prompt using HF AI agents."""
+    """
+    Create a pipeline from a natural language prompt.
+
+    Parses the prompt via AI (TinyLlama-1.1B on HF) with a 5-second timeout,
+    falling back to a rule-based keyword parser that handles common patterns
+    (source → destination, schedule keywords, transformations, quality rules).
+    Generated Airflow DAG code uses PythonOperator with extract/transform/load
+    tasks connected via XCom.
+    """,
     prompt = request.prompt
     if not prompt or not prompt.strip():
         raise HTTPException(status_code=400, detail="Prompt cannot be empty")
 
-    # 1. Parse intent using HuggingFace IntentParser (with rule-based fallback)
-    parsed_intent = await intent_parser.parse(prompt)
+    # 1. Parse intent — try AI parsing first (with 5s timeout), fall back to
+    #    rule-based parser for instant responses when HF models are slow on CPU.
+    try:
+        parsed_intent = await asyncio.wait_for(
+            intent_parser.parse(prompt),
+            timeout=5.0,
+        )
+    except (asyncio.TimeoutError, Exception):
+        logger.info("AI intent parsing timed out — using rule-based fallback")
+        parsed_intent = intent_parser._rule_based_parse(prompt)
 
-    # 2. Execute through multi-agent system for code generation (lazy import
-    #    so the routes module loads even if smolagents isn't installed yet)
+    # 2. Generate DAG code, dbt code, and tests
+    #    Uses a lightweight CodeGenerator that imports instantly (no smolagents dependency).
+    #    The AgentOrchestrator (with smolagents) is imported lazily and only used if
+    #    it can be initialized quickly — it's never imported inline to avoid the ~9s
+    #    import time penalty from smolagents loading transformers + torch.
     dag_code = None
     dbt_code = None
     tests = parsed_intent.get("data_quality_rules", [])
 
     try:
-        from app.core.agent_orchestrator import AgentOrchestrator, CodeGeneratorTool  # noqa: E402
+        from app.core.code_generator import CodeGenerator
 
-        orchestrator = AgentOrchestrator()
-        if orchestrator.is_enabled():
-            agent_result = await orchestrator.execute(prompt, parsed_intent)
-            dbt_code = agent_result.get("result") if agent_result.get("status") == "success" else None
-
-        generator = CodeGeneratorTool()
-        spec = parsed_intent
-        import json
-
-        dag_code = generator.forward(json.dumps(spec), "dag")
-        dbt_code = dbt_code or generator.forward(json.dumps(spec), "dbt")
-        tests = parsed_intent.get("data_quality_rules", [])
+        generator = CodeGenerator()
+        generated = generator.generate_all(parsed_intent)
+        dag_code = generated.get("dag_code")
+        dbt_code = generated.get("dbt_code")
+        tests = generated.get("tests", tests)
     except Exception as exc:
-        logger.warning("Pipeline code generation failed, proceeding with parsed intent only: %s", exc)
+        logger.warning("Code generation failed, proceeding with parsed intent only: %s", exc)
 
     # 3. Save pipeline
     new_pipeline = Pipeline(

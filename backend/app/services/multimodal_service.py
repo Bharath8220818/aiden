@@ -331,16 +331,27 @@ class MultimodalService:
             else:
                 return {"success": False, "error": f"Unsupported model type: {self.model_type}"}
 
-            inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
-
-            with torch.no_grad():
-                outputs = self.model.generate(
-                    **inputs,
-                    max_new_tokens=max_tokens,
-                    temperature=temperature,
-                    do_sample=True,
-                    pad_token_id=self.processor.tokenizer.eos_token_id,
-                )
+            # transformers >=4.46 returns a plain Tensor; older versions return BatchFeature (dict)
+            if isinstance(inputs, dict) or hasattr(inputs, "items"):
+                inputs_dict = {k: v.to(self.model.device) for k, v in inputs.items()}
+                with torch.no_grad():
+                    outputs = self.model.generate(
+                        **inputs_dict,
+                        max_new_tokens=max_tokens,
+                        temperature=temperature,
+                        do_sample=True,
+                        pad_token_id=self.processor.tokenizer.eos_token_id,
+                    )
+            else:
+                input_ids = inputs.to(self.model.device)
+                with torch.no_grad():
+                    outputs = self.model.generate(
+                        input_ids,
+                        max_new_tokens=max_tokens,
+                        temperature=temperature,
+                        do_sample=True,
+                        pad_token_id=self.processor.tokenizer.eos_token_id,
+                    )
 
             response = self.processor.decode(outputs[0], skip_special_tokens=True)
             if "assistant" in response:
