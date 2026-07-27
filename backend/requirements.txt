@@ -37,6 +37,6 @@ datasets>=2.20.0
 torch>=2.4.0
 
 # ─── Integrations ───
-supabase>=2.0.0
+supabase>=2.31.0
 google-cloud-bigquery>=3.20.0,<3.25.0
 pyarrow>=14.0.0
