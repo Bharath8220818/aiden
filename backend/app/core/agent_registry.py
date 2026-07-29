@@ -56,28 +56,14 @@ class AgentRegistry:
 # Each is a smolagents.Tool subclass. The orchestrator discovers them by
 # name ("extraction", "analysis", "pipeline_builder", "governance", "deployment").
 
-import importlib
+from app.agents.extraction_agent import ExtractionAgent
+from app.agents.analysis_agent import AnalysisAgent
+from app.agents.pipeline_builder_agent import PipelineBuilderAgent
+from app.agents.governance_agent import GovernanceAgent
+from app.agents.deployment_agent import DeploymentAgent
 
-_AGENT_MODULES = [
-    "app.agents.extraction_agent",
-    "app.agents.analysis_agent",
-    "app.agents.pipeline_builder_agent",
-    "app.agents.governance_agent",
-    "app.agents.deployment_agent",
-]
-
-_AGENT_CLASS_NAMES = [
-    "ExtractionAgent",
-    "AnalysisAgent",
-    "PipelineBuilderAgent",
-    "GovernanceAgent",
-    "DeploymentAgent",
-]
-
-for _mod_name, _cls_name in zip(_AGENT_MODULES, _AGENT_CLASS_NAMES):
-    try:
-        _mod = importlib.import_module(_mod_name)
-        _cls = getattr(_mod, _cls_name)
-        AgentRegistry.register(_cls)
-    except Exception as _exc:
-        logger.warning("Failed to register %s: %s", _cls_name, _exc)
+AgentRegistry.register(ExtractionAgent)
+AgentRegistry.register(AnalysisAgent)
+AgentRegistry.register(PipelineBuilderAgent)
+AgentRegistry.register(GovernanceAgent)
+AgentRegistry.register(DeploymentAgent)

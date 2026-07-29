@@ -28,6 +28,9 @@ class GovernanceAgent(Tool):
             "description": "Pipeline resource/intent being accessed"
         }
     }
+    # Note: orchestrator calls agent.forward(user_id, action, resource) directly.
+    # smolagens BaseTool.__call__ would pass all three as keyword arguments;
+    # the direct forward() call uses positional args for clarity.
     output_type = "object"
 
     def forward(self, user_id: int, action: str, resource: Dict[str, Any]) -> Dict[str, Any]:

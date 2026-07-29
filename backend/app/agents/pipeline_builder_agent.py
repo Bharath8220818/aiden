@@ -28,6 +28,9 @@ class PipelineBuilderAgent(Tool):
             "description": "Quality report dict from the AnalysisAgent"
         }
     }
+    # Note: orchestrator calls agent.forward(intent, schema, quality_report) directly.
+    # smolagens BaseTool.__call__ would pass only the first input; direct forward() call
+    # supports multiple positional arguments without relying on __call__'s keyword dispatch.
     output_type = "object"
 
     def forward(self, intent: Dict[str, Any], schema: Dict[str, Any], quality_report: Dict[str, Any]) -> Dict[str, Any]:

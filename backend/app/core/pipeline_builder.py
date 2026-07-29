@@ -150,9 +150,9 @@ SELECT
     *
     {", " + transforms_sql if transforms_sql else ""}
 FROM {{{{ source('raw', '{source_table}') }}}}
-{% if is_incremental() %}
+{{% if is_incremental() %}}
     WHERE _loaded_at > (SELECT MAX(_loaded_at) FROM {{{{ this }}}})
-{% endif %}
+{{% endif %}}
 '''
 
     def generate_tests(self, config: Dict[str, Any]) -> list:
