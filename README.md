@@ -124,7 +124,7 @@ aiden/
 |---------|-------------|
 | `uvicorn app.main:app --reload --port 8000` | Dev server |
 | `alembic upgrade head` | Run database migrations |
-| `pytest -v` | Run test suite |
+`pytest tests/test_core/test_intent_parser.py -v` | Run intent parser tests (10 tests) |
 | `python scripts\seed_user.py` | Create test users |
 | `python scripts\train_agent.py --agent intent` | Train intent agent |
 | `python scripts\download_models.py` | Download HF models |
@@ -248,7 +248,7 @@ set PYTORCH_NO_CUDA=1
 | Backend slow to start on Windows | `set PYTORCH_NO_CUDA=1` before `uvicorn` |
 | `supabase` not installed | Auto-disables — no action needed |
 | `asyncpg` not installed | SQLite works fine for dev — no action needed |
-| Frontend chunk >500 kB warning | Code-splitting planned — warning is safe to ignore |
+| Frontend chunk >500 kB warning | Warning only — all 34 pages use `React.lazy()` code-splitting with 22+ separate chunks |
 
 ---
 
