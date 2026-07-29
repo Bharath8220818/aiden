@@ -82,14 +82,29 @@ logs/
 # ============================================================
 # Hugging Face Cache
 # ============================================================
+models/cache/
+models/cache/**
 backend/models/cache/
 backend/models/cache/**
 backend/models/.cache/
 backend/models/downloads/
 
 # ============================================================
+# Large Binary / Model Files (any location)
+# ============================================================
+*.safetensors
+*.gguf
+*.bin
+*.pt
+*.pth
+*.pkl
+*.onnx
+
+# ============================================================
 # Fine-Tuned Models
 # ============================================================
+models/custom/
+models/custom/**
 backend/models/custom/
 backend/models/custom/**
 
@@ -106,6 +121,7 @@ backend/models/runs/
 backend/models/runs/**
 
 # Keep the models folder structure
+!models/.gitkeep
 !backend/models/.gitkeep
 
 # ============================================================
