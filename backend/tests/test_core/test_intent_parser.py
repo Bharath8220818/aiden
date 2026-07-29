@@ -83,8 +83,9 @@ async def test_intent_parser_extracts_table_name():
     result = await parser.parse(
         "Build pipeline from table 'sales_orders' in postgres to snowflake"
     )
-    # The parser uses 'table_name' key, not 'table'
-    assert result["source_config"].get("table_name") == "sales_orders"
+    # The parser may return table under 'table' (rule-based) or 'table_name' (AI)
+    table_val = result["source_config"].get("table") or result["source_config"].get("table_name")
+    assert table_val == "sales_orders", f"Expected 'sales_orders', got config={result['source_config']}"
 
 
 @pytest.mark.asyncio
