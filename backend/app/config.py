@@ -2,15 +2,47 @@ from pydantic_settings import BaseSettings
 from pydantic import field_validator
 from typing import List, Optional
 import logging
+import subprocess
+import sys
 
 logger = logging.getLogger(__name__)
 
-# ── CUDA availability check (cached once at import time) ────────────────
-try:
-    import torch
-    _CUDA_AVAILABLE = torch.cuda.is_available()
-except ImportError:
-    _CUDA_AVAILABLE = False
+# ── CUDA availability check (safe subprocess with timeout) ──
+# Both `import torch` and `torch.cuda.is_available()` can hang indefinitely
+# on Windows without an NVIDIA GPU. We use a subprocess with a 5-second
+# timeout to check safely. The result is cached after the first check.
+_CUDA_AVAILABLE: Optional[bool] = None
+
+
+def _check_cuda() -> bool:
+    """Check CUDA availability once and cache the result.
+
+    Uses a subprocess with a 3-second timeout and PYTORCH_NO_CUDA=1
+    to avoid hanging the main process on Windows machines without
+    an NVIDIA GPU where ``import torch`` can block indefinitely.
+    """
+    global _CUDA_AVAILABLE
+    if _CUDA_AVAILABLE is not None:
+        return _CUDA_AVAILABLE
+
+    # Fast early exit: if PYTORCH_NO_CUDA is set, skip the subprocess entirely
+    if __import__("os").environ.get("PYTORCH_NO_CUDA"):
+        _CUDA_AVAILABLE = False
+        return _CUDA_AVAILABLE
+
+    try:
+        # The inner subprocess must receive PYTORCH_NO_CUDA so that
+        # ``import torch`` does not hang inside the child process.
+        child_env = {**__import__("os").environ, "PYTORCH_NO_CUDA": "1"}
+        result = subprocess.run(
+            [sys.executable, "-c", "import torch; print(torch.cuda.is_available())"],
+            capture_output=True, text=True, timeout=3,
+            env=child_env,
+        )
+        _CUDA_AVAILABLE = result.stdout.strip() == "True"
+    except Exception:
+        _CUDA_AVAILABLE = False
+    return _CUDA_AVAILABLE
 
 
 class Settings(BaseSettings):
@@ -52,7 +84,6 @@ class Settings(BaseSettings):
     def parse_cors_origins(cls, value):
         if isinstance(value, str):
             raw = value.strip()
-            # Try JSON array format: '["http://a.com","http://b.com"]'
             if raw.startswith("[") and raw.endswith("]"):
                 import json
                 try:
@@ -61,16 +92,19 @@ class Settings(BaseSettings):
                         return result
                 except json.JSONDecodeError:
                     pass
-            # Comma-separated list: "http://a.com,http://b.com"
-            origins = [
-                o.strip().strip('"').strip("'")
-                for o in raw.split(",")
-                if o.strip()
-            ]
+            origins = [o.strip().strip('"').strip("'") for o in raw.split(",") if o.strip()]
             return origins
         if isinstance(value, list):
             return value
         return []
+
+    # ── Airflow Settings ──
+    AIRFLOW_URL: Optional[str] = None
+    AIRFLOW_USERNAME: Optional[str] = None
+    AIRFLOW_PASSWORD: Optional[str] = None
+
+    # ── OpenAI Settings ──
+    OPENAI_API_KEY: Optional[str] = None
 
     # ── Hugging Face Settings ──
     HF_TOKEN: Optional[str] = None
@@ -104,19 +138,12 @@ class Settings(BaseSettings):
     @field_validator("MULTIMODAL_ENABLED", mode="before")
     @classmethod
     def enforce_cuda_requirement(cls, value):
-        """
-        Force MULTIMODAL_ENABLED to False when CUDA is unavailable.
-        The 7B LLaVA model requires too much RAM on CPU-only machines.
-        A user can still force-enable by passing MULTIMODAL_ENABLED=True
-        as an env var at process start, but this validator guards against
-        accidental loading on CPU.
-        """
-        if not _CUDA_AVAILABLE:
+        """Force MULTIMODAL_ENABLED to False when CUDA is unavailable."""
+        if not _check_cuda():
             if value is True or (isinstance(value, str) and value.lower() in ("true", "1", "yes")):
                 logger.warning(
                     "CUDA is not available — forcing MULTIMODAL_ENABLED=False. "
-                    "Multimodal inference (LLaVA 7B) requires a GPU. "
-                    "Set the env var at process start to override."
+                    "Multimodal inference (LLaVA 7B) requires a GPU."
                 )
             return False
         return value

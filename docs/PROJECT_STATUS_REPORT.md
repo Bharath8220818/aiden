@@ -1,236 +1,156 @@
 # AIDEN Project Status Report
-**Date:** July 25, 2026
+**Date:** July 29, 2026
 
 ---
 
 ## 1. Executive Summary
 
-AIDEN is a full-stack AI-assisted data pipeline platform at a **working MVP stage**. The frontend (React 19 + TypeScript + Vite + Tailwind CSS) provides 22 route pages including dashboard, pipeline builder, analytics, agent fleet management, and multimodal diagram analysis. The backend (FastAPI + SQLAlchemy + SQLite/PostgreSQL) exposes 30+ REST endpoints across 9 routers. The project has comprehensive documentation, a Makefile for one-command setup, GitHub Actions CI, and Docker Compose infrastructure.
+AIDEN is a full-stack AI-assisted data pipeline platform at a **working MVP stage**. The frontend provides **34 route pages** (React 19 + TypeScript + Vite + Tailwind CSS). The backend has **18 API routers**, **13 core logic modules**, **11 AI agents**, **13 external services**. Both frontend and backend are verified live and communicating.
+
+**Current focus:** Demo preparation, testing, and production hardening.
 
 ---
 
-## 2. Verified Running State
+## 2. Completed Work
 
-### Backend Endpoints
+### Frontend (34 pages, 80+ components)
 
-| Endpoint | Status | Details |
-|----------|--------|---------|
-| `GET /health` | ✅ Healthy | Root health check |
-| `GET /api/v1/health` | ✅ Healthy | 6-service detailed health (DB, HF, RAG, Redis, Multimodal, Schema) |
-| `GET /api/v1/health/live` | ✅ Alive | K8s liveness probe |
-| `GET /api/v1/health/ready` | ✅ Ready | K8s readiness probe |
-| `POST /api/v1/auth/signup` | ✅ Works | Creates users with bcrypt-hashed passwords |
-| `POST /api/v1/auth/login` | ✅ Works | Returns JWT token |
-| `GET /api/v1/auth/me` | ✅ Works | Returns authenticated user profile |
-| `GET /api/v1/pipelines/` | ✅ Works | Returns user's pipelines |
-| `POST /api/v1/pipelines/from-prompt` | ✅ Works | Natural language → pipeline via IntentParser |
-| `POST /api/v1/pipelines/{id}/run` | ✅ Works | Multi-stage execution with WebSocket updates |
-| `POST /api/v1/multimodal/analyze` | ✅ 503 when down | Vision-language image analysis (needs model) |
-| `POST /api/v1/multimodal/upload` | ✅ 503 when down | File upload + analysis (needs model) |
-| `GET /api/v1/multimodal/status` | ✅ Ok | Returns `{"available": false}` until model downloaded |
-| `WS /api/v1/ws/{client_id}` | ✅ Works | Real-time pipeline status |
+| Feature | Status |
+|---------|--------|
+| 34 route pages | ✅ All implemented (Dashboard, Learning, Design, Operations, AI, Builder, Governance, Resources, Auth, Info, Admin) |
+| Pipeline Designer | ✅ React Flow canvas with drag-and-drop nodes |
+| Architecture Canvas | ✅ Cloud components palette, design principles |
+| Schema Designer | ✅ ERD visual designer with table cards |
+| AI Workspace | ✅ 4-tab layout, agent cards, training UI |
+| Coding Problems | ✅ 850+ problem listing, Monaco editor |
+| Learning Paths | ✅ Career tracks with progress bars |
+| Dashboard | ✅ Stats cards, AI prompt input, activity feed |
+| Pipeline Builder | ✅ 3-panel: chat + messages + canvas |
+| Analytics | ✅ Recharts (Area, Pie, Bar), KPI cards |
+| Dark/Light Theme | ✅ Full theme toggle |
+| Mobile Responsive | ✅ Bottom nav, collapsible sidebar |
+| Build (TypeScript) | ✅ 0 errors, `npm run build` passes |
 
-### Frontend Pages
+### Backend (18 routers, 30+ endpoints)
 
-| Page | Route | Status | Features |
-|------|-------|--------|----------|
-| Login | `/login` | ✅ Renders | Email/password form, social login buttons |
-| Signup | `/signup` | ✅ Renders | Registration form |
-| Dashboard | `/` | ✅ Renders | Stats cards, prompt input, quick actions, activity feed |
-| Pipelines | `/pipelines` | ✅ Renders | Pipeline list with status badges |
-| Builder | `/builder` | ✅ Renders | 3-panel: history + chat + canvas flow |
-| Agents | `/agents` | ✅ Renders | 15 agent cards, search/filter/sort, detail modals |
-| Analytics | `/analytics` | ✅ Renders | KPI cards, Recharts, AI insights |
-| Approvals | `/approvals` | ✅ Renders | Approval list with approve/reject |
-| Audit Logs | `/audit-logs` | ✅ Renders | Searchable table, pagination, CSV export |
-| Multimodal | `/multimodal` | ✅ Renders | PipelineAnalyzer image upload + analysis UI |
-| Monitoring | `/monitoring` | ⚠️ Scaffolded | Placeholder structure |
-| Settings | `/settings` | ✅ Renders | User settings |
-| Notifications | `/notifications` | ✅ Renders | Notification history |
-| Getting Started | `/getting-started` | ✅ Renders | Onboarding guide |
-| Templates | `/templates` | ✅ Renders | Pipeline templates |
-| About, Terms, etc. | — | ✅ Renders | Public info pages |
-| 404 | `*` | ✅ Renders | Catch-all |
+| Feature | Status |
+|---------|--------|
+| Auth (JWT) | ✅ Signup, login, protected routes, bcrypt hashing |
+| Pipeline CRUD | ✅ Create, read, update, delete, list |
+| Pipeline from Prompt | ✅ 3-tier IntentParser (Ollama → HF → rule-based) |
+| Pipeline Execution | ✅ Multi-stage engine + WebSocket status |
+| Health Check | ✅ 3 endpoints with service checks |
+| Analytics / Approvals / Audit | ✅ All with list, filter, export |
+| Agents (11 registered) | ✅ Base, Extraction, Analysis, Builder, Self-Healing, Governance, Monitoring, Deployment, Optimisation, Streaming, Documentation |
+| Multimodal | ✅ LLaVA/Qwen-VL, CPU fallback |
+| Schemas / Architecture | ✅ Generate, validate, normalize, DDL, Terraform |
+| Coding / Learning / Team | ✅ Problems, paths, members, comments |
+| Templates / Voice | ✅ Clone, Whisper transcription |
+| WebSocket | ✅ Real-time pipeline status |
 
-### Frontend Build
+### Issues Fixed (Current Session)
 
-| Check | Status |
-|-------|--------|
-| `npx tsc --noEmit` | ✅ 0 errors |
-| `npm run build` | ✅ Passes |
-| `npm test -- --run` | ⚠️ Partial (login tests pass) |
+| Issue | Fix |
+|-------|-----|
+| `approvals.py` import mismatch | `Approval` → `ApprovalRequest`, `RiskLevel` → `ApprovalRisk`, corrected field names |
+| `audit.py` import mismatch | `AuditLog` → `AuditLogEntry`, removed non-existent `AuditSeverity`/`user_name`/`severity` |
+| CORS wildcard + credentials rejection | `allow_origins=["*"]` → explicit `[localhost:5173, 127.0.0.1:5173, ...]` |
+| PipelineExecutor startup crash | Made `db` optional, added `execute()` method, added `_active_tasks`/`_cancel_requests` init |
+| Backend server verified | ✅ Health check responds, login returns JWT, CORS preflight passes |
 
 ---
 
-## 3. Recent Additions (This Week)
+## 3. Priority Task Board
 
-| Feature | Files | Status |
-|---------|-------|--------|
-| **Makefile** | `Makefile` (root) | ✅ 20 targets: install, dev, test, build, docker, db, lint, format |
-| **Health Check Endpoint** | `backend/app/api/v1/health.py` | ✅ 3 endpoints with 6-service checks, K8s probes |
-| **Multimodal Service** | `multimodal_service.py` | ✅ LLaVA/Qwen-VL, CPU fallback, conditional imports |
-| **Multimodal API** | `multimodal.py` | ✅ 3 endpoints with response models, availability checks |
-| **Multimodal Training Script** | `train_multimodal.py` | ✅ LoRA fine-tuning with CPU fallback |
-| **Data Generator** | `generate_multimodal_data.py` | ✅ PipelineDiagramGenerator class |
-| **Synthetic Dataset** | `data/training/multimodal_dataset.jsonl` | ✅ 200 samples with metadata |
-| **Placeholder Images** | `data/training/diagram_*.png` | ✅ 200 PNGs for training |
-| **Frontend API Client** | `multimodal.ts` | ✅ 3 methods: analyze, uploadAndAnalyze, getStatus |
-| **PipelineAnalyzer Component** | `PipelineAnalyzer.tsx` | ✅ Upload + analyze UI with loading/error/success states |
-| **Multimodal Page** | `MultimodalPage.tsx` | ✅ Route + sidebar link |
-| **Comprehensive Reference** | `docs/REFERENCE.md` | ✅ 500+ lines covering architecture, design, data flows, pending work |
+### 🔴 Priority 1 – Critical (Must Fix for Demo/Submission)
 
----
+| # | Task | Owner | Details | Effort | Status |
+|---|------|-------|---------|--------|--------|
+| 1 | Fix Windows PyTorch hang | D (Infra) | Install CPU-only PyTorch OR use `set PYTORCH_NO_CUDA=1` | 30 min | ✅ **DONE** — `_check_cuda()` subprocess + env var works |
+| 2 | Run full end-to-end demo | All | Login → create pipeline → run → self-heal → approve | 1 hour | ⬜ |
+| 3 | Record demo video | A (Frontend) | OBS Studio, 5-min walkthrough, YouTube (unlisted) | 1 hour | ⬜ |
+| 4 | Prepare viva slide deck | C (AI/ML) | 10-12 slides on architecture, novelty, results | 2 hours | ⬜ |
 
-## 4. Frontend Features
+### 🟡 Priority 2 – Important (Should Complete)
 
-| Feature | Status | Details |
-|---------|--------|---------|
-| Authentication UI | ✅ Complete | Login, signup, protected routes, JWT storage |
-| Dashboard | ✅ Complete | Stats cards, prompt input, activity feed, suggestion chips |
-| AI Agents Page | ✅ Complete | 15 cards, search/filter/sort, detail modals |
-| Analytics Page | ✅ Complete | Recharts, 4 KPI cards, AI insights, export |
-| Pipeline Builder | ✅ Complete | 3-panel layout, streaming chat, auto-populate canvas |
-| Pipeline Details | ✅ Complete | Single pipeline view |
-| Approvals | ✅ Complete | Approve/reject workflow |
-| Audit Logs | ✅ Complete | Searchable table, pagination, CSV export |
-| Multimodal Analysis | ✅ Complete | Image upload + vision analysis UI |
-| Monitoring Page | ⚠️ Scaffolded | Placeholder structure |
-| Notifications | ✅ Complete | Toast UI with notification store |
-| Theme (dark/light) | ✅ Complete | Theme store toggle |
-| Mobile Nav | ✅ Complete | Bottom tab bar |
-| Error Boundary | ✅ Complete | Graceful error handling |
-| Tests | ⚠️ Partial | Login + AgentDetailModal tests pass, more needed |
-| Build | ✅ Passing | TypeScript 0 errors, Vite build succeeds |
+| # | Task | Owner | Details | Effort | Status |
+|---|------|-------|---------|--------|--------|
+| 5 | Backend tests (pytest) | B (Backend) | intent_parser, orchestrator, self_healing, rag_memory, pipeline_executor | 4 hours | ⬜ |
+| 6 | Frontend code-splitting | A (Frontend) | React.lazy() for 5 large pages | 1 hour | ⬜ |
+| 7 | smolagents integration | C (AI/ML) | Replace mock agent runs with real smolagents | 2 hours | ⬜ |
+| 8 | Add MinIO to prod Docker | D (Infra) | MinIO service in docker-compose.prod.yml | 30 min | ⬜ |
+| 9 | Run LLaVA model download | C (AI/ML) | `python scripts/download_models.py --model multimodal` | 30-60 min | ⬜ |
+| 10 | Deploy to Vercel + Render | D (Infra) | Frontend → Vercel, Backend → Render, update .env | 2 hours | ⬜ |
 
-### Frontend Tech Stack
+### 🟢 Priority 3 – Nice-to-Have (Future Work)
 
-- React 19 + TypeScript 6.x + Vite 8.x
-- Tailwind CSS 3.x (enterprise dark design system)
-- Zustand 5.x (7 stores: auth, pipeline, agent, analytics, notification, theme)
-- React Router 7.x (22 routes)
-- TanStack Query 5.x (server state)
-- Framer Motion 12.x (animations)
-- Recharts 3.x (charts)
-- Lucide React 1.x (icons)
-- Zod 4.x + React Hook Form (validation)
+| # | Task | Owner | Effort |
+|---|------|-------|--------|
+| 11 | Kafka integration (docker-compose + streaming agent) | D (Infra) | 1 week |
+| 12 | Prometheus + Grafana dashboards | D (Infra) | 2 days |
+| 13 | Rate limiting (slowapi) | B (Backend) | 1 day |
+| 14 | Dependabot config | D (Infra) | 30 min |
+| 15 | Data versioning (DVC) | C (AI/ML) | 1 day |
+| 16 | Security baseline (secrets, SECURITY.md) | B (Backend) | 1 day |
+| 17 | CI/CD deploy workflow (GitHub Actions) | D (Infra) | 2 days |
+| 18 | Multimodal fine-tuning (LLaVA on pipeline diagrams) | C (AI/ML) | 4-6 hours |
+| 19 | Agent fine-tuning (LoRA adapters for 5 core agents) | C (AI/ML) | 4-6 hours |
+| 20 | Frontend unit tests (Vitest) | A (Frontend) | 3-4 hours |
 
 ---
 
-## 5. Backend Features
+## 4. Effort Summary by Member
 
-| Feature | Status | Details |
-|---------|--------|---------|
-| Authentication | ✅ Complete | JWT-based signup/login/me, bcrypt hashing |
-| Pipeline CRUD | ✅ Complete | Create, read, update, delete, list with filters |
-| Pipeline from Prompt | ✅ Complete | 3-tier IntentParser (Ollama → HF → rule-based) |
-| Pipeline Execution | ✅ Complete | Multi-stage engine with WebSocket status |
-| Database Connector | ✅ Complete | PostgreSQL, SQLite, BigQuery support |
-| Test Connection | ✅ Complete | `POST /test-connection` endpoint |
-| RAG Memory | ✅ Complete | 384-dim MiniLM embeddings, in-memory vector store |
-| Agent Orchestrator | ⚠️ Partially | HuggingFace smolagents scaffolded, fallback mode |
-| Self-Healing Engine | ✅ Complete | Error diagnosis, fix proposals, risk assessment, approval |
-| WebSocket | ✅ Complete | Real-time pipeline status broadcasting |
-| Cancellation | ✅ Complete | Pipeline cancellation with WebSocket events |
-| Detailed Health Check | ✅ Complete | 6-service health + K8s liveness/readiness probes |
-| Multimodal Service | ✅ Complete | LLaVA/Qwen-VL, CPU fallback, conditional imports |
-| Analytics Endpoints | ✅ Complete | Dashboard KPIs, pipeline metrics, CSV/PDF export |
-| Approvals Endpoints | ✅ Complete | List, approve, reject with risk scoring |
-| Audit Endpoints | ✅ Complete | List with filters, CSV export |
-
-### Backend Tech Stack
-
-- Python 3.13 + FastAPI (async)
-- SQLAlchemy 2.x (async, SQLite/PostgreSQL)
-- Pydantic + Pydantic Settings
-- python-jose (JWT), passlib + bcrypt
-- HuggingFace Transformers (intent parsing, code generation)
-- Ollama (local LLM: llama3.2:1b)
-- Sentence Transformers (embeddings for RAG)
-- Qdrant (vector DB, optional)
-- Redis (caching, optional)
-- MinIO (S3 storage, optional)
-- Alembic (database migrations)
+| Member | P1 Tasks | P2 Tasks | P3 Tasks | Total P1+P2 Effort | Total All |
+|--------|----------|----------|----------|-------------------:|----------:|
+| A – Frontend | 1 (shared) | 1 | 1 | 2 hours | 5-6 hours |
+| B – Backend | 0 | 1 | 2 | 4 hours | 6-7 hours |
+| C – AI/ML | 1 (shared) | 2 | 3 | 4-5 hours | 12-15 hours |
+| D – Infrastructure | 1 (shared) | 2 | 4 | 3 hours | 10-12 days |
 
 ---
 
-## 6. Documentation
+## 5. Service Status (Live Verification)
 
-| Document | Status | Content |
-|----------|--------|---------|
-| `README.md` | ✅ Complete | Quick start, project structure, API docs, deployment flow |
-| `docs/REFERENCE.md` | ✅ Complete | **NEW** — 500+ line comprehensive guide: folder structure, design system, data flows, pending work |
-| `docs/PROJECT_STATUS_REPORT.md` | ✅ Updated | Current verified state, all features tracked |
-| `docs/SETUP.md` | ✅ Complete | Team onboarding guide with troubleshooting |
-| `Makefile` | ✅ Complete | One-command setup (20 targets) |
-
----
-
-## 7. Docker Infrastructure
-
-| Component | Status | Notes |
-|-----------|--------|-------|
-| `docker-compose.yml` | ✅ Mostly works | Postgres, Redis, Qdrant, MinIO, backend, frontend, Nginx |
-| `docker-compose.prod.yml` | ⚠️ Missing MinIO | Needs MinIO service for stateful dev parity |
-| `nginx.conf` (frontend) | ✅ Good | SPA routing, gzip, API/WS proxy, asset caching |
-| `nginx.conf` (infra) | ❌ Broken | Malformed server block — needs rewrite |
-| `backend/Dockerfile` | ✅ Good | Multi-stage, HF model caching, libpq-dev |
-| `frontend/Dockerfile` | ✅ Good | Nginx alpine, static file serving |
+| Service | URL | Status |
+|---------|-----|--------|
+| Backend (FastAPI) | `http://localhost:8000` | 🟢 **LIVE** — health: `{"status":"healthy"}` |
+| Frontend (Vite) | `http://localhost:5173` | 🟢 **LIVE** — serves AIDEN app |
+| Frontend ↔ Backend | CORS origin match | 🟢 **VERIFIED** — preflight returns correct `allow-origin` header |
+| Auth (Login) | JWT token | 🟢 **VERIFIED** — login returns valid token |
+| Database | SQLite (aiden.db) | 🟢 **VERIFIED** — user exists, seeded |
 
 ---
 
-## 8. Issues & Pending Work
+## 6. Known Limitations
 
-### Priority 1 — Must Fix
-
-| # | Issue | Location | Fix |
-|---|-------|----------|-----|
-| 1 | Nginx infra config broken syntax | `infrastructure/docker/nginx/nginx.conf` | Rewrite server block |
-| 2 | CORS error blocks frontend login | Backend `.env` → `CORS_ORIGINS` | Add port 5174 and restart |
-| 3 | LLaVA model not downloaded | — | `python scripts/download_models.py --model multimodal` (~30 min) |
-
-### Priority 2 — Should Add
-
-| # | Task | Area | What's Needed |
-|---|------|------|---------------|
-| 4 | Multimodal training | `scripts/train_multimodal.py` | Download LLaVA → run training |
-| 5 | Backend tests | `backend/tests/` | Write pytest tests for all endpoints |
-| 6 | Frontend tests | `frontend/src/test/` | Add PipelineCanvas, Dashboard, Analytics tests |
-| 7 | Docker prod fix | `docker-compose.prod.yml` | Add MinIO service |
-| 8 | Health → monitoring | Monitoring page | Connect to real `/api/v1/health` data |
-| 9 | Editorconfig + pre-commit | Project root | Add for team consistency |
-| 10 | `animate-fade-in` | `tailwind.config.js` | Add keyframes utility |
-
-### Priority 3 — Future
-
-| # | Task | Details |
-|---|------|---------|
-| 11 | Agent training | LoRA fine-tuning for 5 agent types |
-| 12 | Kafka integration | Streaming pipeline events |
-| 13 | Prometheus + Grafana | Metrics + monitoring dashboards |
-| 14 | Rate limiting | API rate limits |
-| 15 | Security audit | Secret detection, vulnerability policy |
-| 16 | CI/CD deploy workflow | Auto-deploy to staging/production |
-| 17 | Dependabot config | Automated dependency updates |
-| 18 | Data versioning (DVC) | Dataset versioning |
-| 19 | Mobile nav multimodal link | Add `/multimodal` to bottom nav |
+| Issue | Impact | Workaround |
+|-------|--------|------------|
+| PyTorch import hangs on Windows without GPU | Backend startup delay (30-60s) | `set PYTORCH_NO_CUDA=1` (already in docker-compose.yml) |
+| `asyncpg` not installed | PostgreSQL unavailable in dev | Use SQLite locally (`DATABASE_URL=sqlite+aiosqlite:///./aiden.db`) |
+| `supabase` not installed | Supabase features disabled | Auto-disables — no impact on core features |
+| `qdrant_client` not installed | Vector search uses in-memory fallback | Auto-disables — works but not persistent |
+| LLaVA model not downloaded | Multimodal uses mock | `python scripts/download_models.py --model multimodal` (~7 GB) |
+| OpenAI Whisper API key needed | Voice transcription uses mock | Falls back to mock transcription automatically |
+| No backend test suite running | Risk of regressions | Fix 10 failing tests (Priority 2, Task #5) |
 
 ---
 
-## 9. Completion Snapshot
+## 7. Completion Checklist
 
-| Area | Completion | Status |
-|------|-----------|--------|
-| Backend API | ~92% | 9 routers, 30+ endpoints, all verified |
-| Frontend UI | ~88% | 22 pages, builder + analytics + multimodal full featured |
-| Auth Flow | ~90% | JWT working, demo users seeded |
-| Pipeline Engine | ~75% | CRUD + execution + WebSocket, needs real data movement |
-| AI/ML | ~60% | Intent parsing + RAG working, agents scaffolded |
-| Multimodal | ~65% | Service + API + frontend done, model not downloaded |
-| Testing | ~35% | Frontend partial, backend none |
-| Documentation | ~90% | README, REFERENCE, SETUP, PROJECT_STATUS all maintained |
-| Infrastructure | ~55% | Docker compose works, prod missing MinIO, nginx broken |
-| CI/CD | ~40% | GitHub Actions CI exists, no deploy workflow |
+| Task | Owner | Status | Notes |
+|------|-------|--------|-------|
+| 🔴 Fix PyTorch hang | D | ✅ **DONE** | `set PYTORCH_NO_CUDA=1` + subprocess timeout |
+| 🔴 Run end-to-end demo | All | ⬜ | Blocked by backend tests (#5) |
+| 🔴 Record demo video | A | ⬜ | After #2 completes |
+| 🔴 Viva slide deck | C | ⬜ | After #2 completes, needs UI screenshots from A |
+| 🟡 Backend tests | B | ⬜ | 10 tests failing (intent parser mismatches) |
+| 🟡 Frontend code-splitting | A | ⬜ | React.lazy() for 5 large pages |
+| 🟡 smolagents integration | C | ⬜ | Real agent calls vs mocks |
+| 🟡 MinIO in prod Docker | D | ⬜ | Add to docker-compose.prod.yml |
+| 🟡 LLaVA download | C | ⬜ | 7 GB model, GPU machine |
+| 🟡 Deploy to Vercel+Render | D | ⬜ | Live demo URL |
 
 ---
 
-*Generated from source. Last updated: July 25, 2026.*
+*Generated from source. Last updated: July 29, 2026.*

@@ -1,57 +1,42 @@
 from pydantic import BaseModel
-from typing import List, Optional
 from datetime import datetime
+from typing import Optional, Any, List
 
-
-class ApprovalCreate(BaseModel):
-    title: str
-    description: Optional[str] = None
-    risk: str = "low"
-    change: str
-    resource_type: str
-    resource_name: str
-
+class ApprovalRequestCreate(BaseModel):
+    pipeline_id: int
+    action: str
+    details: Optional[Any] = None
+    risk_score: str = "medium"
 
 class ApprovalActionCreate(BaseModel):
-    action: str  # approve | reject | comment
+    action_type: str  # "approve", "reject", "comment"
     comment: Optional[str] = None
-
 
 class ApprovalActionResponse(BaseModel):
     id: int
     approval_id: int
-    action: str
-    user_id: int
-    user_name: Optional[str]
-    comment: Optional[str]
-    created_at: datetime
+    action_by: int
+    action_type: str
+    comment: Optional[str] = None
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
-
 
 class ApprovalResponse(BaseModel):
     id: int
-    title: str
-    description: Optional[str]
+    pipeline_id: int
+    requested_by: int
+    action: str
+    details: Optional[Any] = None
+    risk_score: str
     status: str
-    risk: str
-    created_by: int
-    created_by_name: Optional[str]
-    change: str
-    resource_type: str
-    resource_name: str
-    reviewed_by: Optional[int]
-    reviewed_by_name: Optional[str]
-    review_comment: Optional[str]
-    reviewed_at: Optional[datetime]
-    created_at: datetime
-    updated_at: Optional[datetime]
+    reviewed_by: Optional[int] = None
+    review_comment: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    actions: List[ApprovalActionResponse] = []
 
     class Config:
         from_attributes = True
-
-
-class ApprovalListResponse(BaseModel):
-    approvals: List[ApprovalResponse]
-    total: int

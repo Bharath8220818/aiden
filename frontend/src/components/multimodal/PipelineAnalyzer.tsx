@@ -180,7 +180,7 @@ export const PipelineAnalyzer: React.FC = () => {
             {result}
           </div>
           <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-            <span>Model: {multimodalApi.getStatus ? 'aiden-multimodal' : 'unknown'}</span>
+            <span>Model: aiden-multimodal</span>
             <span>{result.split(' ').length} tokens</span>
           </div>
           <div className="mt-3 flex gap-3">

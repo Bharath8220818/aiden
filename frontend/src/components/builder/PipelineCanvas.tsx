@@ -335,7 +335,7 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
             // Normalize agent name: "intent_parser" → "Intent Parser"
             const displayName = agent
               .replace(/_/g, ' ')
-              .replace(/\b\w/g, (c) => c.toUpperCase());
+              .replace(/\b\w/g, (c: string) => c.toUpperCase());
             const entry: AgentStep = {
               agent: displayName,
               status,

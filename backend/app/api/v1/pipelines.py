@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 executions_router = APIRouter()
 intent_parser = IntentParser()
-pipeline_executor = PipelineExecutor()
 
 
 @router.post("/from-prompt", response_model=PipelineResponse)
@@ -388,17 +387,19 @@ async def run_pipeline(
         "timestamp": datetime.now().isoformat(),
     })
 
+    # Create a fresh executor with the db session from this request
+    executor = PipelineExecutor(db)
+
     # Register cancellation event before launching (closes race window)
     PipelineExecutor._cancel_requests[execution.id] = asyncio.Event()
 
     # Kick off execution in the background
     # NOTE: Must use asyncio.create_task() — BackgroundTasks.add_task() does NOT support async functions
-    task = asyncio.create_task(pipeline_executor.execute(pipeline, execution))
+    task = asyncio.create_task(executor.execute(pipeline, execution))
 
     # Store the task so it doesn't get garbage-collected before completion
-    # _active_tasks is initialized in PipelineExecutor.__init__
-    pipeline_executor._active_tasks.add(task)
-    task.add_done_callback(pipeline_executor._active_tasks.discard)
+    executor._active_tasks.add(task)
+    task.add_done_callback(executor._active_tasks.discard)
 
     return execution
 
