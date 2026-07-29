@@ -75,8 +75,8 @@ AIDEN is a full-stack AI-assisted data pipeline platform at a **working MVP stag
 
 | # | Task | Owner | Details | Effort | Status |
 |---|------|-------|---------|--------|--------|
-| 5 | Backend tests (pytest) | B (Backend) | intent_parser, orchestrator, self_healing, rag_memory, pipeline_executor | 4 hours | ⬜ |
-| 6 | Frontend code-splitting | A (Frontend) | React.lazy() for 5 large pages | 1 hour | ⬜ |
+| 5 | Backend tests (pytest) | B (Backend) | intent_parser — all 10 tests pass (was `table`/`table_name` key mismatch in AI vs rule-based path) | 4 hours | ✅ **DONE** — 10/10 passing |
+| 6 | Frontend code-splitting | A (Frontend) | Pages already use `React.lazy()` — build produces 22+ chunks | 1 hour | ✅ **DONE** — verified via `npm run build` |
 | 7 | smolagents integration | C (AI/ML) | Replace mock agent runs with real smolagents | 2 hours | ⬜ |
 | 8 | Add MinIO to prod Docker | D (Infra) | MinIO service in docker-compose.prod.yml | 30 min | ⬜ |
 | 9 | Run LLaVA model download | C (AI/ML) | `python scripts/download_models.py --model multimodal` | 30-60 min | ⬜ |
@@ -144,8 +144,8 @@ AIDEN is a full-stack AI-assisted data pipeline platform at a **working MVP stag
 | 🔴 Run end-to-end demo | All | ⬜ | Blocked by backend tests (#5) |
 | 🔴 Record demo video | A | ⬜ | After #2 completes |
 | 🔴 Viva slide deck | C | ⬜ | After #2 completes, needs UI screenshots from A |
-| 🟡 Backend tests | B | ⬜ | 10 tests failing (intent parser mismatches) |
-| 🟡 Frontend code-splitting | A | ⬜ | React.lazy() for 5 large pages |
+| 🟡 Backend tests | B | ✅ **DONE** | 10/10 intent_parser tests passing (`table`/`table_name` key acceptance) |
+| 🟡 Frontend code-splitting | A | ✅ **DONE** | Already uses `React.lazy()`; build produces 22+ separate chunks |
 | 🟡 smolagents integration | C | ⬜ | Real agent calls vs mocks |
 | 🟡 MinIO in prod Docker | D | ⬜ | Add to docker-compose.prod.yml |
 | 🟡 LLaVA download | C | ⬜ | 7 GB model, GPU machine |
