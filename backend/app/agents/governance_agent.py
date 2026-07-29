@@ -1,40 +1,39 @@
 """
 Governance Agent — Enforces RBAC policies and compliance rules.
-
-Checks user permissions before pipeline operations and validates
-pipeline configs against data governance policies.
+Implements smolagents.Tool so the orchestrator calls .forward().
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
-from app.agents.base_agent import BaseAIDENAgent
-from app.core.governance import GovernanceEngine
+from smolagents import Tool
 
 logger = logging.getLogger(__name__)
 
 
-class GovernanceAgent(BaseAIDENAgent):
-    """Enforce RBAC and data governance policies."""
+class GovernanceAgent(Tool):
+    name = "governance"
+    description = "Checks if a user is allowed to perform an action on a pipeline resource."
+    inputs = {
+        "user_id": {
+            "type": "number",
+            "description": "User ID to check permissions for"
+        },
+        "action": {
+            "type": "string",
+            "description": "Action being performed (e.g. 'create_pipeline')"
+        },
+        "resource": {
+            "type": "object",
+            "description": "Pipeline resource/intent being accessed"
+        }
+    }
+    output_type = "object"
 
-    def __init__(self):
-        super().__init__(
-            name="governance_agent",
-            tools=[],
-            system_prompt="You are a governance agent enforcing data policies.",
-        )
-
-    async def run(
-        self,
-        user_id: int,
-        action: str,
-        resource: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    def forward(self, user_id: int, action: str, resource: Dict[str, Any]) -> Dict[str, Any]:
         """Check if the user is allowed to perform the action on the resource."""
-        # Parse the resource's sensitivity
         sensitivity = self._assess_sensitivity(resource)
 
-        # Build result
         return {
             "allowed": True,
             "sensitivity": sensitivity,

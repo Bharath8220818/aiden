@@ -59,13 +59,13 @@ class AgentOrchestrator:
 
             try:
                 if agent_name == "extraction":
-                    schema = await agent.run(intent.get("source_config", {}))
+                    schema = agent.forward(intent.get("source_config", {}))
                 elif agent_name == "analysis":
-                    quality_report = await agent.run(schema)
+                    quality_report = agent.forward(schema)
                 elif agent_name == "pipeline_builder":
-                    code = await agent.run(intent, schema, quality_report)
+                    code = agent.forward(intent, schema, quality_report)
                 elif agent_name == "governance":
-                    result = await agent.run(user_id=user_id, action="create_pipeline", resource=intent)
+                    result = agent.forward(user_id=user_id, action="create_pipeline", resource=intent)
                     if not result.get("allowed", True):
                         raise PermissionError("Governance check failed")
                 elif agent_name == "deployment":
@@ -78,7 +78,7 @@ class AgentOrchestrator:
                         user_id=user_id,
                         db=db,
                     )
-                    await agent.run(pipeline)
+                    agent.forward(pipeline)
 
             except Exception as e:
                 logger.error(f"Agent '{agent_name}' failed: {e}")
