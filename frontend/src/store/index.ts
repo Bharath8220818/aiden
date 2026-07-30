@@ -11,3 +11,4 @@ export { useSchemaStore } from './schemaStore';
 export { useArchitectureStore } from './architectureStore';
 export { useLearningStore } from './learningStore';
 export { useTeamStore } from './teamStore';
+export { useShortcutStore } from './shortcutStore';

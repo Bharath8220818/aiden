@@ -34,6 +34,8 @@ import CanvasControls from './CanvasControls';
 import type { PipelineNodeData } from './PipelineNode';
 import type { PaletteItem } from './NodePalette';
 import LoadingSpinner from '../common/LoadingSpinner';
+import { useRegistryShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { ShortcutsHelpModal, ShortcutsTrigger } from '../common/ShortcutsHelpModal';
 
 // ── Agent Step Types ──────────────────────────────────────────────────
 
@@ -185,6 +187,57 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
   const [codePreview, setCodePreview] = useState<string | null>(null);
   const reactFlowRef = useRef<ReactFlowInstance | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
+
+  // ── Canvas callbacks (defined before useKeyboardShortcuts!) ──────
+  const onFitView = useCallback(() => {
+    reactFlowRef.current?.fitView({ padding: 0.2, duration: 300 });
+  }, []);
+
+  const onResetZoom = useCallback(() => {
+    reactFlowRef.current?.setViewport({ x: 0, y: 0, zoom: 1 });
+    setZoom(1);
+  }, []);
+
+  // ── Keyboard Shortcuts ────────────────────────────────────────────
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  useRegistryShortcuts(
+    'pipeline-designer',
+    {
+      'common.delete': () => { if (selectedNode) handleNodeDelete(selectedNode.id); },
+      'common.backspace': () => { if (selectedNode) handleNodeDelete(selectedNode.id); },
+      'common.shortcuts': () => setShowShortcuts(true),
+      'common.select-all': () => {},
+      'pipeline-designer.add-source': () => handleAddNode('source'),
+      'pipeline-designer.add-transform': () => handleAddNode('transform'),
+      'pipeline-designer.add-destination': () => handleAddNode('destination'),
+      'pipeline-designer.auto-layout': () => reactFlowRef.current?.fitView({ padding: 0.2, duration: 300 }),
+      'pipeline-designer.grid': () => {},
+      'pipeline-designer.run': () => addNotification({ type: 'info', message: 'Pipeline run requested via shortcut!' }),
+      'pipeline-designer.properties': () => { if (selectedNode) setShowProperties(true); },
+      'pipeline-designer.save': () => addNotification({ type: 'success', message: 'Pipeline saved! (mock)' }),
+      'common.zoom-in': () => setZoom(z => Math.min(z + 0.1, 2.5)),
+      'common.zoom-out': () => setZoom(z => Math.max(z - 0.1, 0.2)),
+      'common.fit-view': onFitView,
+      'common.deselect': () => {},
+    }
+  );
+
+  const handleAddNode = useCallback((type: string) => {
+    const newNode: Node<PipelineNodeData> = {
+      id: generateNodeId(type),
+      type: 'pipelineNode',
+      position: { x: 80 + nodes.length * 40, y: 120 + Math.random() * 100 },
+      data: {
+        label: type.charAt(0).toUpperCase() + type.slice(1),
+        type: type as 'source' | 'transform' | 'destination',
+        description: `New ${type} node`,
+        status: 'idle',
+      },
+    };
+    setNodes((nds) => [...nds, newNode]);
+    addNotification({ type: 'info', message: `Added ${type} node` });
+  }, [setNodes, addNotification]);
 
   // ── Agent Step Tracking ────────────────────────────────────────────
   const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
@@ -506,14 +559,7 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
     [selectedNode],
   );
 
-  const onFitView = useCallback(() => {
-    reactFlowRef.current?.fitView({ padding: 0.2, duration: 300 });
-  }, []);
-
-  const onResetZoom = useCallback(() => {
-    reactFlowRef.current?.setViewport({ x: 0, y: 0, zoom: 1 });
-    setZoom(1);
-  }, []);
+  // onFitView and onResetZoom are defined earlier (before useKeyboardShortcuts)
 
   const onExportImage = useCallback(async () => {
     if (!canvasContainerRef.current) return;
@@ -637,6 +683,7 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
               {showProperties ? 'Hide Properties' : 'Properties'}
             </button>
           )}
+          <ShortcutsTrigger onClick={() => setShowShortcuts(true)} />
           <CanvasControls
             onFitView={onFitView}
             onResetZoom={onResetZoom}
@@ -780,6 +827,12 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
         node={selectedNode}
         isOpen={isModalOpen}
         onClose={() => { setIsModalOpen(false); }}
+      />
+
+      <ShortcutsHelpModal
+        isOpen={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
+        scopes={['common', 'pipeline-designer']}
       />
     </div>
   );

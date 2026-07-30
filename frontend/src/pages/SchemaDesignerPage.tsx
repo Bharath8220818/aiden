@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Database, Plus, Sparkles,
   Download, Share2, Columns, Key,
   Link2
 } from 'lucide-react';
+import { useRegistryShortcuts } from '../hooks/useKeyboardShortcuts';
+import { ShortcutsHelpModal, ShortcutsTrigger } from '../components/common/ShortcutsHelpModal';
 
 interface Column {
   name: string;
@@ -64,6 +66,72 @@ const typeColors: Record<string, { border: string; header: string; text: string;
 export default function SchemaDesignerPage() {
   const [tables, setTables] = useState<Table[]>(initialTables);
   const [aiPrompt, setAiPrompt] = useState('');
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  const handleAddTable = useCallback(() => {
+    const newId = String(Date.now());
+    const newTable: Table = {
+      id: newId,
+      name: `new_table_${tables.length + 1}`,
+      type: 'fact',
+      color: 'purple',
+      x: 60 + (tables.length % 3) * 160,
+      y: 100 + Math.floor(tables.length / 3) * 160,
+      columns: [
+        { name: 'id', type: 'BIGINT', primaryKey: true, nullable: false },
+        { name: 'name', type: 'VARCHAR(255)', primaryKey: false, nullable: true },
+      ],
+    };
+    setTables(prev => [...prev, newTable]);
+  }, [tables.length]);
+
+  const handleGenerateDDL = useCallback(() => {
+    const ddl = tables.map(t => {
+      const cols = t.columns.map(c => {
+        const parts = [`  ${c.name} ${c.type}`];
+        if (c.primaryKey) parts.push('PRIMARY KEY');
+        if (!c.nullable) parts.push('NOT NULL');
+        if (c.foreignKey) parts.push(`REFERENCES ${c.foreignKey}`);
+        return parts.join(' ');
+      });
+      return `CREATE TABLE ${t.name} (\n${cols.join(',\n')}\n);`;
+    }).join('\n\n');
+    navigator.clipboard.writeText(ddl);
+  }, [tables]);
+
+  const handleAddRelationship = useCallback(() => {
+    const factTable = tables.find(t => t.type === 'fact');
+    const dimTable = tables.find(t => t.type === 'dimension' && !factTable?.columns.some(c => c.foreignKey?.startsWith(t.name)));
+    if (factTable && dimTable) {
+      const pkCol = dimTable.columns.find(c => c.primaryKey);
+      if (pkCol) {
+        setTables(prev => prev.map(t =>
+          t.id === factTable.id
+            ? { ...t, columns: [...t.columns, { name: `${dimTable.name}_id`, type: 'BIGINT', primaryKey: false, foreignKey: `${dimTable.name}.${pkCol.name}`, nullable: false }] }
+            : t
+        ));
+      }
+    }
+  }, [tables]);
+
+  useRegistryShortcuts(
+    'schema-designer',
+    {
+      'common.delete': () => {},
+      'common.backspace': () => {},
+      'common.shortcuts': () => setShowShortcuts(true),
+      'common.select-all': () => {},
+      'schema-designer.add-table': handleAddTable,
+      'schema-designer.add-relationship': handleAddRelationship,
+      'schema-designer.generate-ddl': handleGenerateDDL,
+      'schema-designer.validate': () => {},
+      'schema-designer.toggle-columns': () => {},
+      'common.zoom-in': () => {},
+      'common.zoom-out': () => {},
+      'common.fit-view': () => {},
+      'common.deselect': () => {},
+    }
+  );
   const [dragging, setDragging] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
@@ -103,6 +171,7 @@ export default function SchemaDesignerPage() {
           <button className="btn-secondary btn-sm"><Share2 className="h-4 w-4" /> Normalize</button>
         </div>
         <div className="flex items-center gap-2">
+          <ShortcutsTrigger onClick={() => setShowShortcuts(true)} />
           <span className="rounded-full border border-purple-500/20 bg-purple-500/10 px-3 py-1 text-xs font-medium text-purple-400">Star Schema</span>
           <span className="rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400">✓ Validated</span>
           <button className="btn-primary btn-sm"><Sparkles className="h-4 w-4" /> Validate Schema</button>
@@ -199,6 +268,12 @@ export default function SchemaDesignerPage() {
           <button className="btn-primary btn-sm"><Sparkles className="h-4 w-4" /> Generate Schema</button>
         </div>
       </motion.div>
+
+      <ShortcutsHelpModal
+        isOpen={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
+        scopes={['common', 'schema-designer']}
+      />
     </div>
   );
 }
