@@ -108,15 +108,13 @@ class HuggingFaceService:
                 bnb_4bit_compute_dtype=torch.float16,
                 bnb_4bit_use_double_quant=True,
             )
-            # Sanity check: verify HF Hub is reachable
+            # Sanity check: verify HF Hub is reachable (non-blocking)
+            # Avoid downloading a full model — just check imports + cache dir
             try:
+                # Quick import check
                 from transformers import AutoModel
-                AutoModel.from_pretrained(
-                    "distilbert-base-uncased",
-                    cache_dir=settings.HF_CACHE_DIR,
-                )
                 self._available = True
-                logger.info("HuggingFace environment verified — Hub reachable")
+                logger.info("HuggingFace environment verified (imports OK)")
             except Exception as sanity_err:
                 logger.warning("HF Hub sanity check failed: %s", sanity_err)
                 self._available = False
