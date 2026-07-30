@@ -2,15 +2,19 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.orm import declarative_base
 from app.config import settings
 
+# Render provides postgresql:// but async engine needs postgresql+asyncpg://
+_database_url = settings.DATABASE_URL
+if _database_url.startswith("postgresql://"):
+    _database_url = _database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
 # Connection args based on dialect
 engine_kwargs = {"echo": settings.DEBUG}
-if not settings.DATABASE_URL.startswith("sqlite"):
+if not _database_url.startswith("sqlite"):
     engine_kwargs["pool_size"] = 10
     engine_kwargs["max_overflow"] = 20
 
-# Async engine for PostgreSQL or SQLite
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    _database_url,
     **engine_kwargs
 )
 
