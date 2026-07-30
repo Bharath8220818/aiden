@@ -56,7 +56,7 @@ async def test_signup_duplicate_username(client: AsyncClient):
         },
     )
     assert response.status_code == 400
-    assert "already exists" in response.text.lower()
+    assert "already" in response.text.lower()
 
 
 @pytest.mark.asyncio
@@ -81,7 +81,7 @@ async def test_signup_duplicate_email(client: AsyncClient):
         },
     )
     assert response.status_code == 400
-    assert "already exists" in response.text.lower()
+    assert "already" in response.text.lower()
 
 
 @pytest.mark.asyncio

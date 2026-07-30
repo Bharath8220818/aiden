@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 
 from app.main import app
 from app.database import Base, get_db
-from app.models import Pipeline, User  # noqa: F401 — register models
+from app.models import Pipeline, User, ApprovalRequest, AuditLogEntry, AnalyticsEvent  # noqa: F401 — register models
 from app.core.security import get_password_hash
 
 # ─── Test Database (in-memory to avoid file locking) ────────────────────

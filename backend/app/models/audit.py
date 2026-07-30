@@ -1,31 +1,19 @@
-from sqlalchemy import Column, DateTime, Enum, Integer, String, Text
+from sqlalchemy import Column, Integer, String, Text, JSON, DateTime, ForeignKey
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.database import Base
-import enum
 
-
-class AuditSeverity(str, enum.Enum):
-    INFO = "info"
-    WARNING = "warning"
-    ERROR = "error"
-
-
-class AuditLog(Base):
-    """Append-only audit trail for all user actions.
-
-    Every create / update / delete operation across the system should
-    write a row here so team members can review who did what and when.
-    """
-
+class AuditLogEntry(Base):
     __tablename__ = "audit_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False, index=True)
-    user_name = Column(String(100), nullable=True)
-    action = Column(String(50), nullable=False, index=True)
-    resource_type = Column(String(50), nullable=False, index=True)
-    resource_id = Column(String(50), nullable=True)
-    details = Column(Text, nullable=True)
-    severity = Column(Enum(AuditSeverity), default=AuditSeverity.INFO, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    action = Column(String(100), nullable=False, index=True)  # e.g., "pipeline.create", "pipeline.run", "approval.approve"
+    resource_type = Column(String(50), nullable=True)  # e.g., "pipeline", "user", "approval"
+    resource_id = Column(Integer, nullable=True)
+    details = Column(JSON, default=dict)
     ip_address = Column(String(45), nullable=True)
+    user_agent = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    user = relationship("User", backref="audit_logs", lazy="joined")

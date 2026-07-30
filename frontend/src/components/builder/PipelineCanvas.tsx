@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -17,7 +18,10 @@ import type {
   ReactFlowInstance,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Database, LayoutPanelTop, GitBranch, Sparkles } from 'lucide-react';
+import {
+  Database, LayoutPanelTop, GitBranch, Sparkles,
+  Loader2, CheckCircle2, XCircle, Cpu,
+} from 'lucide-react';
 import { usePipelineStore } from '../../store/pipelineStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useAgentStore } from '../../store/agentStore';
@@ -30,6 +34,68 @@ import CanvasControls from './CanvasControls';
 import type { PipelineNodeData } from './PipelineNode';
 import type { PaletteItem } from './NodePalette';
 import LoadingSpinner from '../common/LoadingSpinner';
+import { useRegistryShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { ShortcutsHelpModal, ShortcutsTrigger } from '../common/ShortcutsHelpModal';
+
+// ── Agent Step Types ──────────────────────────────────────────────────
+
+interface AgentStep {
+  agent: string;
+  status: AgentStepStatus;
+  detail: string;
+  timestamp: number;
+}
+
+const AGENT_ICONS: Record<string, string> = {
+  'Intent Parser': '🧠',
+  'Extraction': '📤',
+  'Analysis': '📊',
+  'Pipeline Builder': '🏗️',
+  'Multimodal': '🔮',
+  'Rag Memory': '💾',
+  'Self Healing': '🔧',
+  default: '🤖',
+};
+
+const AGENT_STEP_STATUS_CONFIG = {
+  running: {
+    icon: <Loader2 size={14} className="animate-spin" />,
+    border: 'border-purple-500/40',
+    bg: 'bg-purple-500/10',
+    glow: 'shadow-purple-500/10',
+    indicator: 'bg-purple-500 animate-pulse',
+  },
+  success: {
+    icon: <CheckCircle2 size={14} className="text-green-400" />,
+    border: 'border-green-500/30',
+    bg: 'bg-green-500/5',
+    glow: 'shadow-green-500/5',
+    indicator: 'bg-green-500',
+  },
+  failed: {
+    icon: <XCircle size={14} className="text-red-400" />,
+    border: 'border-red-500/30',
+    bg: 'bg-red-500/5',
+    glow: 'shadow-red-500/5',
+    indicator: 'bg-red-500',
+  },
+  warning: {
+    icon: <Cpu size={14} className="text-yellow-400" />,
+    border: 'border-yellow-500/30',
+    bg: 'bg-yellow-500/5',
+    glow: 'shadow-yellow-500/5',
+    indicator: 'bg-yellow-500',
+  },
+  skipped: {
+    icon: <Cpu size={14} className="text-gray-500" />,
+    border: 'border-gray-500/20',
+    bg: 'bg-gray-500/5',
+    glow: 'shadow-gray-500/5',
+    indicator: 'bg-gray-500',
+  },
+} as const;
+
+type AgentStepStatus = keyof typeof AGENT_STEP_STATUS_CONFIG;
 
 const nodeTypes: NodeTypes = {
   pipelineNode: PipelineNode,
@@ -51,14 +117,55 @@ interface PipelineCanvasProps {
   compact?: boolean;
 }
 
+// ── Agent Step Card Component ─────────────────────────────────────────
+
+const AgentStepCard: React.FC<{ step: AgentStep }> = ({ step }) => {
+  const cfg = AGENT_STEP_STATUS_CONFIG[step.status] || AGENT_STEP_STATUS_CONFIG.running;
+  const icon = AGENT_ICONS[step.agent] || AGENT_ICONS[step.agent.split(' ')[0]] || AGENT_ICONS.default;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -20, scale: 0.95 }}
+      animate={{
+        opacity: step.status === 'success' || step.status === 'failed' ? 0.85 : 1,
+        x: 0,
+        scale: 1,
+      }}
+      exit={{ opacity: 0, x: -20, scale: 0.95, transition: { duration: 0.2 } }}
+      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+      className={`pointer-events-auto rounded-xl border ${cfg.border} ${cfg.bg} ${cfg.glow} backdrop-blur-sm p-3 shadow-lg`}
+    >
+      <div className="flex items-start gap-3">
+        {/* Icon */}
+        <span className="text-lg leading-none mt-0.5 shrink-0">{icon}</span>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-white truncate">
+              {step.agent}
+            </span>
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.indicator}`} />
+          </div>
+          {step.detail && (
+            <p className="text-xs text-gray-400 mt-0.5 line-clamp-2 leading-relaxed">
+              {step.detail}
+            </p>
+          )}
+        </div>
+
+        {/* Status icon */}
+        <span className="shrink-0 mt-0.5">{cfg.icon}</span>
+      </div>
+    </motion.div>
+  );
+};
+
+
 const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
   pipelineId,
   className = '',
   pipeline: pipelineProp,
-<<<<<<< HEAD
-  interactive: _interactive = true,
-=======
->>>>>>> 72e7d724ec4e401eeac5269ea0dff29dc1d33539
   compact = false,
 }) => {
   const {
@@ -80,6 +187,61 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
   const [codePreview, setCodePreview] = useState<string | null>(null);
   const reactFlowRef = useRef<ReactFlowInstance | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
+
+  // ── Canvas callbacks (defined before useKeyboardShortcuts!) ──────
+  const onFitView = useCallback(() => {
+    reactFlowRef.current?.fitView({ padding: 0.2, duration: 300 });
+  }, []);
+
+  const onResetZoom = useCallback(() => {
+    reactFlowRef.current?.setViewport({ x: 0, y: 0, zoom: 1 });
+    setZoom(1);
+  }, []);
+
+  // ── Keyboard Shortcuts ────────────────────────────────────────────
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  useRegistryShortcuts(
+    'pipeline-designer',
+    {
+      'common.delete': () => { if (selectedNode) handleNodeDelete(selectedNode.id); },
+      'common.backspace': () => { if (selectedNode) handleNodeDelete(selectedNode.id); },
+      'common.shortcuts': () => setShowShortcuts(true),
+      'common.select-all': () => {},
+      'pipeline-designer.add-source': () => handleAddNode('source'),
+      'pipeline-designer.add-transform': () => handleAddNode('transform'),
+      'pipeline-designer.add-destination': () => handleAddNode('destination'),
+      'pipeline-designer.auto-layout': () => reactFlowRef.current?.fitView({ padding: 0.2, duration: 300 }),
+      'pipeline-designer.grid': () => {},
+      'pipeline-designer.run': () => addNotification({ type: 'info', message: 'Pipeline run requested via shortcut!' }),
+      'pipeline-designer.properties': () => { if (selectedNode) setShowProperties(true); },
+      'pipeline-designer.save': () => addNotification({ type: 'success', message: 'Pipeline saved! (mock)' }),
+      'common.zoom-in': () => setZoom(z => Math.min(z + 0.1, 2.5)),
+      'common.zoom-out': () => setZoom(z => Math.max(z - 0.1, 0.2)),
+      'common.fit-view': onFitView,
+      'common.deselect': () => {},
+    }
+  );
+
+  const handleAddNode = useCallback((type: string) => {
+    const newNode: Node<PipelineNodeData> = {
+      id: generateNodeId(type),
+      type: 'pipelineNode',
+      position: { x: 80 + nodes.length * 40, y: 120 + Math.random() * 100 },
+      data: {
+        label: type.charAt(0).toUpperCase() + type.slice(1),
+        type: type as 'source' | 'transform' | 'destination',
+        description: `New ${type} node`,
+        status: 'idle',
+      },
+    };
+    setNodes((nds) => [...nds, newNode]);
+    addNotification({ type: 'info', message: `Added ${type} node` });
+  }, [setNodes, addNotification]);
+
+  // ── Agent Step Tracking ────────────────────────────────────────────
+  const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
+  const agentStepTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Compact mode: render nodes/edges from the pipeline prop ──────────
 
@@ -206,10 +368,49 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
     maxReconnectAttempts: 5,
   });
 
+  // ── Cleanup agent step timeout on unmount ──────────────────────────────
+  useEffect(() => {
+    return () => {
+      if (agentStepTimeoutRef.current) {
+        clearTimeout(agentStepTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleWebSocketMessage = useCallback(
     (data: any) => {
       const { type, payload } = data;
       switch (type) {
+        case 'agent_step': {
+          const { agent, status, detail } = data;
+          setAgentSteps((prev) => {
+            const existing = prev.findIndex((s) => s.agent === agent);
+            // Normalize agent name: "intent_parser" → "Intent Parser"
+            const displayName = agent
+              .replace(/_/g, ' ')
+              .replace(/\b\w/g, (c: string) => c.toUpperCase());
+            const entry: AgentStep = {
+              agent: displayName,
+              status,
+              detail: detail || '',
+              timestamp: Date.now(),
+            };
+            if (existing >= 0) {
+              const updated = [...prev];
+              updated[existing] = entry;
+              return updated;
+            }
+            return [...prev, entry];
+          });
+          // Auto-clear completed/failed steps after 30s
+          if (status === 'success' || status === 'failed') {
+            if (agentStepTimeoutRef.current) clearTimeout(agentStepTimeoutRef.current);
+            agentStepTimeoutRef.current = setTimeout(() => {
+              setAgentSteps((prev) => prev.filter((s) => s.status === 'running'));
+            }, 30000);
+          }
+          break;
+        }
         case 'pipeline_status': {
           const { stage, status, records, duration } = payload || {};
           setNodes((nds) =>
@@ -358,14 +559,7 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
     [selectedNode],
   );
 
-  const onFitView = useCallback(() => {
-    reactFlowRef.current?.fitView({ padding: 0.2, duration: 300 });
-  }, []);
-
-  const onResetZoom = useCallback(() => {
-    reactFlowRef.current?.setViewport({ x: 0, y: 0, zoom: 1 });
-    setZoom(1);
-  }, []);
+  // onFitView and onResetZoom are defined earlier (before useKeyboardShortcuts)
 
   const onExportImage = useCallback(async () => {
     if (!canvasContainerRef.current) return;
@@ -489,6 +683,7 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
               {showProperties ? 'Hide Properties' : 'Properties'}
             </button>
           )}
+          <ShortcutsTrigger onClick={() => setShowShortcuts(true)} />
           <CanvasControls
             onFitView={onFitView}
             onResetZoom={onResetZoom}
@@ -595,6 +790,17 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
         )}
       </div>
 
+      {/* Agent Step Cards — real-time agent activity overlay */}
+      {agentSteps.length > 0 && (
+        <div className="absolute bottom-4 left-4 z-10 w-72 space-y-2 pointer-events-none">
+          <AnimatePresence initial={false}>
+            {agentSteps.map((step) => (
+              <AgentStepCard key={step.agent} step={step} />
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
+
       {codePreview && (
         <div className="border-t border-[#1E293B] bg-[#111827] shrink-0">
           <div className="flex items-center justify-between px-4 py-2">
@@ -621,6 +827,12 @@ const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
         node={selectedNode}
         isOpen={isModalOpen}
         onClose={() => { setIsModalOpen(false); }}
+      />
+
+      <ShortcutsHelpModal
+        isOpen={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
+        scopes={['common', 'pipeline-designer']}
       />
     </div>
   );

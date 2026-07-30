@@ -17,12 +17,13 @@ logger = logging.getLogger(__name__)
 class IntentParser:
     """
     Natural Language → Structured Pipeline Configuration.
-    Uses HuggingFace LLM with RAG context and graceful fallback to rule‑based parsing.
+    Uses Ollama (local) then HuggingFace LLM (remote) then rule-based fallback.
     """
 
     def __init__(self, model_name: Optional[str] = None):
         self.model_name = model_name or settings.INTENT_MODEL
-        self._use_llm = hf_service.is_available()          # <-- ADDED
+        self._use_llm = hf_service.is_available()
+        self._use_ollama = self._check_ollama()
         self._pipeline = None
         self._rag_enabled = True  # Can be toggled
 
@@ -43,7 +44,7 @@ class IntentParser:
         Respond with JSON only, no other text.
         """
 
-        logger.info(f"IntentParser initialized with LLM: {self._use_llm}")
+        logger.info(f"IntentParser initialized — HF: {self._use_llm} | Ollama: {self._use_ollama}")
 
     async def parse(self, query: str, user_id: Optional[int] = None) -> Dict[str, Any]:
         """
@@ -56,18 +57,29 @@ class IntentParser:
         Returns:
             Structured pipeline configuration
         """
-        # Try AI parsing (with RAG context) if available
+        # Try Ollama first (fast, local, always available)
+        if self._use_ollama and self._rag_enabled:
+            try:
+                result = await self._try_ollama_parse(query, user_id)
+                if result and self._validate(result):
+                    if user_id:
+                        rag_memory.store_pipeline(query, result, user_id)
+                    logger.info(f"Ollama parsed successfully: {result.get('name')}")
+                    return result
+            except Exception as e:
+                logger.warning(f"Ollama parsing failed: {e}")
+
+        # Then try HuggingFace LLM
         if self._use_llm and self._rag_enabled:
             try:
                 result = await self._try_ai_parse(query, user_id)
                 if result and self._validate(result):
-                    # Store the successful parse in RAG memory
                     if user_id:
                         rag_memory.store_pipeline(query, result, user_id)
-                    logger.info(f"LLM parsed successfully: {result.get('name')}")
+                    logger.info(f"HF LLM parsed successfully: {result.get('name')}")
                     return result
             except Exception as e:
-                logger.warning(f"LLM parsing failed: {e}, falling back to rule-based")
+                logger.warning(f"HF LLM parsing failed: {e}")
 
         # Fallback to rule-based
         logger.info("Using rule-based fallback parser")
@@ -96,6 +108,64 @@ class IntentParser:
             return json.loads(json_str)
         except json.JSONDecodeError as e:
             logger.error(f"JSON parse error: {e}")
+            return None
+
+    def _check_ollama(self) -> bool:
+        """Check if Ollama is running and has a usable model."""
+        try:
+            import requests
+            resp = requests.get(
+                f"{settings.LLM_BASE_URL}/api/tags",
+                timeout=3,
+            )
+            if resp.status_code != 200:
+                return False
+            models = resp.json().get("models", [])
+            if not models:
+                logger.info("Ollama is running but no models pulled yet")
+                return False
+            logger.info(f"Ollama available with {len(models)} model(s)")
+            return True
+        except Exception as e:
+            logger.debug(f"Ollama check failed: {e}")
+            return False
+
+    async def _try_ollama_parse(self, query: str, user_id: Optional[int]) -> Optional[Dict[str, Any]]:
+        """Attempt to parse using Ollama's local LLM."""
+        prompt = self._build_prompt(query, user_id)
+
+        try:
+            import requests
+            resp = requests.post(
+                f"{settings.LLM_BASE_URL}/api/generate",
+                json={
+                    "model": settings.LLM_MODEL,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {"temperature": 0.1},
+                },
+                timeout=30,
+            )
+            if resp.status_code != 200:
+                logger.warning(f"Ollama returned {resp.status_code}: {resp.text[:200]}")
+                return None
+
+            response = resp.json().get("response", "")
+            if not response:
+                return None
+
+            # Extract JSON from response
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+            if json_start == -1 or json_end == 0:
+                logger.warning("No JSON found in Ollama response")
+                return None
+
+            json_str = response[json_start:json_end]
+            return json.loads(json_str)
+
+        except Exception as e:
+            logger.warning(f"Ollama request failed: {e}")
             return None
 
     def _build_prompt(self, query: str, user_id: Optional[int]) -> str:
