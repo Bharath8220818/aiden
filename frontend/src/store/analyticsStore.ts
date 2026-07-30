@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { subDays, format } from 'date-fns';
+import { analyticsApi } from '../api/analytics';
 
 export type Period = '7D' | '30D' | '90D' | '1Y';
 
@@ -77,7 +78,6 @@ const PIPELINE_METRICS: PipelineMetric[] = [
 
 function computeInsights(pipelines: PipelineMetric[]): AiInsight[] {
   const worstPipeline = pipelines.reduce((w, p) => (p.successRate < w.successRate ? p : w), pipelines[0]);
-  const totalRuns = pipelines.reduce((s, p) => s + p.runs, 0);
   const totalCost = pipelines.reduce((s, p) => s + parseFloat(p.cost.replace('$', '')), 0);
   const bestPipeline = pipelines.reduce((b, p) => (p.successRate > b.successRate ? p : b), pipelines[0]);
 
@@ -114,22 +114,68 @@ function computeInsights(pipelines: PipelineMetric[]): AiInsight[] {
 
 interface AnalyticsState {
   period: Period;
+  isLoading: boolean;
   trendData: TrendPoint[];
   costBreakdown: CostBreakdown[];
   pipelineMetrics: PipelineMetric[];
   aiInsights: AiInsight[];
 
+  fetchDashboard: () => Promise<void>;
   setPeriod: (period: Period) => void;
   exportCsv: () => void;
   exportPdf: () => void;
 }
 
-export const useAnalyticsStore = create<AnalyticsState>((set) => ({
+export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
   period: '30D',
+  isLoading: false,
   trendData: TREND_DATA,
   costBreakdown: COST_BREAKDOWN,
   pipelineMetrics: PIPELINE_METRICS,
   aiInsights: computeInsights(PIPELINE_METRICS),
+
+  fetchDashboard: async () => {
+    set({ isLoading: true });
+    try {
+      const { period } = get();
+      const data = await analyticsApi.getDashboard(period);
+      const perf = data.performance || [];
+      const costs = data.costs?.length ? data.costs : COST_BREAKDOWN;
+      const pipelines = data.pipelines?.length ? data.pipelines : PIPELINE_METRICS;
+
+      // Map API trend data to TrendPoint format
+      const trendData: TrendPoint[] = perf.length > 0
+        ? perf.map((p: any) => ({
+            date: p.date || p.label || '',
+            runs: p.runs || p.value || 0,
+            success: p.success ?? p.runs ?? 0,
+            failed: p.failed ?? 0,
+            duration: p.duration ?? 0,
+          }))
+        : generateTrendData(period === '7D' ? 7 : period === '30D' ? 30 : period === '90D' ? 90 : 365);
+
+      const pipelineMetrics: PipelineMetric[] = pipelines.map((p: any) => ({
+        name: p.name || `Pipeline #${p.id}`,
+        id: p.id,
+        runs: p.runs || 0,
+        avgDuration: p.avgDuration || `${p.avg_duration ?? 0} min`,
+        dataVolume: p.dataVolume || `${p.data_volume ?? 0} GB`,
+        cost: p.cost || `$${p.total_cost ?? 0}`,
+        successRate: p.successRate ?? p.success_rate ?? 100,
+      }));
+
+      set({
+        trendData,
+        costBreakdown: costs,
+        pipelineMetrics,
+        aiInsights: computeInsights(pipelineMetrics.length > 0 ? pipelineMetrics : PIPELINE_METRICS),
+        isLoading: false,
+      });
+    } catch {
+      // Fall back to mock data
+      set({ isLoading: false });
+    }
+  },
 
   setPeriod: (period) => {
     const days = period === '7D' ? 7 : period === '30D' ? 30 : period === '90D' ? 90 : 365;

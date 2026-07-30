@@ -44,20 +44,30 @@ COPY scripts/download_models.py scripts/download_models.py
 
 ENV HF_CACHE_DIR=${HF_CACHE_DIR}
 
-# Download models during build.
+# Download small embedding model during build.  The large intent model
+# (~6 GB) is skipped here to keep builds fast — it downloads on first use.
 # Preferred: uses BuildKit secret mount (token never in image layers).
-# If HF_TOKEN was passed via --build-arg, the secret mount is empty and
-# the --mount target won't exist, so the fallback $HF_TOKEN env var is used.
+# If SKIP_MODEL_DOWNLOAD=true the entire download is skipped.
 RUN --mount=type=secret,id=hf_token \
-    if [ -f /run/secrets/hf_token ] && [ -s /run/secrets/hf_token ]; then \
-      export HF_TOKEN=$(cat /run/secrets/hf_token); \
-    fi && \
-    python scripts/download_models.py --model intent --model embedding
+    if [ "${SKIP_MODEL_DOWNLOAD:-false}" = "true" ]; then \
+      echo "  → SKIP_MODEL_DOWNLOAD=true — skipping model download"; \
+    else \
+      if [ -f /run/secrets/hf_token ] && [ -s /run/secrets/hf_token ]; then \
+        export HF_TOKEN=$(cat /run/secrets/hf_token); \
+      fi && \
+      echo "  → Downloading embedding model (~90 MB)..." && \
+      python scripts/download_models.py --model embedding || \
+      echo "  ⚠ Model download failed (non-fatal — will download at runtime)"; \
+    fi
 
 # ── Application code ───────────────────────────────────────────────────
 COPY . .
 
+# ── Docker entrypoint (wait for DB, seed users, then start) ────────────
+COPY docker-entrypoint.sh .
+RUN chmod +x docker-entrypoint.sh
+
 # ── Runtime ─────────────────────────────────────────────────────────────
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["./docker-entrypoint.sh"]
