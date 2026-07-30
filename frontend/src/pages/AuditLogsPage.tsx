@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Download, ChevronDown, Globe, Clock, ArrowUpDown } from 'lucide-react';
+import { auditApi } from '../api/audit';
 
-type ActionType = 'all' | 'login' | 'create' | 'update' | 'delete' | 'run' | 'approve';
+type ActionType = 'all' | 'login' | 'create' | 'update' | 'delete' | 'run' | 'approve' | 'reject' | 'cancel';
 type TimeSort = 'newest' | 'oldest';
 
 interface AuditEntry {
@@ -17,7 +18,8 @@ interface AuditEntry {
   status: 'success' | 'failure' | 'pending';
 }
 
-const AUDIT_LOGS: AuditEntry[] = [
+// ─── Mock data as fallback when backend is unavailable ────────────────
+const MOCK_AUDIT_LOGS: AuditEntry[] = [
   { id: 1, user: 'Bharath K.', userRole: 'Admin', action: 'Login', actionType: 'login', resource: 'AIDEN Platform', details: 'Login from new device (Chrome 126, Windows)', ip: '192.168.1.100', timestamp: '2026-07-21 14:32:01', status: 'success' },
   { id: 2, user: 'Femi F.', userRole: 'Engineer', action: 'Create Pipeline', actionType: 'create', resource: 'Daily Sales ETL', details: 'Created pipeline from prompt: "Build a daily sales pipeline from PostgreSQL to Snowflake"', ip: '192.168.1.101', timestamp: '2026-07-21 14:30:22', status: 'success' },
   { id: 3, user: 'AIDEN Auto', userRole: 'System', action: 'Run Pipeline', actionType: 'run', resource: 'IoT Stream Pipeline', details: 'Auto-triggered execution (scheduled: every 5 min)', ip: '10.0.0.1', timestamp: '2026-07-21 14:28:15', status: 'success' },
@@ -52,8 +54,61 @@ const AuditLogsPage: React.FC = () => {
   const [actionFilter, setActionFilter] = useState<ActionType>('all');
   const [timeSort, setTimeSort] = useState<TimeSort>('newest');
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [logs, setLogs] = useState<AuditEntry[]>(MOCK_AUDIT_LOGS);
+  const [totalEvents, setTotalEvents] = useState(MOCK_AUDIT_LOGS.length);
+  // ─── Fetch logs from backend, fall back to mock ──────────────────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await auditApi.list({ limit: 50, sort: 'newest' });
+        const entries: AuditEntry[] = (data.logs || data).map((log: any, i: number) => ({
+          id: log.id || i + 1,
+          user: log.username || log.user || 'System',
+          userRole: log.role || 'User',
+          action: log.action.charAt(0).toUpperCase() + log.action.slice(1),
+          actionType: log.action as ActionType,
+          resource: log.resource || 'AIDEN Platform',
+          details: log.details || '',
+          ip: log.ip_address || log.ip || 'N/A',
+          timestamp: log.created_at || log.timestamp || new Date().toISOString(),
+          status: log.status || 'success',
+        }));
+        setLogs(entries);
+        setTotalEvents(data.total ?? entries.length);
+      } catch {
+        setLogs(MOCK_AUDIT_LOGS);
+        setTotalEvents(MOCK_AUDIT_LOGS.length);
+      }
+    })();
+  }, []);
 
-  const filtered = [...AUDIT_LOGS]
+  // ─── Export CSV via real API or client-side fallback ────────────────
+  const handleExportCsv = async () => {
+    try {
+      const blob = await auditApi.exportCSV({});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit-logs-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // Client-side fallback: generate CSV from current data
+      const headers = 'ID,User,Action,Resource,IP,Status,Timestamp\n';
+      const rows = filtered.map((e) =>
+        `${e.id},"${e.user}","${e.action}","${e.resource}",${e.ip},${e.status},${e.timestamp}`
+      ).join('\n');
+      const blob = new Blob([headers + rows], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit-logs-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const filtered = [...logs]
     .filter((entry) => {
       if (actionFilter !== 'all' && entry.actionType !== actionFilter) return false;
       if (search) {
@@ -89,7 +144,10 @@ const AuditLogsPage: React.FC = () => {
           </p>
         </div>
 
-        <button className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800">
+        <button
+          onClick={handleExportCsv}
+          className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+        >
           <Download size={14} />
           Export CSV
         </button>
@@ -98,10 +156,10 @@ const AuditLogsPage: React.FC = () => {
       {/* ── Stats ── */}
       <div className="grid grid-cols-4 gap-3">
         {[
-          { label: 'Total Events', value: AUDIT_LOGS.length, color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300', icon: Clock },
-          { label: 'Creates', value: AUDIT_LOGS.filter((l) => l.actionType === 'create').length, color: 'bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400', icon: 'bg-green-500' },
-          { label: 'Failures', value: AUDIT_LOGS.filter((l) => l.status === 'failure').length, color: 'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400', icon: 'bg-red-500' },
-          { label: 'Auto Actions', value: AUDIT_LOGS.filter((l) => l.user === 'AIDEN Auto').length, color: 'bg-purple-100 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400', icon: 'bg-purple-500' },
+          { label: 'Total Events', value: totalEvents, color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300', icon: Clock },
+          { label: 'Creates', value: logs.filter((l) => l.actionType === 'create').length, color: 'bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400', icon: 'bg-green-500' },
+          { label: 'Failures', value: logs.filter((l) => l.status === 'failure').length, color: 'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400', icon: 'bg-red-500' },
+          { label: 'Auto Actions', value: logs.filter((l) => l.user.includes('AIDEN') || l.user === 'System').length, color: 'bg-purple-100 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400', icon: 'bg-purple-500' },
         ].map((s) => (
           <div key={s.label} className={`rounded-xl p-3 text-center ${s.color}`}>
             <p className="text-lg font-bold">{s.value}</p>
@@ -148,7 +206,7 @@ const AuditLogsPage: React.FC = () => {
         </div>
 
         <p className="text-sm text-gray-500">
-          Showing <span className="font-semibold text-gray-900 dark:text-white">{filtered.length}</span> of {AUDIT_LOGS.length} events
+          Showing <span className="font-semibold text-gray-900 dark:text-white">{filtered.length}</span> of {totalEvents} events
         </p>
       </div>
 

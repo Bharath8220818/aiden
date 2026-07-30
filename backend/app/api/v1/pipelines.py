@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 executions_router = APIRouter()
 intent_parser = IntentParser()
-pipeline_executor = PipelineExecutor()
 
 
 @router.post("/from-prompt", response_model=PipelineResponse)
@@ -42,37 +41,49 @@ async def create_pipeline_from_prompt(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Create a pipeline from a natural language prompt using HF AI agents."""
+    """
+    Create a pipeline from a natural language prompt.
+
+    Parses the prompt via AI (TinyLlama-1.1B on HF) with a 5-second timeout,
+    falling back to a rule-based keyword parser that handles common patterns
+    (source → destination, schedule keywords, transformations, quality rules).
+    Generated Airflow DAG code uses PythonOperator with extract/transform/load
+    tasks connected via XCom.
+    """,
     prompt = request.prompt
     if not prompt or not prompt.strip():
         raise HTTPException(status_code=400, detail="Prompt cannot be empty")
 
-    # 1. Parse intent using HuggingFace IntentParser (with rule-based fallback)
-    parsed_intent = await intent_parser.parse(prompt)
+    # 1. Parse intent — try AI parsing first (with 5s timeout), fall back to
+    #    rule-based parser for instant responses when HF models are slow on CPU.
+    try:
+        parsed_intent = await asyncio.wait_for(
+            intent_parser.parse(prompt),
+            timeout=5.0,
+        )
+    except (asyncio.TimeoutError, Exception):
+        logger.info("AI intent parsing timed out — using rule-based fallback")
+        parsed_intent = intent_parser._rule_based_parse(prompt)
 
-    # 2. Execute through multi-agent system for code generation (lazy import
-    #    so the routes module loads even if smolagents isn't installed yet)
+    # 2. Generate DAG code, dbt code, and tests
+    #    Uses a lightweight CodeGenerator that imports instantly (no smolagents dependency).
+    #    The AgentOrchestrator (with smolagents) is imported lazily and only used if
+    #    it can be initialized quickly — it's never imported inline to avoid the ~9s
+    #    import time penalty from smolagents loading transformers + torch.
     dag_code = None
     dbt_code = None
     tests = parsed_intent.get("data_quality_rules", [])
 
     try:
-        from app.core.agent_orchestrator import AgentOrchestrator, CodeGeneratorTool  # noqa: E402
+        from app.core.code_generator import CodeGenerator
 
-        orchestrator = AgentOrchestrator()
-        if orchestrator.is_enabled():
-            agent_result = await orchestrator.execute(prompt, parsed_intent)
-            dbt_code = agent_result.get("result") if agent_result.get("status") == "success" else None
-
-        generator = CodeGeneratorTool()
-        spec = parsed_intent
-        import json
-
-        dag_code = generator.forward(json.dumps(spec), "dag")
-        dbt_code = dbt_code or generator.forward(json.dumps(spec), "dbt")
-        tests = parsed_intent.get("data_quality_rules", [])
+        generator = CodeGenerator()
+        generated = generator.generate_all(parsed_intent)
+        dag_code = generated.get("dag_code")
+        dbt_code = generated.get("dbt_code")
+        tests = generated.get("tests", tests)
     except Exception as exc:
-        logger.warning("Pipeline code generation failed, proceeding with parsed intent only: %s", exc)
+        logger.warning("Code generation failed, proceeding with parsed intent only: %s", exc)
 
     # 3. Save pipeline
     new_pipeline = Pipeline(
@@ -323,7 +334,6 @@ async def cancel_pipeline(
 @router.post("/{pipeline_id}/run", response_model=PipelineExecutionResponse)
 async def run_pipeline(
     pipeline_id: int,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -377,11 +387,19 @@ async def run_pipeline(
         "timestamp": datetime.now().isoformat(),
     })
 
+    # Create a fresh executor with the db session from this request
+    executor = PipelineExecutor(db)
+
     # Register cancellation event before launching (closes race window)
     PipelineExecutor._cancel_requests[execution.id] = asyncio.Event()
 
     # Kick off execution in the background
-    background_tasks.add_task(pipeline_executor.execute, pipeline, execution)
+    # NOTE: Must use asyncio.create_task() — BackgroundTasks.add_task() does NOT support async functions
+    task = asyncio.create_task(executor.execute(pipeline, execution))
+
+    # Store the task so it doesn't get garbage-collected before completion
+    executor._active_tasks.add(task)
+    task.add_done_callback(executor._active_tasks.discard)
 
     return execution
 
@@ -420,6 +438,43 @@ async def get_execution_logs(
     if not execution:
         raise HTTPException(status_code=404, detail="Execution not found")
     return execution.logs or []
+
+
+@executions_router.get("/")
+async def list_executions(
+    skip: int = 0,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List all executions for the current user."""
+    result = await db.execute(
+        select(PipelineExecution)
+        .where(PipelineExecution.user_id == current_user.id)
+        .order_by(PipelineExecution.id.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    return result.scalars().all()
+
+
+@executions_router.get("/{execution_id}")
+async def get_execution(
+    execution_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get a single execution by ID."""
+    result = await db.execute(
+        select(PipelineExecution).where(
+            PipelineExecution.id == execution_id,
+            PipelineExecution.user_id == current_user.id,
+        )
+    )
+    execution = result.scalar_one_or_none()
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+    return execution
 
 
 @executions_router.get("/{execution_id}/logs")

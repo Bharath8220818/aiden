@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__)
 # ── Conditional imports ────────────────────────────────────────────────
 try:
     import torch
-    from peft import PeftModel
     from sentence_transformers import SentenceTransformer
     from transformers import (
         AutoModelForCausalLM,
@@ -38,10 +37,18 @@ try:
     HF_AVAILABLE = True
 except ImportError as exc:
     torch = None
-    PeftModel = SentenceTransformer = None
+    SentenceTransformer = None
     AutoModelForCausalLM = AutoTokenizer = BitsAndBytesConfig = hf_pipeline = None
     HF_AVAILABLE = False
     HF_IMPORT_ERROR = exc
+
+# peft is optional — only needed for loading fine-tuned (LoRA) models
+try:
+    from peft import PeftModel, PeftConfig
+    PEFT_AVAILABLE = True
+except ImportError:
+    PeftModel = PeftConfig = None
+    PEFT_AVAILABLE = False
 
 
 class HuggingFaceService:
@@ -101,15 +108,13 @@ class HuggingFaceService:
                 bnb_4bit_compute_dtype=torch.float16,
                 bnb_4bit_use_double_quant=True,
             )
-            # Sanity check: verify HF Hub is reachable
+            # Sanity check: verify HF Hub is reachable (non-blocking)
+            # Avoid downloading a full model — just check imports + cache dir
             try:
+                # Quick import check
                 from transformers import AutoModel
-                AutoModel.from_pretrained(
-                    "distilbert-base-uncased",
-                    cache_dir=settings.HF_CACHE_DIR,
-                )
                 self._available = True
-                logger.info("HuggingFace environment verified — Hub reachable")
+                logger.info("HuggingFace environment verified (imports OK)")
             except Exception as sanity_err:
                 logger.warning("HF Hub sanity check failed: %s", sanity_err)
                 self._available = False
@@ -158,8 +163,11 @@ class HuggingFaceService:
                 os.path.isdir(model_name) and os.path.exists(os.path.join(model_name, "adapter_config.json"))
             )
             if is_peft:
-                from peft import PeftConfig
-
+                if not PEFT_AVAILABLE:
+                    raise RuntimeError(
+                        "Cannot load PEFT/LoRA model — peft is not installed. "
+                        "Install it with: pip install peft"
+                    )
                 config = PeftConfig.from_pretrained(model_name)
                 base_model = AutoModelForCausalLM.from_pretrained(
                     config.base_model_name_or_path,

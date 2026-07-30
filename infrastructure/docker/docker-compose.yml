@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database
   postgres:
@@ -20,6 +18,7 @@ services:
       retries: 5
     networks:
       - aiden-network
+    restart: unless-stopped
 
   # Redis Cache
   redis:
@@ -37,6 +36,7 @@ services:
       retries: 5
     networks:
       - aiden-network
+    restart: unless-stopped
 
   # Qdrant Vector Database
   qdrant:
@@ -48,6 +48,7 @@ services:
       - qdrant_data:/qdrant/storage
     networks:
       - aiden-network
+    restart: unless-stopped
 
   # MinIO S3 Storage
   minio:
@@ -69,6 +70,7 @@ services:
       retries: 5
     networks:
       - aiden-network
+    restart: unless-stopped
 
   # Backend API
   backend:
@@ -76,12 +78,26 @@ services:
       context: ../../backend
       dockerfile: Dockerfile
     container_name: aiden-backend
+    entrypoint: ["/app/docker-entrypoint.sh"]
     environment:
       DATABASE_URL: postgresql+asyncpg://aiden:aiden123@postgres:5432/aiden
       REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333
       MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: aiden-pipelines
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-local-jwt-secret-change-in-prod}
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRE_MINUTES: 1440
+      CORS_ORIGINS: "http://localhost:80,http://localhost:5173,http://localhost:3000"
+      PYTORCH_NO_CUDA: "1"
       DEBUG: "True"
+      SKIP_DB_SEED: "false"
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@example.com}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-Admin123!}
+      SEED_DEMO_EMAIL: ${SEED_DEMO_EMAIL:-demo@example.com}
+      SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-demo1234}
     ports:
       - "8000:8000"
     depends_on:
@@ -92,6 +108,8 @@ services:
     networks:
       - aiden-network
     restart: unless-stopped
+    volumes:
+      - backend_media:/app/uploads
 
   # Frontend UI
   frontend:
@@ -113,6 +131,7 @@ volumes:
   redis_data:
   qdrant_data:
   minio_data:
+  backend_media:
 
 networks:
   aiden-network:

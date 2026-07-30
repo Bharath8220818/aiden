@@ -16,23 +16,24 @@ async def create_test_user() -> None:
         await conn.run_sync(Base.metadata.create_all)
 
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(User).where(User.username == "testuser"))
+        # Check if user already exists
+        result = await db.execute(select(User).where(User.email == "femifriendly@gmail.com"))
         existing = result.scalar_one_or_none()
 
         if existing:
-            print("Test user already exists!")
+            print(f"✅ Test user already exists: {existing.email}")
             return
 
         new_user = User(
-            username="testuser",
-            email="test@example.com",
-            full_name="Test User",
-            hashed_password=get_password_hash("testpass123"),
+            username="femifriendly",
+            email="femifriendly@gmail.com",
+            full_name="Femi Friendly",
+            hashed_password=get_password_hash("Femi@2005"),
             is_active=True,
         )
         db.add(new_user)
         await db.commit()
-        print("Test user created: testuser / testpass123")
+        print("✅ Test user created: femifriendly@gmail.com / Femi@2005")
 
 
 if __name__ == "__main__":
