@@ -1,6 +1,5 @@
 import { useEffect, useCallback, useMemo } from 'react';
 import { useShortcutStore } from '../store/shortcutStore';
-import type { ShortcutBinding, ShortcutDefWithHandler } from '../store/shortcutStore';
 
 // ─── Re-export types so consumers get everything from one file ──────
 
@@ -77,23 +76,24 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions) {
   }, [scopeKey, registry, handlers, inline]);
 
   const handler = useCallback(
-    (e: KeyboardEvent) => {
+    (e: Event) => {
+      const ke = e as KeyboardEvent;
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
 
       for (const s of shortcuts) {
-        const keyMatch = e.key.toLowerCase() === s.key.toLowerCase();
+        const keyMatch = ke.key.toLowerCase() === s.key.toLowerCase();
         if (!keyMatch) continue;
 
         const ctrlOrMeta = s.ctrlOrMeta
-          ? isMac ? e.metaKey : e.ctrlKey
+          ? isMac ? ke.metaKey : ke.ctrlKey
           : true;
 
-        const shiftMatch = s.shift ? e.shiftKey : !e.shiftKey;
-        const altMatch = s.alt ? e.altKey : !e.altKey;
+        const shiftMatch = s.shift ? ke.shiftKey : !ke.shiftKey;
+        const altMatch = s.alt ? ke.altKey : !ke.altKey;
 
         if (ctrlOrMeta && shiftMatch && altMatch) {
-          e.preventDefault();
-          e.stopPropagation();
+          ke.preventDefault();
+          ke.stopPropagation();
           s.handler();
           break;
         }

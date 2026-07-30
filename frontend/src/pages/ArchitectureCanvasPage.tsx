@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
   Database, Brain, Share2, Download, Zap,
   Monitor, Globe, Activity,
-  Plus, Search, Sparkles, Minus, RotateCcw, Keyboard
+  Plus, Search, Sparkles, Minus, RotateCcw
 } from 'lucide-react';
 import { useRegistryShortcuts } from '../hooks/useKeyboardShortcuts';
 import { ShortcutsHelpModal, ShortcutsTrigger } from '../components/common/ShortcutsHelpModal';
