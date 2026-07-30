@@ -3,8 +3,11 @@ import { motion } from 'framer-motion';
 import {
   Database, Brain, Share2, Download, Zap,
   Monitor, Globe, Activity,
-  Plus, Search, Sparkles, Minus, RotateCcw
+  Plus, Search, Sparkles, Minus, RotateCcw, Keyboard
 } from 'lucide-react';
+import { useRegistryShortcuts } from '../hooks/useKeyboardShortcuts';
+import { ShortcutsHelpModal, ShortcutsTrigger } from '../components/common/ShortcutsHelpModal';
+import { useNotificationStore } from '../store/notificationStore';
 
 const cloudComponents = [
   { category: 'Sources', items: ['Database', 'API', 'Kafka', 'S3', 'IoT'] },
@@ -20,6 +23,30 @@ function BarChart3Icon(props: React.SVGProps<SVGSVGElement>) {
 
 export default function ArchitectureCanvasPage() {
   const [zoom, setZoom] = useState(100);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const { addNotification } = useNotificationStore();
+
+  useRegistryShortcuts(
+    'architecture-canvas',
+    {
+      'common.delete': () => {},
+      'common.backspace': () => {},
+      'common.shortcuts': () => setShowShortcuts(true),
+      'common.select-all': () => {},
+      'architecture-canvas.add-cloud': () => addCanvasItem('source', 'Cloud Service'),
+      'architecture-canvas.add-storage': () => addCanvasItem('storage', 'Storage'),
+      'architecture-canvas.add-processing': () => addCanvasItem('processing', 'Processor'),
+      'architecture-canvas.add-streaming': () => addCanvasItem('streaming', 'Kafka'),
+      'architecture-canvas.add-medallion': () => {},
+      'architecture-canvas.export': () => { addNotification({ type: 'success', message: 'Diagram exported!' }); },
+      'architecture-canvas.toggle-principles': () => {},
+      'common.zoom-in': () => setZoom(z => Math.min(z + 10, 200)),
+      'common.zoom-out': () => setZoom(z => Math.max(z - 10, 25)),
+      'common.fit-view': () => setZoom(100),
+      'common.deselect': () => {},
+    }
+  );
+
   const [canvasItems, setCanvasItems] = useState([
     { id: '1', name: 'Mobile Apps', type: 'source' as const, x: 60, y: 180 },
     { id: '2', name: 'Event Hub', type: 'streaming' as const, x: 320, y: 180 },
@@ -28,6 +55,17 @@ export default function ArchitectureCanvasPage() {
     { id: '5', name: 'Lakehouse', type: 'storage' as const, x: 840, y: 240 },
     { id: '6', name: 'Power BI', type: 'analytics' as const, x: 1100, y: 180 },
   ]);
+
+  const addCanvasItem = useCallback((type: string, name: string) => {
+    const newItem = {
+      id: String(Date.now()),
+      name,
+      type: type as 'source' | 'streaming' | 'processing' | 'storage' | 'analytics',
+      x: 60 + (canvasItems.length % 3) * 260,
+      y: 180 + Math.floor(canvasItems.length / 3) * 120,
+    };
+    setCanvasItems(prev => [...prev, newItem]);
+  }, [canvasItems.length]);
   const [aiPrompt, setAiPrompt] = useState('');
   const [dragging, setDragging] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -89,6 +127,7 @@ export default function ArchitectureCanvasPage() {
           <span className="w-12 text-center text-xs font-medium text-[var(--color-text-secondary)]">{zoom}%</span>
           <button className="btn-icon btn-sm" onClick={() => setZoom(z => Math.max(z - 10, 25))}><Minus className="h-4 w-4" /></button>
           <button className="btn-icon btn-sm" onClick={() => setZoom(100)}><RotateCcw className="h-4 w-4" /></button>
+          <ShortcutsTrigger onClick={() => setShowShortcuts(true)} />
           <button className="btn-primary btn-sm"><Brain className="h-4 w-4" /> AI Optimize</button>
         </div>
       </motion.div>
@@ -185,6 +224,12 @@ export default function ArchitectureCanvasPage() {
           <button className="btn-primary btn-sm"><Sparkles className="h-4 w-4" /> Generate</button>
         </div>
       </motion.div>
+
+      <ShortcutsHelpModal
+        isOpen={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
+        scopes={['common', 'architecture-canvas']}
+      />
     </div>
   );
 }
