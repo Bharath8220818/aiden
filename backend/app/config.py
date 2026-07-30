@@ -77,13 +77,15 @@ class Settings(BaseSettings):
     JWT_EXPIRE_MINUTES: int = 1440
 
     # CORS — Allow all origins in production for Render + Vercel
-    CORS_ORIGINS: List[str] = []
+    CORS_ORIGINS: Optional[List[str]] = []
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, value):
         if isinstance(value, str):
             raw = value.strip()
+            if not raw:
+                return []
             if raw.startswith("[") and raw.endswith("]"):
                 import json
                 try:
