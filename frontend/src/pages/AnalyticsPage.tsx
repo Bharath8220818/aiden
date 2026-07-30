@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -46,7 +47,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 const DONUT_COLORS = ['#7C3AED', '#06B6D4', '#F59E0B', '#22C55E', '#EF4444', '#64748B'];
 
 const CostDonutChart: React.FC<{ data: any[] }> = ({ data }) => {
-  const total = data.reduce((s: number, c: any) => s + c.amount, 0);
   return (
     <div className="flex items-center gap-6">
       <div className="h-44 w-44 shrink-0">
@@ -88,8 +88,13 @@ const CostDonutChart: React.FC<{ data: any[] }> = ({ data }) => {
 const AnalyticsPage: React.FC = () => {
   const {
     period, trendData, costBreakdown, pipelineMetrics, aiInsights,
-    setPeriod, exportCsv, exportPdf,
+    fetchDashboard, setPeriod, exportCsv, exportPdf,
   } = useAnalyticsStore();
+
+  // ─── Fetch real data from backend on mount, fall back to mock ──────
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
 
   const handleInsightAction = (action: string) => {
     if (action === 'view-costs') {

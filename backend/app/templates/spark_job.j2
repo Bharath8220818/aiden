@@ -1,0 +1,72 @@
+"""
+AIDEN-Generated Spark Job
+==========================
+Pipeline : {{ pipeline_name }}
+Source   : {{ source_type }}
+Target   : {{ destination_type }}
+Generated: {{ created_at }}
+"""
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, when, isnan, isnull, count
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType
+
+# ── Spark Session ──────────────────────────────────────────────────────────
+spark = SparkSession.builder \
+    .appName("aiden_{{ pipeline_name | replace(' ', '_') | lower }}") \
+    .config("spark.sql.adaptive.enabled", "true") \
+    .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
+    .getOrCreate()
+
+
+# ── Extract ────────────────────────────────────────────────────────────────
+def extract() -> DataFrame:
+    """Extract data from {{ source_type }}."""
+    # TODO: Replace with actual {{ source_type }} connector
+    df = spark.read.parquet("/data/{{ source_type }}/input/")
+    return df
+
+
+# ── Transform ──────────────────────────────────────────────────────────────
+def transform(df: DataFrame) -> DataFrame:
+    """Apply transformations."""
+{% for t in transformations %}
+    # {{ t }}
+{% endfor %}
+    # Clean nulls
+    df = df.dropna(thresh=2)
+
+    # Deduplicate
+    df = df.dropDuplicates()
+
+    return df
+
+
+# ── Quality Checks ─────────────────────────────────────────────────────────
+def quality_check(df: DataFrame) -> bool:
+    """Run data quality checks."""
+    total = df.count()
+    null_counts = df.select([count(when(isnull(c), c)).alias(c) for c in df.columns]).collect()[0]
+    passed = all(null_counts[c] == 0 for c in df.columns if c in ("id", "key"))
+    return passed
+
+
+# ── Load ───────────────────────────────────────────────────────────────────
+def load(df: DataFrame) -> None:
+    """Load data into {{ destination_type }}."""
+    # TODO: Replace with actual {{ destination_type }} connector
+    df.write.mode("overwrite").parquet("/data/{{ destination_type }}/output/")
+
+
+# ── Main ───────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    df = extract()
+    df = transform(df)
+    if quality_check(df):
+        load(df)
+        print(f"✅ Successfully loaded {df.count()} records")
+    else:
+        print("❌ Quality check failed — aborting load")
+        raise SystemExit(1)
+
+    spark.stop()

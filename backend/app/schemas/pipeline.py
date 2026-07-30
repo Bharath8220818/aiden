@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
@@ -40,6 +40,14 @@ class PipelineResponse(BaseModel):
     code: Optional[str]
     dbt_code: Optional[str]
     tests: Optional[List[Any]] = None
+
+    @field_validator("tests", mode="before")
+    @classmethod
+    def coerce_tests(cls, v):
+        """Coerce empty string or None to empty list for Pydantic v2 strict mode."""
+        if v is None or v == "":
+            return []
+        return v
 
     class Config:
         from_attributes = True

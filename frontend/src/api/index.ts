@@ -27,8 +27,11 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('auth_token');
-      window.location.href = '/login';
+      // Avoid redirecting again when a login-page request returns 401.
+      if (!window.location.pathname.includes('/login')) {
+        localStorage.removeItem('auth_token');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -36,5 +39,8 @@ api.interceptors.response.use(
 
 export { authApi } from './auth';
 export { pipelineApi } from './pipelines';
+export { analyticsApi } from './analytics';
+export { approvalsApi } from './approvals';
+export { auditApi } from './audit';
 
 export default api;

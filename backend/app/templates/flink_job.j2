@@ -1,0 +1,64 @@
+"""
+AIDEN-Generated Flink Streaming Job
+=====================================
+Pipeline : {{ pipeline_name }}
+Source   : {{ source_type }}
+Target   : {{ destination_type }}
+Generated: {{ created_at }}
+"""
+
+from pyflink.datastream import StreamExecutionEnvironment
+from pyflink.datastream.connectors.kafka import (
+    KafkaSource,
+    KafkaSink,
+    KafkaRecordSerializationSchema,
+)
+from pyflink.common import WatermarkStrategy, Duration
+from pyflink.common.serialization import SimpleStringSchema
+
+
+# ── Environment ────────────────────────────────────────────────────────────
+env = StreamExecutionEnvironment.get_execution_environment()
+env.set_parallelism({{ parallelism | default(2) }})
+env.enable_checkpointing({{ checkpoint_interval_ms | default(60000) }})
+env.get_checkpoint_config().set_min_pause_between_checkpoints(30000)
+
+
+# ── Source ─────────────────────────────────────────────────────────────────
+source = KafkaSource.builder() \
+    .set_bootstrap_servers("{{ kafka_bootstrap | default('localhost:9092') }}") \
+    .set_topics("{{ source_topic | default('input') }}") \
+    .set_group_id("aiden_flink_{{ pipeline_name | replace(' ', '_') | lower }}") \
+    .set_starting_offsets("earliest") \
+    .set_value_only_deserializer(SimpleStringSchema()) \
+    .build()
+
+
+# ── Transformations ────────────────────────────────────────────────────────
+def transform_data(value: str) -> str:
+    """Apply streaming transformations."""
+{% for t in transformations %}
+    # {{ t }}
+{% endfor %}
+    return value.upper()
+
+
+# ── Sink ───────────────────────────────────────────────────────────────────
+sink = KafkaSink.builder() \
+    .set_bootstrap_servers("{{ kafka_bootstrap | default('localhost:9092') }}") \
+    .set_record_serializer(
+        KafkaRecordSerializationSchema.builder()
+            .set_topic("{{ destination_topic | default('output') }}")
+            .set_value_serialization_schema(SimpleStringSchema())
+            .build()
+    ) \
+    .build()
+
+
+# ── Pipeline ───────────────────────────────────────────────────────────────
+ds = env.from_source(source, WatermarkStrategy.no_watermarks(), "Kafka Source")
+ds = ds.map(transform_data).name("transform")
+ds.sink_to(sink).name("Kafka Sink")
+
+if __name__ == "__main__":
+    env.execute("aiden_{{ pipeline_name | replace(' ', '_') | lower }}")

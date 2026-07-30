@@ -1,0 +1,14 @@
+
+from airflow import DAG
+from datetime import datetime, timedelta
+from airflow.operators.dummy import DummyOperator
+
+default_args = {
+    'owner': 'AIDEN',
+    'retries': 3,
+    'retry_delay': timedelta(minutes=5),
+}
+
+dag = DAG(
+    'postgres_to_snowflake_pipeline',
+    schedule_interval='0 6 * * *'
