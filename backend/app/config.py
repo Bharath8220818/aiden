@@ -192,6 +192,8 @@ class Settings(BaseSettings):
     # Supabase Settings
     SUPABASE_URL: str = ""
     SUPABASE_SERVICE_ROLE_KEY: str = ""
+    SUPABASE_ANON_KEY: str = ""
+    FRONTEND_URL: str = "http://localhost:5173"
 
     class Config:
         env_file = ".env"
