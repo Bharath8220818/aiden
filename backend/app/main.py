@@ -33,6 +33,21 @@ async def lifespan(app: FastAPI):
         logger.info("Multimodal: ⏸️  DISABLED (enable with MULTIMODAL_ENABLED=True + CUDA GPU)")
     logger.info("=" * 50)
 
+    # ── Database connection status ──
+    from app.database import _database_url
+    if "supabase" in _database_url:
+        logger.info("Database: Supabase PostgreSQL (hosted)")
+    elif "sqlite" in _database_url:
+        logger.warning("Database: SQLite (local file) — not recommended for production")
+    else:
+        logger.info("Database: PostgreSQL")
+
+    # ── Supabase client status ──
+    if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
+        logger.info(f"Supabase client: ✅ configured ({settings.SUPABASE_URL})")
+    else:
+        logger.warning("Supabase client: ⚠️  not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing)")
+
     # Create database tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

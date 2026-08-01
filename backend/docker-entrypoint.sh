@@ -13,6 +13,15 @@ set -e
 
 echo "=== AIDEN Backend — Starting ==="
 
+# ── 0. Memory optimization for Render free tier (512 MiB) ──────────────
+# Disable CUDA detection to prevent torch from consuming excess memory
+export PYTORCH_NO_CUDA=1
+# Prevent transformers from downloading models at import time
+export HF_HUB_OFFLINE=0
+# Reduce memory usage by limiting thread count
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+
 # ── 1. Wait for PostgreSQL to be ready ────────────────────────────────
 if [ -n "$DATABASE_URL" ] && echo "$DATABASE_URL" | grep -qE "^.*://.*@.*:[0-9]+/.*"; then
   echo "→ Waiting for PostgreSQL..."
@@ -63,12 +72,14 @@ asyncio.run(_seed())
 echo "  ✓ User seeding complete"
 
 # ── 4. Start the application server ────────────────────────────────────
+# Use 1 worker on Render free tier to stay within 512 MiB memory limit.
+# Increase to 2-4 workers on paid plans or with more RAM.
 echo ""
 echo "=== Starting Uvicorn ==="
 exec uvicorn app.main:app \
   --host 0.0.0.0 \
   --port 8000 \
-  --workers 4 \
+  --workers 1 \
   --proxy-headers \
   --forwarded-allow-ips='*' \
   --log-level info

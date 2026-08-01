@@ -359,7 +359,7 @@ def main():
         help="Disable 4-bit quantization (use if running on CPU)",
     )
 
-    args = parse_args()
+    args = parser.parse_args()
 
     # Map agent type to output subdirectory (matches agent_loader.py paths)
     agent_map = {

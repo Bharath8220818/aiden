@@ -62,7 +62,7 @@ async def dashboard_kpis(
 
 @router.get("/export")
 async def export_analytics(
-    format: str = Query("csv", regex="^(csv|json)$"),
+    format: str = Query("csv", pattern="^(csv|json)$"),
     period: str = Query("30D"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
