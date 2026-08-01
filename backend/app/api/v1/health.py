@@ -2,12 +2,98 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from datetime import datetime
-from app.database import get_db, engine
+import sys
+import asyncio
+from app.database import get_db, AsyncSessionLocal
 from app.config import settings
 
 router = APIRouter()
 
-@router.get("/health")
+
+@router.get("/healthz")
+async def healthz():
+    """
+    Lightweight health check for Render and monitoring.
+    Checks database connectivity only -- does NOT load ML models.
+    Response time: <500ms.
+    """
+    try:
+        async with AsyncSessionLocal() as session:
+            await asyncio.wait_for(
+                session.execute(text("SELECT 1")), timeout=5
+            )
+        return {
+            "status": "ok",
+            "database": "connected",
+            "service": settings.APP_NAME,
+            "version": settings.APP_VERSION,
+        }
+    except asyncio.TimeoutError:
+        return {
+            "status": "error",
+            "database": "timeout",
+            "detail": "Database connection timed out after 5s",
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "database": "disconnected",
+            "detail": str(e),
+        }
+
+
+@router.get("/full")
+async def health_full():
+    """
+    Full health check -- includes ML model status (may be slow).
+    For deeper diagnostics.
+    """
+    status = {
+        "status": "ok",
+        "python_version": sys.version,
+    }
+
+    # Database (with timeout to avoid hanging on pool exhaustion)
+    try:
+        async with AsyncSessionLocal() as session:
+            await asyncio.wait_for(
+                session.execute(text("SELECT 1")), timeout=5
+            )
+        status["database"] = "connected"
+    except asyncio.TimeoutError:
+        status["database"] = "timeout"
+        status["status"] = "degraded"
+    except Exception as e:
+        status["database"] = f"error: {e}"
+        status["status"] = "degraded"
+
+    # CUDA / torch (lazy -- only imported if installed)
+    try:
+        import torch
+        status["cuda"] = torch.cuda.is_available()
+        status["torch_version"] = torch.__version__
+    except ImportError:
+        status["cuda"] = False
+        status["torch_version"] = "not installed"
+
+    # HuggingFace transformers
+    try:
+        import transformers
+        status["transformers_version"] = transformers.__version__
+    except ImportError:
+        status["transformers_version"] = "not installed"
+
+    # sentence-transformers embeddings
+    try:
+        import sentence_transformers
+        status["embeddings"] = "installed"
+    except ImportError:
+        status["embeddings"] = "not installed"
+
+    return status
+
+
+@router.get("/")
 async def health_check():
     """Basic health check."""
     return {
@@ -17,10 +103,12 @@ async def health_check():
         "timestamp": datetime.utcnow().isoformat(),
     }
 
+
 @router.get("/live")
 async def liveness():
     """Kubernetes liveness probe."""
     return {"status": "alive", "timestamp": datetime.utcnow().isoformat()}
+
 
 @router.get("/ready")
 async def readiness(db: AsyncSession = Depends(get_db)):
