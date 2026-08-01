@@ -9,6 +9,8 @@ from app.api.v1 import pipelines, auth, analytics, approvals, audit, executions
 from app.api.v1 import multimodal as multimodal_router
 from app.api.v1 import agents, schemas, architecture, coding, learning, team, templates, voice, health
 from app.api.v1.websocket import websocket_endpoint
+from app.middleware.rate_limit import RateLimitMiddleware
+from app.middleware.logging import RequestLoggingMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +19,14 @@ async def lifespan(app: FastAPI):
     # Startup: Log key configuration status
     logger.info("=" * 50)
     logger.info(f"{settings.APP_NAME} v{settings.APP_VERSION} starting up")
+
+    # ── Environment validation ──
+    logger.info("Validating environment...")
+    if not settings.DATABASE_URL:
+        raise RuntimeError("DATABASE_URL is not set")
+    if len(settings.JWT_SECRET_KEY) < 32:
+        logger.warning("JWT_SECRET_KEY is short — consider using a longer key.")
+    logger.info("✅ Environment validation passed")
 
     # CUDA / Multimodal status
     try:
@@ -97,6 +107,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Rate limiting & request logging ──
+# Starlette applies middleware in reverse order: added first = runs last.
+# So logging is added first (runs after rate limiting) so rejected 429s are logged.
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(RateLimitMiddleware, requests_per_minute=60)
 
 # Include routers
 # ── Core ──

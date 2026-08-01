@@ -4,6 +4,7 @@ from typing import List, Optional
 import logging
 import subprocess
 import sys
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +119,44 @@ class Settings(BaseSettings):
     AGENT_MODEL: str = "HuggingFaceTB/SmolAgent"
     CODE_MODEL: str = "HuggingFaceH4/starchat-beta"
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def validate_database_url(cls, v):
+        """Validate DATABASE_URL uses a supported dialect."""
+        if not v:
+            raise ValueError("DATABASE_URL is required")
+
+        if v.startswith("sqlite"):
+            return v
+
+        if v.startswith("postgresql"):
+            pattern = r"postgresql(\+asyncpg)?://[^:]+:[^@]+@[\w.-]+(:\d+)?/[\w._-]+"
+            if not re.match(pattern, v):
+                logger.warning(f"DATABASE_URL format may be incorrect: {v[:30]}...")
+        elif v.startswith("https://") or v.startswith("http://"):
+            logger.error(
+                "DATABASE_URL starts with '%s://' — this looks like a REST API URL, "
+                "not a PostgreSQL connection string. Use the PostgreSQL URI from "
+                "Supabase Dashboard → Settings → Database → Connection string."
+            )
+        else:
+            logger.warning(f"Unusual DATABASE_URL dialect: {v[:30]}...")
+
+        return v
+
+    @field_validator("JWT_SECRET_KEY")
+    @classmethod
+    def validate_jwt_secret(cls, v):
+        """Ensure JWT secret is strong enough."""
+        if v in ("your-jwt-secret-key", "your-secret-key-here-change-in-production"):
+            logger.warning(
+                "JWT_SECRET_KEY is using a default value — "
+                "set a strong random key in production!"
+            )
+        if len(v) < 32:
+            raise ValueError("JWT_SECRET_KEY must be at least 32 characters long")
+        return v
 
     @field_validator("DEBUG", mode="before")
     @classmethod
