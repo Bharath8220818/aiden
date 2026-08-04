@@ -9,8 +9,38 @@ Tests for pipeline endpoints.
 - POST   /api/v1/pipelines/{id}/run       — execute
 """
 
+import asyncio
+import time
+
 import pytest
 from httpx import AsyncClient
+
+
+async def _wait_for_execution(
+    client: AsyncClient,
+    auth_headers: dict,
+    pipeline_id: int,
+    execution_id: int,
+    timeout: float = 15.0,
+):
+    """Poll execution status until it reaches a terminal state.
+
+    The run endpoint spawns a background task (PipelineExecutor) that
+    writes to the same test DB session. We wait for it to finish so the
+    fixture teardown doesn't race the executor's transactions.
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        resp = await client.get(
+            f"/api/v1/pipelines/{pipeline_id}/executions",
+            headers=auth_headers,
+        )
+        if resp.status_code == 200:
+            for ex in resp.json():
+                if ex["id"] == execution_id and ex["status"] in ("success", "failed", "cancelled"):
+                    return ex
+        await asyncio.sleep(0.3)
+    return None
 
 
 @pytest.mark.asyncio
@@ -240,6 +270,11 @@ async def test_run_pipeline_success(client: AsyncClient, auth_headers):
     assert "id" in data  # execution ID
     assert data["status"] in ("pending", "running")
     assert data["pipeline_id"] == pipeline_id
+
+    # Let the background executor finish before teardown
+    final = await _wait_for_execution(client, auth_headers, pipeline_id, data["id"])
+    assert final is not None, "execution did not reach a terminal state"
+    assert final["status"] == "success"
 
 
 @pytest.mark.asyncio

@@ -36,9 +36,12 @@ class AgentOrchestrator:
             intent = await self.intent_parser.parse(prompt)
 
         # 2. Retrieve similar intents from RAG
-        similar = rag_memory.search(prompt, top_k=3)
-        if similar:
-            intent["examples"] = rag_memory.format_context(similar)
+        try:
+            similar = rag_memory.search(prompt, top_k=3)
+            if similar:
+                intent["examples"] = rag_memory.format_context(similar)
+        except Exception as e:
+            logger.warning(f"RAG search failed, continuing without examples: {e}")
 
         # 3. Sequential agent execution
         schema = intent.get("source_config", {})
@@ -99,7 +102,10 @@ class AgentOrchestrator:
             )
 
         # 5. Store in RAG for future learning
-        rag_memory.add(prompt, intent)
+        try:
+            rag_memory.add(prompt, intent)
+        except Exception as e:
+            logger.warning(f"RAG store failed: {e}")
 
         return {
             "pipeline": pipeline,
