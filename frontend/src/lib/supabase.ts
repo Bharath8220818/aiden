@@ -1,7 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://whjstcclxklikppvvwfr.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Supabase renamed the "anon key" to "publishable key" in 2025 — accept both
+// names so the app works regardless of which one is set in .env.
+const supabaseAnonKey =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  '';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 

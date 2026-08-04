@@ -387,15 +387,27 @@ async def run_pipeline(
         "timestamp": datetime.now().isoformat(),
     })
 
-    # Create a fresh executor with the db session from this request
-    executor = PipelineExecutor(db)
+    # Create the executor with a DEDICATED session — never share the request's
+    # session with a background task: the request session is closed when the
+    # request completes, so the async task would race a close()/rollback()
+    # mid-commit (sqlalchemy.exc.IllegalStateChangeError).
+    from app.database import AsyncSessionLocal
+
+    executor_session = AsyncSessionLocal()
+    executor = PipelineExecutor(executor_session)
 
     # Register cancellation event before launching (closes race window)
     PipelineExecutor._cancel_requests[execution.id] = asyncio.Event()
 
     # Kick off execution in the background
     # NOTE: Must use asyncio.create_task() — BackgroundTasks.add_task() does NOT support async functions
-    task = asyncio.create_task(executor.execute(pipeline, execution))
+    async def _run_with_session():
+        try:
+            await executor.execute(pipeline, execution)
+        finally:
+            await executor_session.close()
+
+    task = asyncio.create_task(_run_with_session())
 
     # Store the task so it doesn't get garbage-collected before completion
     executor._active_tasks.add(task)

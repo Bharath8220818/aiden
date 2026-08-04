@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { authApi } from '../api/auth';
-import { signInWithGitHub, signInWithEmail, signUpWithEmail, exchangeToken, signOut as supabaseSignOut } from '../lib/supabase';
+import { signInWithGitHub, exchangeToken, signOut as supabaseSignOut } from '../lib/supabase';
 import type { User } from '../types/auth';
 
 interface AuthState {
