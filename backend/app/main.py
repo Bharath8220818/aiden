@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from app.config import settings
 from app.database import engine, Base
 from app.models import Pipeline, User, ApprovalRequest, AuditLogEntry, AnalyticsEvent  # noqa: F401 — register models with Base.metadata
-from app.api.v1 import pipelines, auth, analytics, approvals, audit, executions
+from app.api.v1 import pipelines, auth, analytics, approvals, audit, executions, supabase_auth
 from app.api.v1 import multimodal as multimodal_router
 from app.api.v1 import agents, schemas, architecture, coding, learning, team, templates, voice, health
 from app.api.v1.websocket import websocket_endpoint
@@ -117,6 +117,7 @@ app.add_middleware(RateLimitMiddleware, requests_per_minute=60)
 # Include routers
 # ── Core ──
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(supabase_auth.router, prefix="/api/v1/auth/supabase", tags=["auth", "supabase"])
 app.include_router(pipelines.router, prefix="/api/v1/pipelines", tags=["pipelines"])
 app.include_router(executions.router, prefix="/api/v1/executions", tags=["executions"])
 

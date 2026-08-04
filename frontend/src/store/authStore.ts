@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { authApi } from '../api/auth';
+import { signInWithGitHub, exchangeToken, signOut as supabaseSignOut } from '../lib/supabase';
 import type { User } from '../types/auth';
 
 interface AuthState {
@@ -17,7 +18,9 @@ interface AuthState {
     full_name: string;
     password: string;
   }) => Promise<void>;
-  logout: () => void;
+  loginWithGitHub: () => Promise<void>;
+  exchangeSupabaseToken: (supabaseAccessToken: string) => Promise<void>;
+  logout: () => Promise<void>;
   getCurrentUser: () => Promise<void>;
   clearError: () => void;
 }
@@ -73,8 +76,41 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
+      // ── LOGIN WITH GITHUB ──
+      loginWithGitHub: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          await signInWithGitHub();
+          // Redirect happens automatically via Supabase OAuth
+        } catch (error: any) {
+          const message = error?.message || 'GitHub login failed. Please try again.';
+          set({ error: message, isLoading: false });
+          throw new Error(message);
+        }
+      },
+
+      // ── EXCHANGE SUPABASE TOKEN ──
+      exchangeSupabaseToken: async (supabaseAccessToken: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await exchangeToken(supabaseAccessToken);
+          const token = response.access_token;
+          localStorage.setItem('auth_token', token);
+          set({ token, isAuthenticated: true, isLoading: false, user: response.user });
+        } catch (error: any) {
+          const message = error?.message || 'Token exchange failed.';
+          set({ error: message, isLoading: false });
+          throw new Error(message);
+        }
+      },
+
       // ── LOGOUT ──
-      logout: () => {
+      logout: async () => {
+        try {
+          await supabaseSignOut();
+        } catch {
+          // Ignore Supabase logout errors
+        }
         localStorage.removeItem('auth_token');
         set({ user: null, token: null, isAuthenticated: false, error: null });
       },

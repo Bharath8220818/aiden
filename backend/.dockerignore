@@ -43,7 +43,6 @@ Thumbs.db
 # ── Dev/test files (not needed in production image) ─────────────────
 tests/
 pytest.ini
-requirements.txt
 
 # ── Docker files (avoid recursive copies) ──────────────────────────
 Dockerfile

@@ -16,6 +16,7 @@ import { ToastProvider } from './components/providers/ToastProvider';
 // Lazy loaded pages — split into separate JS chunks
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const SignupPage = lazy(() => import('./pages/SignupPage'));
+const AuthCallback = lazy(() => import('./components/auth/AuthCallback'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const PipelinesPage = lazy(() => import('./pages/PipelinesPage'));
@@ -94,6 +95,7 @@ function AppShellWithRoutes() {
               <Routes location={location} key={location.pathname}>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignupPage />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Suspense>

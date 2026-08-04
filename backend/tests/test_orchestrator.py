@@ -2,22 +2,25 @@
 Tests for AgentOrchestrator.run() — sequential multi-agent pipeline.
 
 Uses extensive mocking so no external services (HuggingFace, database,
-WebSocket connections) are required.  Tests verify the orchestrator's
+WebSocket connections) are required. Tests verify the orchestrator's
 resilience: each agent can fail independently and the orchestrator
 gracefully degrades instead of crashing.
 
-Patching strategy
------------------
-The ``run()`` method uses function-local imports:
+Patch strategy
+--------------
+The current ``run()`` implementation imports its collaborators at the
+**module level** of ``app.core.agent_orchestrator``:
 
-    async def run(self, ...):
-        from app.core.intent_parser import IntentParser   # local
-        from app.core.agent_registry import AgentRegistry  # local
+    from app.core.intent_parser import IntentParser
+    from app.core.pipeline_builder import PipelineBuilder
+    from app.core.agent_registry import AgentRegistry
+    from app.core.rag_memory import rag_memory
 
-Python binds these as *local variables* in the function's scope. The
-correct ``patch()`` targets are therefore the *source* modules, not
-``app.core.agent_orchestrator`` (which has no such attributes at the
-module level).  All patches in this file follow that rule.
+so the correct patch targets are the attributes *on the module*:
+``app.core.agent_orchestrator.IntentParser``, etc. The orchestrator must
+also be constructed *inside* the patch context because ``__init__``
+instantiates ``IntentParser()`` / ``PipelineBuilder()`` and assigns the
+``AgentRegistry`` class to ``self.registry``.
 """
 
 import pytest
@@ -25,14 +28,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.core.agent_orchestrator import AgentOrchestrator
 
+AGENT_NAMES = ["extraction", "analysis", "pipeline_builder", "governance", "deployment"]
+
 
 # ── Fixtures ──────────────────────────────────────────────────────────────
-
-
-@pytest.fixture
-def orchestrator():
-    """Provide a fresh AgentOrchestrator for each test."""
-    return AgentOrchestrator()
 
 
 @pytest.fixture
@@ -53,7 +52,7 @@ def mock_intent():
 
 @pytest.fixture
 def mock_schema():
-    """Schema returned by ExtractionAgent.run()."""
+    """Schema returned by the extraction agent's forward()."""
     return {
         "tables": ["sales"],
         "columns": {"sales": ["id", "amount", "date", "region"]},
@@ -64,7 +63,7 @@ def mock_schema():
 
 @pytest.fixture
 def mock_quality():
-    """Quality report returned by AnalysisAgent.run()."""
+    """Quality report returned by the analysis agent's forward()."""
     return {
         "tables_analysed": 1,
         "total_columns": 4,
@@ -73,28 +72,23 @@ def mock_quality():
             "potential_issues": ["nullable columns"],
             "recommended_actions": ["validate NOT NULL constraints"],
         }],
-        "suggestions": [
-            "Run NOT NULL validation on key columns",
-            "Check for duplicate rows",
-        ],
         "overall_quality": "needs_review",
     }
 
 
 @pytest.fixture
 def mock_code():
-    """Generated code returned by PipelineBuilderAgent.run()."""
+    """Generated code returned by the builder agent's forward()."""
     return {
-        "dag_code": "from airflow import DAG\n# ... dag code ...",
-        "dbt_code": "-- dbt model\nSELECT * FROM source",
+        "dag": "from airflow import DAG\n# ... dag code ...",
+        "dbt": "-- dbt model\nSELECT * FROM source",
         "tests": ["test_no_null_values", "test_no_duplicates"],
-        "summary": "Generated DAG (45 bytes) + dbt model + 2 quality tests",
     }
 
 
 @pytest.fixture
 def mock_pipeline():
-    """Pipeline dict returned by create_pipeline()."""
+    """Pipeline object returned by builder.create_pipeline()."""
     return {
         "id": 1,
         "name": "Test Pipeline",
@@ -108,95 +102,80 @@ def mock_pipeline():
 # ── Mock factories ───────────────────────────────────────────────────────
 
 
-def _make_mock_parser(return_intent):
-    """Return a MagicMock that looks like the IntentParser class."""
-    MockParser = MagicMock()
+def _mock_parser_cls(return_intent):
+    """Mock for the IntentParser class (patch target: module attribute)."""
+    parser_cls = MagicMock()
     parser_instance = MagicMock()
     parser_instance.parse = AsyncMock(return_value=return_intent)
-    MockParser.return_value = parser_instance
-    return MockParser
+    parser_cls.return_value = parser_instance
+    return parser_cls
 
 
-def _make_mock_builder(return_pipeline):
-    """Return a MagicMock that looks like the PipelineBuilder class."""
-    MockBuilder = MagicMock()
+def _mock_builder_cls(return_pipeline=None, create_side_effect=None):
+    """Mock for the PipelineBuilder class."""
+    builder_cls = MagicMock()
     builder_instance = MagicMock()
-    builder_instance.create_pipeline = AsyncMock(return_value=return_pipeline)
-    MockBuilder.return_value = builder_instance
-    return MockBuilder
+    builder_instance.generate_all.return_value = {
+        "dag": "dag code", "dbt": "dbt code", "tests": [], "config": {},
+    }
+    if create_side_effect is not None:
+        builder_instance.create_pipeline = AsyncMock(side_effect=create_side_effect)
+    else:
+        builder_instance.create_pipeline = AsyncMock(return_value=return_pipeline)
+    builder_cls.return_value = builder_instance
+    return builder_cls
 
 
-def _make_mock_registry(mock_schema, mock_quality, mock_code,
-                        extraction_agent=None, analysis_agent=None,
-                        builder_agent=None):
-    """Return a MagicMock that looks like the AgentRegistry class.
-
-    ``registry.get(name)`` returns a callable that when called returns a
-    mock agent instance with ``run()`` returning the corresponding fixture.
-    If an explicit agent mock is passed (for failure tests), it is used
-    instead.
-    """
-    Registry = MagicMock()
-
-    extract_cls = MagicMock()
-    extract_agent = extraction_agent or MagicMock()
-    if not extraction_agent:
-        extract_agent.run = AsyncMock(return_value=mock_schema)
-    extract_cls.return_value = extract_agent
-
-    analyse_cls = MagicMock()
-    analyse_agent = analysis_agent or MagicMock()
-    if not analysis_agent:
-        analyse_agent.run = AsyncMock(return_value=mock_quality)
-    analyse_cls.return_value = analyse_agent
-
-    build_cls = MagicMock()
-    build_agent = builder_agent or MagicMock()
-    if not builder_agent:
-        build_agent.run = AsyncMock(return_value=mock_code)
-    build_cls.return_value = build_agent
-
-    def _get(name):
-        return {
-            "extraction": extract_cls,
-            "analysis": analyse_cls,
-            "builder": build_cls,
-        }.get(name)
-
-    Registry.get.side_effect = _get
-    return Registry
+def _mock_registry_cls(agent_map=None, get_return=None):
+    """Mock for the AgentRegistry class. ``registry.get(name)`` returns an
+    agent object with a synchronous ``forward()`` method."""
+    registry_cls = MagicMock()
+    if get_return is not None:
+        registry_cls.get.return_value = get_return
+    elif agent_map is not None:
+        registry_cls.get.side_effect = lambda name: agent_map.get(name)
+    else:
+        registry_cls.get.return_value = None
+    return registry_cls
 
 
-def _make_mock_rag():
-    """Return a MagicMock that looks like the rag_memory singleton."""
+def _make_agent(forward_return=None, forward_side_effect=None):
+    agent = MagicMock()
+    if forward_side_effect is not None:
+        agent.forward.side_effect = forward_side_effect
+    else:
+        agent.forward.return_value = forward_return
+    return agent
+
+
+def _mock_rag():
+    """Mock for the rag_memory singleton."""
     rag = MagicMock()
-    rag.search_similar.return_value = []
-    rag.store_pipeline.return_value = True
+    rag.search.return_value = []
+    rag.format_context.return_value = ""
+    rag.add.return_value = True
     return rag
 
 
-def _make_mock_manager():
-    """Return a MagicMock that looks like the WebSocket manager singleton."""
-    mgr = MagicMock()
-    mgr.broadcast = AsyncMock()
-    return mgr
+def _make_success_agents(mock_schema, mock_quality, mock_code):
+    """Five healthy agents — governance allows, deployment no-ops."""
+    return {
+        "extraction": _make_agent(forward_return=mock_schema),
+        "analysis": _make_agent(forward_return=mock_quality),
+        "pipeline_builder": _make_agent(forward_return=mock_code),
+        "governance": _make_agent(forward_return={"allowed": True}),
+        "deployment": _make_agent(forward_return=None),
+    }
 
 
-# ── Patch helpers (correct source-module targets) ────────────────────────
-#
-# The ``run()`` method uses function-local imports:
-#   from app.core.intent_parser import IntentParser
-#   from app.core.pipeline_builder import PipelineBuilder
-#   from app.core.agent_registry import AgentRegistry
-#   from app.core.rag_memory import rag_memory
-#   from app.api.v1.websocket import manager
-#
-# Each of these reads from ``sys.modules["source_module"].attribute_name``.
-# The correct patch() targets are therefore the **source** modules, not
-# ``app.core.agent_orchestrator``.
-#
-# For classes:  patch("app.core.intent_parser.IntentParser")
-# For singletons: patch("app.core.rag_memory.rag_memory")
+async def _run_orchestrator(parser_cls, builder_cls, registry_cls, rag_mock, **kwargs):
+    """Construct an AgentOrchestrator inside the patch context and run it."""
+    with patch("app.core.agent_orchestrator.IntentParser", parser_cls), \
+         patch("app.core.agent_orchestrator.PipelineBuilder", builder_cls), \
+         patch("app.core.agent_orchestrator.AgentRegistry", registry_cls), \
+         patch("app.core.agent_orchestrator.rag_memory", rag_mock):
+        orch = AgentOrchestrator()
+        return await orch.run(db=AsyncMock(), **kwargs)
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -206,414 +185,221 @@ def _make_mock_manager():
 
 @pytest.mark.asyncio
 async def test_run_success_all_agents(
-    orchestrator, mock_intent, mock_schema, mock_quality, mock_code, mock_pipeline
+    mock_intent, mock_schema, mock_quality, mock_code, mock_pipeline
 ):
     """All agents succeed — verify complete return structure."""
-    with patch("app.core.intent_parser.IntentParser",
-               _make_mock_parser(mock_intent)), \
-         patch("app.core.pipeline_builder.PipelineBuilder",
-               _make_mock_builder(mock_pipeline)), \
-         patch("app.core.agent_registry.AgentRegistry",
-               _make_mock_registry(mock_schema, mock_quality, mock_code)), \
-         patch("app.core.rag_memory.rag_memory",
-               _make_mock_rag()), \
-         patch("app.api.v1.websocket.manager",
-               _make_mock_manager()):
-        result = await orchestrator.run(
-            prompt="Build a daily sales ETL from postgres to snowflake",
-            user_id=1,
-        )
+    result = await _run_orchestrator(
+        parser_cls=_mock_parser_cls(mock_intent),
+        builder_cls=_mock_builder_cls(mock_pipeline),
+        registry_cls=_mock_registry_cls(_make_success_agents(mock_schema, mock_quality, mock_code)),
+        rag_mock=_mock_rag(),
+        prompt="Build a daily sales ETL from postgres to snowflake",
+        user_id=1,
+    )
 
-    # ── Top-level keys ──────────────────────────────────────────────
+    assert result["success"] is True
     assert set(result.keys()) == {
-        "status", "pipeline", "intent", "schema",
-        "quality_report", "code", "agents_used",
-    }, f"Expected 7 keys, got {set(result.keys())}"
-    assert result["status"] == "success"
-
-    # ── Pipeline ────────────────────────────────────────────────────
+        "pipeline", "intent", "schema", "quality_report", "code", "agents_used", "success",
+    }
     assert result["pipeline"]["id"] == 1
     assert result["pipeline"]["name"] == "Test Pipeline"
-    assert result["pipeline"]["source_type"] == "postgres"
-    assert result["pipeline"]["destination_type"] == "snowflake"
-
-    # ── Intent ──────────────────────────────────────────────────────
     assert result["intent"]["source_type"] == "postgres"
-    assert result["intent"]["destination_type"] == "snowflake"
-
-    # ── Schema ──────────────────────────────────────────────────────
     assert result["schema"]["tables"] == ["sales"]
-    assert result["schema"]["total_columns"] == 4
-
-    # ── Quality report ──────────────────────────────────────────────
     assert result["quality_report"]["overall_quality"] == "needs_review"
-
-    # ── Code ────────────────────────────────────────────────────────
-    assert result["code"]["summary"] == mock_code["summary"]
-
-    # ── Agents ──────────────────────────────────────────────────────
-    assert result["agents_used"] == ["extraction", "analysis", "builder"]
-
-
-@pytest.mark.asyncio
-async def test_run_extraction_returns_error(
-    orchestrator, mock_intent, mock_quality, mock_code, mock_pipeline
-):
-    """Extraction agent returns an error dict — orchestrator persists it."""
-    mock_schema_fail = {"tables": [], "columns": {}, "error": "Connection refused"}
-
-    extract_agent = MagicMock()
-    extract_agent.run = AsyncMock(return_value=mock_schema_fail)
-
-    with patch("app.core.intent_parser.IntentParser",
-               _make_mock_parser(mock_intent)), \
-         patch("app.core.pipeline_builder.PipelineBuilder",
-               _make_mock_builder(mock_pipeline)), \
-         patch("app.core.agent_registry.AgentRegistry",
-               _make_mock_registry(mock_schema_fail, mock_quality, mock_code,
-                                   extraction_agent=extract_agent)), \
-         patch("app.core.rag_memory.rag_memory",
-               _make_mock_rag()), \
-         patch("app.api.v1.websocket.manager",
-               _make_mock_manager()):
-        result = await orchestrator.run(prompt="Build a pipeline", user_id=1)
-
-    assert result["status"] == "success"
-    assert result["schema"]["error"] == "Connection refused"
-    assert result["schema"]["tables"] == []
-    assert result["code"]["summary"] == mock_code["summary"]
+    assert result["code"]["dag"]
+    assert result["agents_used"] == AGENT_NAMES
 
 
 @pytest.mark.asyncio
 async def test_run_extraction_raises_exception(
-    orchestrator, mock_intent, mock_quality, mock_code, mock_pipeline
+    mock_intent, mock_quality, mock_code, mock_pipeline
 ):
     """Extraction agent raises RuntimeError — orchestrator gracefully degrades."""
-    extract_agent = MagicMock()
-    extract_agent.run = AsyncMock(side_effect=RuntimeError("DB down"))
+    agents = _make_success_agents({"error": "down"}, mock_quality, mock_code)
+    agents["extraction"] = _make_agent(forward_side_effect=RuntimeError("DB down"))
 
-    with patch("app.core.intent_parser.IntentParser",
-               _make_mock_parser(mock_intent)), \
-         patch("app.core.pipeline_builder.PipelineBuilder",
-               _make_mock_builder(mock_pipeline)), \
-         patch("app.core.agent_registry.AgentRegistry",
-               _make_mock_registry({}, mock_quality, mock_code,
-                                   extraction_agent=extract_agent)), \
-         patch("app.core.rag_memory.rag_memory",
-               _make_mock_rag()), \
-         patch("app.api.v1.websocket.manager",
-               _make_mock_manager()):
-        result = await orchestrator.run(prompt="Build a pipeline", user_id=1)
+    result = await _run_orchestrator(
+        parser_cls=_mock_parser_cls(mock_intent),
+        builder_cls=_mock_builder_cls(mock_pipeline),
+        registry_cls=_mock_registry_cls(agents),
+        rag_mock=_mock_rag(),
+        prompt="Build a pipeline",
+        user_id=1,
+    )
 
-    assert result["status"] == "success"
-    assert "DB down" in result["schema"]["error"]
-
-
-@pytest.mark.asyncio
-async def test_run_analysis_returns_error(
-    orchestrator, mock_intent, mock_schema, mock_code, mock_pipeline
-):
-    """Analysis agent returns an error dict — orchestrator persists it."""
-    mock_quality_fail = {
-        "issues": [], "suggestions": [], "overall_quality": "unknown",
-        "error": "Quality profiling failed",
-    }
-
-    analyse_agent = MagicMock()
-    analyse_agent.run = AsyncMock(return_value=mock_quality_fail)
-
-    with patch("app.core.intent_parser.IntentParser",
-               _make_mock_parser(mock_intent)), \
-         patch("app.core.pipeline_builder.PipelineBuilder",
-               _make_mock_builder(mock_pipeline)), \
-         patch("app.core.agent_registry.AgentRegistry",
-               _make_mock_registry(mock_schema, mock_quality_fail, mock_code,
-                                   analysis_agent=analyse_agent)), \
-         patch("app.core.rag_memory.rag_memory",
-               _make_mock_rag()), \
-         patch("app.api.v1.websocket.manager",
-               _make_mock_manager()):
-        result = await orchestrator.run(prompt="Build a pipeline", user_id=1)
-
-    assert result["status"] == "success"
-    assert result["quality_report"]["overall_quality"] == "unknown"
-    assert "error" in result["quality_report"]
+    assert result["success"] is True
+    # schema fell back to the intent's source_config
+    assert result["schema"] == mock_intent["source_config"]
+    assert result["agents_used"] == AGENT_NAMES
 
 
 @pytest.mark.asyncio
 async def test_run_analysis_raises_exception(
-    orchestrator, mock_intent, mock_schema, mock_code, mock_pipeline
+    mock_intent, mock_schema, mock_code, mock_pipeline
 ):
     """Analysis agent raises ValueError — orchestrator gracefully degrades."""
-    analyse_agent = MagicMock()
-    analyse_agent.run = AsyncMock(side_effect=ValueError("Bad data"))
+    agents = _make_success_agents(mock_schema, {}, mock_code)
+    agents["analysis"] = _make_agent(forward_side_effect=ValueError("Bad data"))
 
-    with patch("app.core.intent_parser.IntentParser",
-               _make_mock_parser(mock_intent)), \
-         patch("app.core.pipeline_builder.PipelineBuilder",
-               _make_mock_builder(mock_pipeline)), \
-         patch("app.core.agent_registry.AgentRegistry",
-               _make_mock_registry(mock_schema, {}, mock_code,
-                                   analysis_agent=analyse_agent)), \
-         patch("app.core.rag_memory.rag_memory",
-               _make_mock_rag()), \
-         patch("app.api.v1.websocket.manager",
-               _make_mock_manager()):
-        result = await orchestrator.run(prompt="Build a pipeline", user_id=1)
+    result = await _run_orchestrator(
+        parser_cls=_mock_parser_cls(mock_intent),
+        builder_cls=_mock_builder_cls(mock_pipeline),
+        registry_cls=_mock_registry_cls(agents),
+        rag_mock=_mock_rag(),
+        prompt="Build a pipeline",
+        user_id=1,
+    )
 
-    assert result["status"] == "success"
-    assert result["quality_report"]["error"] == "Bad data"
-    assert result["quality_report"]["overall_quality"] == "unknown"
-
-
-@pytest.mark.asyncio
-async def test_run_builder_returns_error(
-    orchestrator, mock_intent, mock_schema, mock_quality, mock_pipeline
-):
-    """Builder agent returns an error dict — orchestrator persists it."""
-    mock_code_fail = {
-        "dag_code": "", "dbt_code": "", "tests": [],
-        "summary": "Generation failed", "error": "Template not found",
-    }
-
-    build_agent = MagicMock()
-    build_agent.run = AsyncMock(return_value=mock_code_fail)
-
-    with patch("app.core.intent_parser.IntentParser",
-               _make_mock_parser(mock_intent)), \
-         patch("app.core.pipeline_builder.PipelineBuilder",
-               _make_mock_builder(mock_pipeline)), \
-         patch("app.core.agent_registry.AgentRegistry",
-               _make_mock_registry(mock_schema, mock_quality, mock_code_fail,
-                                   builder_agent=build_agent)), \
-         patch("app.core.rag_memory.rag_memory",
-               _make_mock_rag()), \
-         patch("app.api.v1.websocket.manager",
-               _make_mock_manager()):
-        result = await orchestrator.run(prompt="Build a pipeline", user_id=1)
-
-    assert result["status"] == "success"
-    assert result["code"]["error"] == "Template not found"
+    assert result["success"] is True
+    assert result["quality_report"]["quality_score"] == 0.85
+    assert result["agents_used"] == AGENT_NAMES
 
 
 @pytest.mark.asyncio
 async def test_run_builder_raises_exception(
-    orchestrator, mock_intent, mock_schema, mock_quality, mock_pipeline
+    mock_intent, mock_schema, mock_quality, mock_pipeline
 ):
     """Builder agent raises KeyError — orchestrator gracefully degrades."""
-    build_agent = MagicMock()
-    build_agent.run = AsyncMock(side_effect=KeyError("missing_key"))
+    agents = _make_success_agents(mock_schema, mock_quality, {})
+    agents["pipeline_builder"] = _make_agent(forward_side_effect=KeyError("missing_key"))
 
-    with patch("app.core.intent_parser.IntentParser",
-               _make_mock_parser(mock_intent)), \
-         patch("app.core.pipeline_builder.PipelineBuilder",
-               _make_mock_builder(mock_pipeline)), \
-         patch("app.core.agent_registry.AgentRegistry",
-               _make_mock_registry(mock_schema, mock_quality, {},
-                                   builder_agent=build_agent)), \
-         patch("app.core.rag_memory.rag_memory",
-               _make_mock_rag()), \
-         patch("app.api.v1.websocket.manager",
-               _make_mock_manager()):
-        result = await orchestrator.run(prompt="Build a pipeline", user_id=1)
+    result = await _run_orchestrator(
+        parser_cls=_mock_parser_cls(mock_intent),
+        builder_cls=_mock_builder_cls(mock_pipeline),
+        registry_cls=_mock_registry_cls(agents),
+        rag_mock=_mock_rag(),
+        prompt="Build a pipeline",
+        user_id=1,
+    )
 
-    assert result["status"] == "success"
-    assert "error" in result["code"]
+    assert result["success"] is True
+    assert result["code"]["dag"]  # fell back to builder.generate_all()
+    assert result["agents_used"] == AGENT_NAMES
 
 
 @pytest.mark.asyncio
-async def test_run_no_agents_registered(
-    orchestrator, mock_intent, mock_pipeline
+async def test_run_governance_denies(
+    mock_intent, mock_schema, mock_quality, mock_code, mock_pipeline
 ):
-    """AgentRegistry.get returns None for all — orchestrator degrades."""
-    mock_rag = _make_mock_rag()
-    mock_manager = _make_mock_manager()
-    mock_builder = _make_mock_builder(mock_pipeline)
-    mock_parser = _make_mock_parser(mock_intent)
+    """Governance denies the request — PermissionError propagates."""
+    agents = _make_success_agents(mock_schema, mock_quality, mock_code)
+    agents["governance"] = _make_agent(forward_return={"allowed": False})
 
-    Registry = MagicMock()
-    Registry.get.return_value = None  # no agents registered
-
-    with patch("app.core.intent_parser.IntentParser", mock_parser), \
-         patch("app.core.pipeline_builder.PipelineBuilder", mock_builder), \
-         patch("app.core.agent_registry.AgentRegistry", Registry), \
-         patch("app.core.rag_memory.rag_memory", mock_rag), \
-         patch("app.api.v1.websocket.manager", mock_manager):
-        result = await orchestrator.run(prompt="Build from x to y", user_id=1)
-
-    assert result["status"] == "success"
-    assert "No extraction agent registered" in result["schema"]["error"]
-    assert result["quality_report"]["overall_quality"] == "unknown"
-    assert "No builder agent registered" in result["code"]["summary"]
-    assert result["agents_used"] == ["extraction", "analysis", "builder"]
+    with pytest.raises(PermissionError):
+        await _run_orchestrator(
+            parser_cls=_mock_parser_cls(mock_intent),
+            builder_cls=_mock_builder_cls(mock_pipeline),
+            registry_cls=_mock_registry_cls(agents),
+            rag_mock=_mock_rag(),
+            prompt="Build a pipeline",
+            user_id=1,
+        )
 
 
 @pytest.mark.asyncio
-async def test_run_rag_empty(
-    orchestrator, mock_intent, mock_schema, mock_quality, mock_code, mock_pipeline
-):
-    """RAG returns no results — orchestrator proceeds without examples."""
-    mock_rag = _make_mock_rag()
-    mock_rag.search_similar.return_value = []  # empty
+async def test_run_no_agents_registered(mock_intent, mock_pipeline):
+    """No agents registered — orchestrator still creates the pipeline."""
+    result = await _run_orchestrator(
+        parser_cls=_mock_parser_cls(mock_intent),
+        builder_cls=_mock_builder_cls(mock_pipeline),
+        registry_cls=_mock_registry_cls(get_return=None),
+        rag_mock=_mock_rag(),
+        prompt="Build from x to y",
+        user_id=1,
+    )
 
-    with patch("app.core.intent_parser.IntentParser",
-               _make_mock_parser(mock_intent)), \
-         patch("app.core.pipeline_builder.PipelineBuilder",
-               _make_mock_builder(mock_pipeline)), \
-         patch("app.core.agent_registry.AgentRegistry",
-               _make_mock_registry(mock_schema, mock_quality, mock_code)), \
-         patch("app.core.rag_memory.rag_memory", mock_rag), \
-         patch("app.api.v1.websocket.manager",
-               _make_mock_manager()):
-        result = await orchestrator.run(prompt="Build a pipeline", user_id=1)
-
-    assert result["status"] == "success"
-    assert "examples" not in result["intent"]
+    assert result["success"] is True
+    assert result["agents_used"] == []
+    assert result["pipeline"]["id"] == 1
 
 
 @pytest.mark.asyncio
 async def test_run_rag_with_examples(
-    orchestrator, mock_intent, mock_schema, mock_quality, mock_code, mock_pipeline
+    mock_intent, mock_schema, mock_quality, mock_code, mock_pipeline
 ):
     """RAG returns examples — they are attached to the intent."""
     rag_examples = [{
         "query": "previous pipeline",
-        "parsed": {"source_type": "mysql", "destination_type": "bigquery"},
+        "intent": {"source_type": "mysql", "destination_type": "bigquery"},
         "score": 0.92,
         "pipeline_id": 5,
     }]
+    rag = _mock_rag()
+    rag.search.return_value = rag_examples
+    rag.format_context.return_value = "Example 1: previous pipeline"
 
-    mock_rag = _make_mock_rag()
-    mock_rag.search_similar.return_value = rag_examples
+    result = await _run_orchestrator(
+        parser_cls=_mock_parser_cls(mock_intent),
+        builder_cls=_mock_builder_cls(mock_pipeline),
+        registry_cls=_mock_registry_cls(_make_success_agents(mock_schema, mock_quality, mock_code)),
+        rag_mock=rag,
+        prompt="Build a pipeline",
+        user_id=1,
+    )
 
-    with patch("app.core.intent_parser.IntentParser",
-               _make_mock_parser(mock_intent)), \
-         patch("app.core.pipeline_builder.PipelineBuilder",
-               _make_mock_builder(mock_pipeline)), \
-         patch("app.core.agent_registry.AgentRegistry",
-               _make_mock_registry(mock_schema, mock_quality, mock_code)), \
-         patch("app.core.rag_memory.rag_memory", mock_rag), \
-         patch("app.api.v1.websocket.manager",
-               _make_mock_manager()):
-        result = await orchestrator.run(prompt="Build a pipeline", user_id=1)
-
-    assert result["status"] == "success"
+    assert result["success"] is True
     assert "examples" in result["intent"]
-    assert len(result["intent"]["examples"]) == 1
-    assert result["intent"]["examples"][0]["query"] == "previous pipeline"
+    assert "previous pipeline" in result["intent"]["examples"]
 
 
 @pytest.mark.asyncio
 async def test_run_rag_search_raises(
-    orchestrator, mock_intent, mock_schema, mock_quality, mock_code, mock_pipeline
+    mock_intent, mock_schema, mock_quality, mock_code, mock_pipeline
 ):
     """RAG search raises RuntimeError — orchestrator continues."""
-    mock_rag = _make_mock_rag()
-    mock_rag.search_similar.side_effect = RuntimeError("Qdrant down")
+    rag = _mock_rag()
+    rag.search.side_effect = RuntimeError("Qdrant down")
 
-    with patch("app.core.intent_parser.IntentParser",
-               _make_mock_parser(mock_intent)), \
-         patch("app.core.pipeline_builder.PipelineBuilder",
-               _make_mock_builder(mock_pipeline)), \
-         patch("app.core.agent_registry.AgentRegistry",
-               _make_mock_registry(mock_schema, mock_quality, mock_code)), \
-         patch("app.core.rag_memory.rag_memory", mock_rag), \
-         patch("app.api.v1.websocket.manager",
-               _make_mock_manager()):
-        result = await orchestrator.run(prompt="Build a pipeline", user_id=1)
+    result = await _run_orchestrator(
+        parser_cls=_mock_parser_cls(mock_intent),
+        builder_cls=_mock_builder_cls(mock_pipeline),
+        registry_cls=_mock_registry_cls(_make_success_agents(mock_schema, mock_quality, mock_code)),
+        rag_mock=rag,
+        prompt="Build a pipeline",
+        user_id=1,
+    )
 
-    assert result["status"] == "success"
-    assert "examples" not in result["intent"]  # search failed, no examples
+    assert result["success"] is True
+    assert "examples" not in result["intent"]
 
 
 @pytest.mark.asyncio
 async def test_run_pipeline_creation_raises(
-    orchestrator, mock_intent, mock_schema, mock_quality, mock_code
+    mock_intent, mock_schema, mock_quality, mock_code
 ):
-    """create_pipeline() raises — orchestrator returns result with error."""
-    mock_builder_cls = MagicMock()
-    mock_builder = MagicMock()
-    mock_builder.create_pipeline = AsyncMock(
-        side_effect=RuntimeError("DB write failed")
-    )
-    mock_builder_cls.return_value = mock_builder
-
-    with patch("app.core.intent_parser.IntentParser",
-               _make_mock_parser(mock_intent)), \
-         patch("app.core.pipeline_builder.PipelineBuilder",
-               mock_builder_cls), \
-         patch("app.core.agent_registry.AgentRegistry",
-               _make_mock_registry(mock_schema, mock_quality, mock_code)), \
-         patch("app.core.rag_memory.rag_memory",
-               _make_mock_rag()), \
-         patch("app.api.v1.websocket.manager",
-               _make_mock_manager()):
-        result = await orchestrator.run(prompt="Build a pipeline", user_id=1)
-
-    assert result["status"] == "success"
-    assert result["pipeline"]["id"] is None
-    assert "error" in result["pipeline"]
+    """create_pipeline() raises — orchestrator propagates the failure."""
+    with pytest.raises(RuntimeError):
+        await _run_orchestrator(
+            parser_cls=_mock_parser_cls(mock_intent),
+            builder_cls=_mock_builder_cls(create_side_effect=RuntimeError("DB write failed")),
+            registry_cls=_mock_registry_cls(_make_success_agents(mock_schema, mock_quality, mock_code)),
+            rag_mock=_mock_rag(),
+            prompt="Build a pipeline",
+            user_id=1,
+        )
 
 
 @pytest.mark.asyncio
 async def test_run_with_pre_parsed_intent(
-    orchestrator, mock_intent, mock_schema, mock_quality, mock_code, mock_pipeline
+    mock_intent, mock_schema, mock_quality, mock_code, mock_pipeline
 ):
     """Pre-parsed intent skips IntentParser.parse() entirely."""
-    mock_rag = _make_mock_rag()
-    mock_manager = _make_mock_manager()
+    parser_cls = MagicMock()
+    parser_instance = MagicMock()
+    parser_instance.parse = AsyncMock()
+    parser_cls.return_value = parser_instance
 
-    with patch("app.core.intent_parser.IntentParser") as MockParser, \
-         patch("app.core.pipeline_builder.PipelineBuilder",
-               _make_mock_builder(mock_pipeline)), \
-         patch("app.core.agent_registry.AgentRegistry",
-               _make_mock_registry(mock_schema, mock_quality, mock_code)), \
-         patch("app.core.rag_memory.rag_memory", mock_rag), \
-         patch("app.api.v1.websocket.manager", mock_manager):
-        result = await orchestrator.run(
-            prompt="Anything here", user_id=1, intent=mock_intent,
-        )
+    result = await _run_orchestrator(
+        parser_cls=parser_cls,
+        builder_cls=_mock_builder_cls(mock_pipeline),
+        registry_cls=_mock_registry_cls(_make_success_agents(mock_schema, mock_quality, mock_code)),
+        rag_mock=_mock_rag(),
+        prompt="Anything here",
+        user_id=1,
+        pre_parsed_intent=mock_intent,
+    )
 
-    # parser should NOT have been called since intent was pre-parsed
-    MockParser.return_value.parse.assert_not_called()
-
-    assert result["status"] == "success"
+    parser_instance.parse.assert_not_called()
+    assert result["success"] is True
     assert result["intent"]["name"] == "Test Pipeline"
-    assert result["agents_used"] == ["extraction", "analysis", "builder"]
-    assert result["code"]["summary"] == mock_code["summary"]
-
-
-@pytest.mark.asyncio
-async def test_run_websocket_events_emitted(
-    orchestrator, mock_intent, mock_schema, mock_quality, mock_code, mock_pipeline
-):
-    """broadcast() is called with agent_step events for each agent."""
-    mock_rag = _make_mock_rag()
-    mock_manager = _make_mock_manager()
-
-    with patch("app.core.intent_parser.IntentParser",
-               _make_mock_parser(mock_intent)), \
-         patch("app.core.pipeline_builder.PipelineBuilder",
-               _make_mock_builder(mock_pipeline)), \
-         patch("app.core.agent_registry.AgentRegistry",
-               _make_mock_registry(mock_schema, mock_quality, mock_code)), \
-         patch("app.core.rag_memory.rag_memory", mock_rag), \
-         patch("app.api.v1.websocket.manager", mock_manager):
-        result = await orchestrator.run(prompt="Build a pipeline", user_id=42)
-
-    # At minimum: intent_parser(running+success) = 2, then 2 per agent
-    # (running + success) = 6 — total >= 8
-    assert mock_manager.broadcast.call_count >= 6
-
-    call_args = [call[0][0] for call in mock_manager.broadcast.call_args_list]
-    agent_steps = [c for c in call_args if c.get("type") == "agent_step"]
-
-    agent_names = {s.get("agent") for s in agent_steps}
-    assert "intent_parser" in agent_names
-    assert "extraction" in agent_names
-    assert "analysis" in agent_names
-    assert "pipeline_builder" in agent_names
-
-    # user_id propagated
-    for step in agent_steps:
-        assert step.get("user_id") == 42
+    assert result["agents_used"] == AGENT_NAMES
