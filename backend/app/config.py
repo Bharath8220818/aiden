@@ -80,6 +80,9 @@ class Settings(BaseSettings):
     # CORS — Allow all origins in production for Render + Vercel
     CORS_ORIGINS: Optional[List[str]] = []
 
+    # Web request throttling
+    RATE_LIMIT_REQUESTS_PER_MINUTE: int = 600
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, value):

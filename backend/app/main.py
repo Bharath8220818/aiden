@@ -112,7 +112,7 @@ app.add_middleware(
 # Starlette applies middleware in reverse order: added first = runs last.
 # So logging is added first (runs after rate limiting) so rejected 429s are logged.
 app.add_middleware(RequestLoggingMiddleware)
-app.add_middleware(RateLimitMiddleware, requests_per_minute=60)
+app.add_middleware(RateLimitMiddleware, requests_per_minute=settings.RATE_LIMIT_REQUESTS_PER_MINUTE)
 
 # Include routers
 # ── Core ──

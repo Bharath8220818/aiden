@@ -19,7 +19,7 @@ class PipelineExecution(Base):
     id = Column(Integer, primary_key=True, index=True)
     pipeline_id = Column(Integer, ForeignKey("pipelines.id"), nullable=False, index=True)
     user_id = Column(Integer, nullable=False, index=True)
-    status = Column(Enum(ExecutionStatus), default=ExecutionStatus.PENDING)
+    status = Column(Enum(ExecutionStatus, native_enum=False), default=ExecutionStatus.PENDING)
     triggered_by = Column(String(50), nullable=True)
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)

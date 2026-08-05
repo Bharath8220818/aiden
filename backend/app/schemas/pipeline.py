@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 
 
@@ -63,7 +63,9 @@ class PipelineExecutionResponse(BaseModel):
     completed_at: Optional[datetime] = None
     duration_seconds: Optional[int] = None
     error_message: Optional[str] = None
-    logs: Optional[List[str]] = None
+    # Executor writes stage-wise logs as a dict ({stage: {status, timestamp}}),
+    # but legacy/simple executions store a list — accept both shapes.
+    logs: Optional[Union[List[Any], Dict[str, Any]]] = None
     records_processed: Optional[int] = None
 
     class Config:
