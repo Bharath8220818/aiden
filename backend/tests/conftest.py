@@ -6,8 +6,15 @@ Fixtures are function-scoped (not session-scoped) to avoid issues with
 pytest-asyncio strict mode and session-scoped async fixtures.
 """
 
+import os
 import uuid
 import pytest
+
+# Keep RAG tests hermetic: force the in-memory store even when a live Qdrant
+# server is reachable, so tests never read/write the shared dev database.
+# Unconditional (not setdefault) so a dev-exported QDRANT_ENABLED=true cannot
+# leak the live vector DB into the test run.
+os.environ["QDRANT_ENABLED"] = "false"
 from typing import AsyncGenerator
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker

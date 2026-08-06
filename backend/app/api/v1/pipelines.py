@@ -95,7 +95,7 @@ async def create_pipeline_from_prompt(
         schedule=parsed_intent.get("schedule", "0 6 * * *"),
         created_by=current_user.id,
         user_id=current_user.id,
-        status=PipelineStatus.PENDING,
+        status=PipelineStatus.DRAFT,
         code=dag_code,
         dbt_code=dbt_code,
         tests=tests,

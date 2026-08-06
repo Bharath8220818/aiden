@@ -59,7 +59,12 @@ async def analyze_diagram(
     )
 
     if not result["success"]:
-        raise HTTPException(status_code=500, detail=result.get("error", "Analysis failed"))
+        # Upstream (local GPU or remote Colab proxy) failure — report as a
+        # graceful 503 rather than a server error.
+        raise HTTPException(
+            status_code=503,
+            detail=result.get("error", "Analysis failed — multimodal backend unavailable"),
+        )
 
     return result
 
@@ -89,7 +94,10 @@ async def upload_and_analyze(
     )
 
     if not result["success"]:
-        raise HTTPException(status_code=500, detail=result.get("error", "Analysis failed"))
+        raise HTTPException(
+            status_code=503,
+            detail=result.get("error", "Analysis failed — multimodal backend unavailable"),
+        )
 
     return result
 

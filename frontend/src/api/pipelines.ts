@@ -4,7 +4,9 @@ import type { Pipeline, PipelineExecution, PipelineCreateRequest, RagSearchRespo
 export const pipelineApi = {
   // Create pipeline from prompt
   createFromPrompt: async (prompt: string): Promise<Pipeline> => {
-    const response = await api.post('/api/v1/pipelines/from-prompt', { prompt });
+    // from-prompt runs the full agent orchestration (Ollama -> HF -> rule-based),
+    // which can exceed the default 30s axios timeout.
+    const response = await api.post('/api/v1/pipelines/from-prompt', { prompt }, { timeout: 120000 });
     return response.data;
   },
 
