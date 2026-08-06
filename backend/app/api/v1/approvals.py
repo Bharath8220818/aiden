@@ -4,6 +4,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user
@@ -63,7 +64,11 @@ async def list_approvals(
     current_user: User = Depends(get_current_user),
 ) -> dict:
     """List approval requests. Optionally filter by status."""
-    query = select(ApprovalRequest).order_by(ApprovalRequest.created_at.desc())
+    query = (
+        select(ApprovalRequest)
+        .options(selectinload(ApprovalRequest.actions))
+        .order_by(ApprovalRequest.created_at.desc())
+    )
 
     if status_filter:
         query = query.where(ApprovalRequest.status == ApprovalStatus(status_filter))
@@ -90,7 +95,11 @@ async def get_approval(
     current_user: User = Depends(get_current_user),
 ):
     """Get a single approval request by ID."""
-    result = await db.execute(select(ApprovalRequest).where(ApprovalRequest.id == approval_id))
+    result = await db.execute(
+        select(ApprovalRequest)
+        .options(selectinload(ApprovalRequest.actions))
+        .where(ApprovalRequest.id == approval_id)
+    )
     approval = result.scalar_one_or_none()
     if not approval:
         raise HTTPException(status_code=404, detail="Approval not found")
@@ -105,7 +114,11 @@ async def approve_approval(
     current_user: User = Depends(get_current_user),
 ):
     """Approve a pending approval request."""
-    result = await db.execute(select(ApprovalRequest).where(ApprovalRequest.id == approval_id))
+    result = await db.execute(
+        select(ApprovalRequest)
+        .options(selectinload(ApprovalRequest.actions))
+        .where(ApprovalRequest.id == approval_id)
+    )
     approval = result.scalar_one_or_none()
     if not approval:
         raise HTTPException(status_code=404, detail="Approval not found")
@@ -140,7 +153,11 @@ async def reject_approval(
     current_user: User = Depends(get_current_user),
 ):
     """Reject a pending approval request."""
-    result = await db.execute(select(ApprovalRequest).where(ApprovalRequest.id == approval_id))
+    result = await db.execute(
+        select(ApprovalRequest)
+        .options(selectinload(ApprovalRequest.actions))
+        .where(ApprovalRequest.id == approval_id)
+    )
     approval = result.scalar_one_or_none()
     if not approval:
         raise HTTPException(status_code=404, detail="Approval not found")

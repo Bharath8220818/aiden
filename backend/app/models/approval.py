@@ -23,8 +23,8 @@ class ApprovalRequest(Base):
     requested_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     action = Column(String(100), nullable=False)  # e.g., "schema_change", "deploy", "delete"
     details = Column(JSON, default=dict)  # diagnosis, proposed fix, etc.
-    risk_score = Column(Enum(ApprovalRisk), default=ApprovalRisk.MEDIUM)
-    status = Column(Enum(ApprovalStatus), default=ApprovalStatus.PENDING)
+    risk_score = Column(Enum(ApprovalRisk, native_enum=False), default=ApprovalRisk.MEDIUM)
+    status = Column(Enum(ApprovalStatus, native_enum=False), default=ApprovalStatus.PENDING)
     reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     review_comment = Column(Text, nullable=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)

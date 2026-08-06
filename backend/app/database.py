@@ -92,8 +92,19 @@ if not _database_url.startswith("sqlite"):
         # Update the engine URL
         _database_url = _database_url_clean
 
+# asyncpg + Supabase pooler (pgbouncer in transaction mode) doesn't support
+# server-side prepared statements — disable the statement cache to avoid
+# "prepared statement already exists" errors.
+if "pooler.supabase.com" in _database_url or "sslmode=" in _database_url:
+    engine_kwargs.setdefault("connect_args", {})["statement_cache_size"] = 0
+    logger.info("Statement cache disabled for pooled Supabase connection")
+
 engine = create_async_engine(
     _database_url,
+    # Re-validate pooled connections before use — Supabase's pooler/
+    # network drops idle connections, and without pre-ping the first
+    # query after an idle period fails with "connection is closed".
+    pool_pre_ping=True,
     **engine_kwargs
 )
 

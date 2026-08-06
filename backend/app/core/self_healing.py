@@ -78,7 +78,8 @@ class SelfHealingEngine:
         """Diagnose the root cause of a pipeline failure."""
         error_lower = error_log.lower()
 
-        if "column" in error_lower and "not found" in error_lower:
+        if ("column" in error_lower and ("not found" in error_lower or "does not exist" in error_lower)) \
+                or "undefined_column" in error_lower:
             return {
                 "error_type": "schema_drift",
                 "root_cause": "A column referenced in the pipeline no longer exists in the source schema.",

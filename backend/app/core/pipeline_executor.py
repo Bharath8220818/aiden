@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -8,6 +8,15 @@ from app.models.pipeline import Pipeline, PipelineStatus
 from app.models.execution import PipelineExecution, ExecutionStatus
 
 logger = logging.getLogger(__name__)
+
+
+def _to_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    """Normalize naive/aware datetimes into timezone-aware UTC values."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 class PipelineExecutor:
@@ -37,6 +46,8 @@ class PipelineExecutor:
             return
 
         try:
+            if execution.started_at is None:
+                execution.started_at = datetime.now(timezone.utc)
             # Stage 1: Init
             await self._update_status(pipeline, execution, ExecutionStatus.RUNNING, "init")
             logger.info(f"[{execution_id}] Pipeline {pipeline_id}: Initializing...")
@@ -69,16 +80,16 @@ class PipelineExecutor:
             return
         pipeline.status = PipelineStatus.RUNNING if status == ExecutionStatus.RUNNING else PipelineStatus.SUCCESS
         if status == ExecutionStatus.RUNNING:
-            pipeline.last_run_at = datetime.utcnow()
+            pipeline.last_run_at = datetime.now(timezone.utc)
         execution.status = status
-        execution.logs = {**execution.logs, stage: {"status": status.value, "timestamp": datetime.utcnow().isoformat()}} if execution.logs else {stage: {"status": status.value, "timestamp": datetime.utcnow().isoformat()}}
+        execution.logs = {**execution.logs, stage: {"status": status.value, "timestamp": datetime.now(timezone.utc).isoformat()}} if execution.logs else {stage: {"status": status.value, "timestamp": datetime.now(timezone.utc).isoformat()}}
         await self.db.commit()
 
     async def _update_stage(self, execution: PipelineExecution, stage: str):
         if not self.db:
             return
         logs = execution.logs or {}
-        logs[stage] = {"status": "running", "timestamp": datetime.utcnow().isoformat()}
+        logs[stage] = {"status": "running", "timestamp": datetime.now(timezone.utc).isoformat()}
         execution.logs = logs
         await self.db.commit()
 
@@ -86,13 +97,15 @@ class PipelineExecutor:
         if not self.db:
             return
         execution.status = ExecutionStatus.SUCCESS
-        execution.completed_at = datetime.utcnow()
-        execution.duration_seconds = (execution.completed_at - execution.started_at).total_seconds()
+        execution.completed_at = datetime.now(timezone.utc)
+        started_at = _to_utc(execution.started_at) or execution.completed_at
+        completed_at = _to_utc(execution.completed_at) or execution.completed_at
+        execution.duration_seconds = int((completed_at - started_at).total_seconds())
         execution.records_processed = 1000  # Mock value
         pipeline.status = PipelineStatus.SUCCESS
-        pipeline.last_run_at = datetime.utcnow()
+        pipeline.last_run_at = datetime.now(timezone.utc)
         logs = execution.logs or {}
-        logs["finalize"] = {"status": "success", "timestamp": datetime.utcnow().isoformat()}
+        logs["finalize"] = {"status": "success", "timestamp": datetime.now(timezone.utc).isoformat()}
         execution.logs = logs
         await self.db.commit()
 
@@ -100,7 +113,9 @@ class PipelineExecutor:
         if not self.db:
             return
         execution.status = ExecutionStatus.FAILED
-        execution.completed_at = datetime.utcnow()
+        execution.completed_at = datetime.now(timezone.utc)
         execution.error_message = error
-        execution.duration_seconds = (execution.completed_at - execution.started_at).total_seconds()
+        started_at = _to_utc(execution.started_at) or execution.completed_at
+        completed_at = _to_utc(execution.completed_at) or execution.completed_at
+        execution.duration_seconds = int((completed_at - started_at).total_seconds())
         await self.db.commit()

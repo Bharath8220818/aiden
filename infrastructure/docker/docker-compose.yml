@@ -46,6 +46,15 @@ services:
       - "6333:6333"
     volumes:
       - qdrant_data:/qdrant/storage
+    healthcheck:
+      # The qdrant image has bash but no curl/wget/python, so probe /readyz
+      # with bash's built-in /dev/tcp. /readyz only returns 200 once storage
+      # is fully loaded, so Docker restarts the container if it hangs on boot.
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333 && printf \"GET /readyz HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && grep -q \"200 OK\" <&3'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     networks:
       - aiden-network
     restart: unless-stopped

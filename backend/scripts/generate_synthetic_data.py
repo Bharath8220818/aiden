@@ -79,6 +79,14 @@ class SyntheticDataGenerator:
                     "Set up a data pipeline from {source} to {destination} running {frequency}",
                     "Build a pipeline to sync {source} data to {destination} {frequency}",
                     "Create an automated data flow from {source} to {destination} ({frequency})",
+                    # Transform-aware variants — ``{transforms}`` is filled with
+                    # the SAME list that goes into the label, so the accuracy
+                    # of the transformation field is learnable.
+                    "Build a {frequency} {source} to {destination} pipeline that applies {transforms} to the data",
+                    "Create a {source} to {destination} pipeline that {transforms} the data, running {frequency}",
+                    "Set up an ETL from {source} to {destination} with {transforms}, {frequency}",
+                    # Quality-rule-aware variant — ``{rules}`` matches the label.
+                    "Build a {frequency} {source} to {destination} pipeline enforcing {rules}",
                 ],
             },
             # ── Self-Healing ────────────────────────────────────────────
@@ -192,7 +200,13 @@ class SyntheticDataGenerator:
     # ── Intent Parser Data ──────────────────────────────────────────────
 
     def generate_intent(self, count: int = 200) -> List[Dict]:
-        """Generate intent-parsing training examples: prompt → JSON config."""
+        """Generate intent-parsing training examples: prompt → JSON config.
+
+        Prompts that mention transformations/quality rules use the SAME set that
+        appears in the expected output, so the labels are learnable (see
+        scripts/evaluate_intent.py — earlier patterns never surfaced transforms,
+        giving a permanently 0% accuracy on those fields).
+        """
         templates = self._templates["intent"]
         data = []
 
@@ -206,11 +220,17 @@ class SyntheticDataGenerator:
             rules = random.sample(templates["quality_rules"], k=num_rules)
 
             pattern = random.choice(templates["patterns"])
+            # Name the transforms in the prompt with the keywords the rule-based
+            # parser recognises (clean/aggregate/join/filter/enrich/validate),
+            # and surface quality rules in the rules-aware pattern variant.
+            transforms_txt = " and ".join(transforms)
+            rules_txt = " and ".join(rules)
             prompt = pattern.format(
                 source=source,
                 destination=destination,
                 frequency=frequency,
-                transforms=", ".join(transforms),
+                transforms=transforms_txt,
+                rules=rules_txt,
             )
 
             schedule_map = {

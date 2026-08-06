@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 # This avoids importing torch/transformers at module load, saving ~200-500 MB RAM
 # on startup — critical for Render free tier (512 MiB).
 torch = None
+httpx = None  # loaded lazily in _load_heavy_imports; module-level so methods can use it
 TRANSFORMERS_AVAILABLE = False
 MULTIMODAL_AVAILABLE = False
 HTTPX_AVAILABLE = False
@@ -31,7 +32,7 @@ _MULTIMODAL_IMPORTS_LOADED = False
 
 def _load_heavy_imports():
     """Lazily import torch, transformers, and httpx on first use."""
-    global torch, TRANSFORMERS_AVAILABLE, MULTIMODAL_AVAILABLE, HTTPX_AVAILABLE, _MULTIMODAL_IMPORTS_LOADED
+    global torch, httpx, TRANSFORMERS_AVAILABLE, MULTIMODAL_AVAILABLE, HTTPX_AVAILABLE, _MULTIMODAL_IMPORTS_LOADED
     if _MULTIMODAL_IMPORTS_LOADED:
         return
     _MULTIMODAL_IMPORTS_LOADED = True

@@ -59,8 +59,10 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    # Qdrant Vector DB
-    QDRANT_URL: str = "http://localhost:6333"
+    # Qdrant Vector DB — 127.0.0.1 (not localhost) to avoid the Windows
+    # Docker Desktop proxy resolving to ::1 and intermittently refusing.
+    QDRANT_URL: str = "http://127.0.0.1:6333"
+    QDRANT_ENABLED: bool = True  # Set False to force in-memory RAG store (tests/CI)
 
     # MinIO (S3 Storage)
     MINIO_ENDPOINT: str = "localhost:9000"
@@ -79,6 +81,9 @@ class Settings(BaseSettings):
 
     # CORS — Allow all origins in production for Render + Vercel
     CORS_ORIGINS: Optional[List[str]] = []
+
+    # Web request throttling
+    RATE_LIMIT_REQUESTS_PER_MINUTE: int = 600
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
@@ -116,6 +121,10 @@ class Settings(BaseSettings):
 
     # Model Selection
     INTENT_MODEL: str = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+    # Optional LoRA adapter dir (e.g. ./models/intent-parser). When set and the
+    # directory exists with an adapter_config.json, the intent parser loads the
+    # fine-tuned adapter on top of INTENT_MODEL instead of the base model.
+    INTENT_ADAPTER_PATH: Optional[str] = None
     AGENT_MODEL: str = "HuggingFaceTB/SmolAgent"
     CODE_MODEL: str = "HuggingFaceH4/starchat-beta"
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"

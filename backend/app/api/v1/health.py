@@ -90,6 +90,19 @@ async def health_full():
     except ImportError:
         status["embeddings"] = "not installed"
 
+    # Qdrant vector DB (lazy probe — never fails the health check)
+    try:
+        from qdrant_client import QdrantClient
+        probe = QdrantClient(
+            url=settings.QDRANT_URL, timeout=2.0, check_compatibility=False
+        )
+        collections = probe.get_collections().collections
+        status["qdrant"] = "connected"
+        status["qdrant_collections"] = [c.name for c in collections]
+    except Exception as e:
+        status["qdrant"] = f"unavailable: {e}"
+        status["qdrant_collections"] = []
+
     return status
 
 
