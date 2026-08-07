@@ -12,6 +12,7 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import CommandPalette from './components/common/CommandPalette';
 import { PageTransition } from './components/ui/PageTransition';
 import { ToastProvider } from './components/providers/ToastProvider';
+import { useScrollRestoration } from './hooks/useScrollRestoration';
 
 // Lazy loaded pages — split into separate JS chunks
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -39,15 +40,10 @@ const ChangelogPage = lazy(() => import('./pages/ChangelogPage'));
 // ── NEW PAGES (30-pages spec) ──
 const ArchitectureCanvasPage = lazy(() => import('./pages/ArchitectureCanvasPage'));
 const SchemaDesignerPage = lazy(() => import('./pages/SchemaDesignerPage'));
-const CodingProblemsPage = lazy(() => import('./pages/CodingProblemsPage'));
 const AIWorkspacePage = lazy(() => import('./pages/AIWorkspacePage'));
-const LearningPathsPage = lazy(() => import('./pages/LearningPathsPage'));
 const PipelineStudioPage = lazy(() => import('./pages/PipelineStudioPage'));
 const TeamPage = lazy(() => import('./pages/TeamPage'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
-const DataModelingPage = lazy(() => import('./pages/DataModelingPage'));
-const CodingProblemDetailPage = lazy(() => import('./pages/CodingProblemDetailPage'));
-const CloudLabsPage = lazy(() => import('./pages/CloudLabsPage'));
 const PipelineDesignerPage = lazy(() => import('./pages/PipelineDesignerPage'));
 const KnowledgeBasePage = lazy(() => import('./pages/KnowledgeBasePage'));
 
@@ -76,6 +72,7 @@ function PageSkeleton() {
 
 function AppShellWithRoutes() {
   const location = useLocation();
+  const { restoreScroll } = useScrollRestoration();
 
   const isLandingRoute = location.pathname === '/';
   const isAuthRoute = ['/login', '/signup'].includes(location.pathname);
@@ -91,69 +88,64 @@ function AppShellWithRoutes() {
         {isAuthRoute ? (
           <main>
             <Suspense fallback={<PageSkeleton />}>
-              <Routes location={location} key={location.pathname}>
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/signup" element={<SignupPage />} />
-                <Route path="*" element={<NotFoundPage />} />
-              </Routes>
+              <AnimatePresence mode="wait" onExitComplete={restoreScroll}>
+                <Routes location={location} key={location.pathname}>
+                  <Route path="/login" element={<PageTransition variant="fade"><LoginPage /></PageTransition>} />
+                  <Route path="/signup" element={<PageTransition variant="fade"><SignupPage /></PageTransition>} />
+                  <Route path="*" element={<PageTransition variant="fade"><NotFoundPage /></PageTransition>} />
+                </Routes>
+              </AnimatePresence>
             </Suspense>
           </main>
         ) : (
           <AppShell>
             <Suspense fallback={<PageSkeleton />}>
-              <AnimatePresence mode="wait">
+              <AnimatePresence mode="wait" onExitComplete={restoreScroll}>
                 <Routes location={location} key={location.pathname}>
                   {/* Core */}
                   <Route path="/dashboard" element={<ProtectedRoute><PageTransition><DashboardPage /></PageTransition></ProtectedRoute>} />
                   <Route path="/pipelines" element={<ProtectedRoute><PageTransition><PipelinesPage /></PageTransition></ProtectedRoute>} />
-                  <Route path="/pipelines/:id" element={<ProtectedRoute><PageTransition><PipelineDetailsPage /></PageTransition></ProtectedRoute>} />
-                  <Route path="/builder" element={<ProtectedRoute><PageTransition><PipelineBuilderPage /></PageTransition></ProtectedRoute>} />
-                  <Route path="/studio" element={<ProtectedRoute><PageTransition><PipelineStudioPage /></PageTransition></ProtectedRoute>} />
-
-                  {/* Learning & Practice */}
-                  <Route path="/learning-paths" element={<ProtectedRoute><PageTransition><LearningPathsPage /></PageTransition></ProtectedRoute>} />
-                  <Route path="/coding-problems" element={<ProtectedRoute><PageTransition><CodingProblemsPage /></PageTransition></ProtectedRoute>} />
-                  <Route path="/coding-problems/:id" element={<ProtectedRoute><PageTransition><CodingProblemDetailPage /></PageTransition></ProtectedRoute>} />
-                  <Route path="/data-modeling" element={<ProtectedRoute><PageTransition><DataModelingPage /></PageTransition></ProtectedRoute>} />
-                  <Route path="/cloud-labs" element={<ProtectedRoute><PageTransition><CloudLabsPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/pipelines/:id" element={<ProtectedRoute><PageTransition variant="slideX"><PipelineDetailsPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/builder" element={<ProtectedRoute><PageTransition variant="scale"><PipelineBuilderPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/studio" element={<ProtectedRoute><PageTransition variant="scale"><PipelineStudioPage /></PageTransition></ProtectedRoute>} />
 
                   {/* Design & Build */}
-                  <Route path="/architecture-canvas" element={<ProtectedRoute><PageTransition><ArchitectureCanvasPage /></PageTransition></ProtectedRoute>} />
-                  <Route path="/schema-designer" element={<ProtectedRoute><PageTransition><SchemaDesignerPage /></PageTransition></ProtectedRoute>} />
-                  <Route path="/pipeline-designer" element={<ProtectedRoute><PageTransition><PipelineDesignerPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/architecture-canvas" element={<ProtectedRoute><PageTransition variant="scale"><ArchitectureCanvasPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/schema-designer" element={<ProtectedRoute><PageTransition variant="scale"><SchemaDesignerPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/pipeline-designer" element={<ProtectedRoute><PageTransition variant="scale"><PipelineDesignerPage /></PageTransition></ProtectedRoute>} />
 
                   {/* Operations */}
-                  <Route path="/monitoring" element={<ProtectedRoute><PageTransition><MonitoringPage /></PageTransition></ProtectedRoute>} />
-                  <Route path="/analytics" element={<ProtectedRoute><PageTransition><AnalyticsPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/monitoring" element={<ProtectedRoute><PageTransition variant="fade"><MonitoringPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/analytics" element={<ProtectedRoute><PageTransition variant="fade"><AnalyticsPage /></PageTransition></ProtectedRoute>} />
 
                   {/* AI & Automation */}
-                  <Route path="/ai-workspace" element={<ProtectedRoute><PageTransition><AIWorkspacePage /></PageTransition></ProtectedRoute>} />
-                  <Route path="/agents" element={<ProtectedRoute><PageTransition><AgentsPage /></PageTransition></ProtectedRoute>} />
-                  <Route path="/multimodal" element={<ProtectedRoute><PageTransition><MultimodalPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/ai-workspace" element={<ProtectedRoute><PageTransition variant="rotate"><AIWorkspacePage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/agents" element={<ProtectedRoute><PageTransition variant="fade"><AgentsPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/multimodal" element={<ProtectedRoute><PageTransition variant="fade"><MultimodalPage /></PageTransition></ProtectedRoute>} />
 
                   {/* Governance */}
-                  <Route path="/approvals" element={<ProtectedRoute><PageTransition><ApprovalsPage /></PageTransition></ProtectedRoute>} />
-                  <Route path="/audit-logs" element={<ProtectedRoute><PageTransition><AuditLogsPage /></PageTransition></ProtectedRoute>} />
-                  <Route path="/team" element={<ProtectedRoute><PageTransition><TeamPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/approvals" element={<ProtectedRoute><PageTransition variant="fade"><ApprovalsPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/audit-logs" element={<ProtectedRoute><PageTransition variant="fade"><AuditLogsPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/team" element={<ProtectedRoute><PageTransition variant="fade"><TeamPage /></PageTransition></ProtectedRoute>} />
 
                   {/* Resources */}
-                  <Route path="/templates" element={<ProtectedRoute><PageTransition><TemplatesPage /></PageTransition></ProtectedRoute>} />
-                  <Route path="/getting-started" element={<ProtectedRoute><PageTransition><GettingStartedPage /></PageTransition></ProtectedRoute>} />
-                  <Route path="/knowledge-base" element={<ProtectedRoute><PageTransition><KnowledgeBasePage /></PageTransition></ProtectedRoute>} />
-                  <Route path="/notifications" element={<ProtectedRoute><PageTransition><NotificationsPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/templates" element={<ProtectedRoute><PageTransition variant="fade"><TemplatesPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/getting-started" element={<ProtectedRoute><PageTransition variant="fade"><GettingStartedPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/knowledge-base" element={<ProtectedRoute><PageTransition variant="fade"><KnowledgeBasePage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/notifications" element={<ProtectedRoute><PageTransition variant="fade"><NotificationsPage /></PageTransition></ProtectedRoute>} />
 
                   {/* Settings & Admin */}
-                  <Route path="/settings" element={<ProtectedRoute><PageTransition><SettingsPage /></PageTransition></ProtectedRoute>} />
-                  <Route path="/admin" element={<ProtectedRoute><PageTransition><AdminDashboardPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/settings" element={<ProtectedRoute><PageTransition variant="fade"><SettingsPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/admin" element={<ProtectedRoute><PageTransition variant="fade"><AdminDashboardPage /></PageTransition></ProtectedRoute>} />
 
                   {/* Info pages (public) */}
-                  <Route path="/about" element={<AboutPage />} />
-                  <Route path="/terms" element={<TermsPage />} />
-                  <Route path="/privacy" element={<PrivacyPage />} />
-                  <Route path="/changelog" element={<ChangelogPage />} />
+                  <Route path="/about" element={<PageTransition variant="fade"><AboutPage /></PageTransition>} />
+                  <Route path="/terms" element={<PageTransition variant="fade"><TermsPage /></PageTransition>} />
+                  <Route path="/privacy" element={<PageTransition variant="fade"><PrivacyPage /></PageTransition>} />
+                  <Route path="/changelog" element={<PageTransition variant="fade"><ChangelogPage /></PageTransition>} />
 
                   {/* Catch-all */}
-                  <Route path="*" element={<NotFoundPage />} />
+                  <Route path="*" element={<PageTransition variant="fade"><NotFoundPage /></PageTransition>} />
                 </Routes>
               </AnimatePresence>
             </Suspense>
