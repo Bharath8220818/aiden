@@ -30,7 +30,7 @@ from transformers import (
     BitsAndBytesConfig,
     TrainingArguments,
 )
-from trl import SFTTrainer
+from trl import SFTConfig, SFTTrainer
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +63,8 @@ AGENT_CONFIGS = {
     },
     "pipeline_builder": {
         "output_dir": "./models/pipeline-builder",
-        "description": "Pipeline code generation (Airflow DAGs, dbt models)",
-        "system_prompt": "You are a pipeline builder agent. Generate executable pipeline code (Airflow DAG, dbt models) from a config.",
+        "description": "Pipeline code generation (Airflow DAGs, dbt models, SQL)",
+        "system_prompt": "You are a pipeline builder agent. Generate executable pipeline code (Airflow DAG, dbt models) or SQL queries from a request.",
         "dataset_format": "instruction_output",
     },
 }
@@ -87,12 +87,14 @@ class AgentTrainer:
         output_dir: Optional[str] = None,
         max_seq_length: int = 2048,
         use_4bit: Optional[bool] = None,
+        max_steps: Optional[int] = None,
     ):
         self.agent_type = agent_type
         self.agent_config = AGENT_CONFIGS[agent_type]
         self.model_name = model_name
         self.output_dir = output_dir or self.agent_config["output_dir"]
         self.max_seq_length = max_seq_length
+        self.max_steps = max_steps
 
         os.makedirs(self.output_dir, exist_ok=True)
 
@@ -120,11 +122,17 @@ class AgentTrainer:
         elif use_4bit and not torch.cuda.is_available():
             logger.warning("CUDA not available — disabling 4-bit quantization (CPU mode)")
             use_4bit = False
+        self.use_4bit = use_4bit
 
         # ── 2. Load model ────────────────────────────────────────────────
         logger.info("Loading base model: %s", self.model_name)
+        # ``device_map="auto"`` makes accelerate decide placement from the free-memory
+        # snapshot at load time — on a memory-constrained CPU box it can try to offload
+        # half the layers and then fail for lack of an offload_dir. With no CUDA the
+        # model lives fully in RAM anyway, so pin placement deterministically.
+        device_map = "auto" if torch.cuda.is_available() else None
         load_kwargs = {
-            "device_map": "auto",
+            "device_map": device_map,
             "trust_remote_code": True,
         }
         if bnb_config:
@@ -149,7 +157,12 @@ class AgentTrainer:
         if use_4bit:
             self.model = prepare_model_for_kbit_training(self.model)
 
-        self.model.gradient_checkpointing_enable()
+        # Gradient checkpointing trades compute for memory — only worth it
+        # under 4-bit QLoRA where memory is actually constrained. On plain
+        # fp32 CPU/GPU runs it forces the backward pass to recompute the
+        # forward, slowing every step.
+        if use_4bit:
+            self.model.gradient_checkpointing_enable()
         self.model.config.use_cache = False
 
         # ── 5. LoRA configuration ────────────────────────────────────────
@@ -243,6 +256,8 @@ class AgentTrainer:
         epochs: int = 3,
         batch_size: int = 4,
         learning_rate: float = 2e-4,
+        max_steps: Optional[int] = None,
+        resume_from_checkpoint: Optional[str] = None,
     ):
         """Run the fine-tuning process.
 
@@ -265,44 +280,58 @@ class AgentTrainer:
 
         logger.info("Train samples: %d | Validation samples: %d", len(train_dataset), len(eval_dataset))
 
+        effective_max_steps = max_steps if max_steps is not None else self.max_steps
+        if effective_max_steps is None:
+            effective_max_steps = -1  # transformers sentinel: derive steps from epochs
+
         use_fp16 = torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 7
         use_bf16 = torch.cuda.is_available() and torch.cuda.get_device_capability() >= (8, 0)
 
-        training_args = TrainingArguments(
+        # trl 1.x: ``SFTConfig`` extends ``TrainingArguments`` and carries the
+        # trl-specific fields (``max_seq_length``, ``dataset_text_field``) that
+        # were removed from ``SFTTrainer``'s constructor in trl 1.0.  The old
+        # ``TrainingArguments`` + kwargs form crashes on trl 1.8.
+        training_args = SFTConfig(
             output_dir=self.output_dir,
             num_train_epochs=epochs,
             per_device_train_batch_size=batch_size,
             per_device_eval_batch_size=batch_size,
             gradient_accumulation_steps=4,
-            warmup_steps=100,
+            gradient_checkpointing=self.use_4bit,  # memory-only win; pure overhead on fp32/CPU
+            warmup_ratio=0.1,  # relative — absolute warmup_steps would exceed short runs
             learning_rate=learning_rate,
             logging_steps=10,
-            save_steps=100,
-            evaluation_strategy="steps",
-            eval_steps=100,
+            save_steps=50,
+            eval_strategy="steps",  # ``evaluation_strategy`` removed in transformers 4.57
+            eval_steps=50,
+            max_steps=effective_max_steps,
             load_best_model_at_end=True,
             metric_for_best_model="eval_loss",
             greater_is_better=False,
             fp16=use_fp16,
             bf16=use_bf16,
-            gradient_checkpointing=True,
             report_to="none",  # Change to "wandb" for experiment tracking
             save_total_limit=2,
             remove_unused_columns=False,
+            max_length=self.max_seq_length,  # ``max_seq_length`` renamed in trl 1.8
+            dataset_text_field="text",
+            loss_type="nll",  # trl 1.8 default ``chunked_nll`` crashes on LoRA-wrapped
+            #                    models (functools.partial forward has no __func__);
+            #                    chunked CE is pointless for short sequences anyway
         )
 
         trainer = SFTTrainer(
             model=self.model,
-            tokenizer=self.tokenizer,
+            processing_class=self.tokenizer,  # ``tokenizer=`` renamed in trl 1.x
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
             args=training_args,
-            max_seq_length=self.max_seq_length,
-            dataset_text_field="text",
         )
 
         logger.info("Starting training (%d epochs)...", epochs)
-        trainer.train()
+        if resume_from_checkpoint:
+            logger.info("Resuming from checkpoint: %s", resume_from_checkpoint)
+        trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
         # Save final model
         trainer.save_model(self.output_dir)
@@ -313,6 +342,12 @@ class AgentTrainer:
 
 
 def main():
+    # Windows terminals default to cp1252 which cannot print ✅/→; normalize so
+    # the final progress prints don't crash even without PYTHONUTF=1 set.
+    if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(description="Train AIDEN agents using LoRA")
     parser.add_argument(
         "--agent", "-a",
@@ -358,6 +393,24 @@ def main():
         action="store_true",
         help="Disable 4-bit quantization (use if running on CPU)",
     )
+    parser.add_argument(
+        "--max-seq-length",
+        type=int,
+        default=2048,
+        help="Maximum sequence length for tokenization (default: 2048)",
+    )
+    parser.add_argument(
+        "--max-steps",
+        type=int,
+        default=None,
+        help="Cap training at this many optimizer steps (overrides epochs)",
+    )
+    parser.add_argument(
+        "--resume-from-checkpoint",
+        type=str,
+        default=None,
+        help="Resume training from a saved checkpoint dir (e.g. models/intent-parser/checkpoint-50)",
+    )
 
     args = parser.parse_args()
 
@@ -378,6 +431,9 @@ def main():
     print(f"Model:             {args.model}")
     print(f"Epochs:            {args.epochs}")
     print(f"Batch:             {args.batch}")
+    print(f"Max seq length:    {args.max_seq_length}")
+    print(f"Max steps:         {args.max_steps or 'unlimited'}")
+    print(f"Resume:            {args.resume_from_checkpoint or 'fresh run'}")
     print(f"Learning Rate:     {args.lr}")
     print(f"4-bit Quant:       {'No' if args.no_4bit else 'Yes'}")
     print("-" * 50)
@@ -387,6 +443,8 @@ def main():
         model_name=args.model,
         output_dir=output_dir,
         use_4bit=not args.no_4bit,
+        max_seq_length=args.max_seq_length,
+        max_steps=args.max_steps,
     )
 
     trainer.train(
@@ -394,6 +452,8 @@ def main():
         epochs=args.epochs,
         batch_size=args.batch,
         learning_rate=args.lr,
+        max_steps=args.max_steps,
+        resume_from_checkpoint=args.resume_from_checkpoint,
     )
 
     print(f"\n✅ {args.agent} agent training complete!")
