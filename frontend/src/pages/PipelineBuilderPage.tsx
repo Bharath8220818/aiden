@@ -137,7 +137,7 @@ const PipelineBuilderPage: React.FC = () => {
   const [input, setInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [pipelineData, setPipelineData] = useState<any>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const { createFromPrompt } = usePipelineStore();
   const { addNotification } = useNotificationStore();
 
@@ -221,8 +221,20 @@ const PipelineBuilderPage: React.FC = () => {
     setIsGenerating(false);
   };
 
+  const didMountRef = useRef(false);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!didMountRef.current) {
+      // Skip the initial mount: scrollIntoView on first render would scroll
+      // every scrollable ancestor — including the page — and cause the
+      // "jump to top" on navigation.
+      didMountRef.current = true;
+      return;
+    }
+    // Scope the auto-scroll to the chat panel only, never the window.
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
   }, [messages]);
 
   const suggestionChips = [
@@ -285,7 +297,7 @@ const PipelineBuilderPage: React.FC = () => {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-6 space-y-4">
           <AnimatePresence>
             {messages.map((msg) => (
               <motion.div
@@ -318,7 +330,6 @@ const PipelineBuilderPage: React.FC = () => {
               </motion.div>
             ))}
           </AnimatePresence>
-          <div ref={messagesEndRef} />
         </div>
 
         {/* Input */}

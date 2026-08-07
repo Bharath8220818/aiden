@@ -74,18 +74,36 @@ export default function ArchitectureCanvasPage() {
   const handleMouseDown = useCallback((e: React.MouseEvent, id: string) => {
     const item = canvasItems.find(i => i.id === id);
     if (!item) return;
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    if (!canvasRect) return;
+    const scale = zoom / 100;
     setDragging(id);
-    setDragOffset({ x: e.clientX - item.x, y: e.clientY - item.y });
-  }, [canvasItems]);
+    // Grab offset in *canvas units* — divide viewport px by the zoom scale
+    // so the card stays under the cursor while zoomed.
+    setDragOffset({
+      x: (e.clientX - canvasRect.left) / scale - item.x,
+      y: (e.clientY - canvasRect.top) / scale - item.y,
+    });
+  }, [canvasItems, zoom]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!dragging) return;
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    if (!canvasRect) return;
+    const scale = zoom / 100;
+    // Convert viewport coords to canvas-local coords (subtract canvas origin,
+    // divide by zoom) — otherwise the node jumps by the canvas viewport offset
+    // on the first drag.
     setCanvasItems(prev => prev.map(item =>
       item.id === dragging
-        ? { ...item, x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y }
+        ? {
+            ...item,
+            x: (e.clientX - canvasRect.left) / scale - dragOffset.x,
+            y: (e.clientY - canvasRect.top) / scale - dragOffset.y,
+          }
         : item
     ));
-  }, [dragging, dragOffset]);
+  }, [dragging, dragOffset, zoom]);
 
   const handleMouseUp = useCallback(() => setDragging(null), []);
 
@@ -154,7 +172,9 @@ export default function ArchitectureCanvasPage() {
           ))}
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
+        {/* Opacity-only animation: a scale transform here would scale
+            getBoundingClientRect() during mount and corrupt drag coordinates. */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
           className="relative flex-1 overflow-hidden rounded-2xl border border-[var(--color-border)]" style={{ height: '600px' }}
           ref={canvasRef} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
           
