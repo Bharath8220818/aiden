@@ -17,6 +17,7 @@ import { useScrollRestoration } from './hooks/useScrollRestoration';
 // Lazy loaded pages — split into separate JS chunks
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const SignupPage = lazy(() => import('./pages/SignupPage'));
+const AuthCallback = lazy(() => import('./components/auth/AuthCallback'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const PipelinesPage = lazy(() => import('./pages/PipelinesPage'));

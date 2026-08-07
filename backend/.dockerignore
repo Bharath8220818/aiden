@@ -5,7 +5,6 @@ __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
-*.egg-info
 *.egg-info/
 .tox/
 .mypy_cache/
@@ -40,3 +39,19 @@ Thumbs.db
 
 # ── Documentation (not needed at runtime) ───────────────────────────
 *.md
+
+# ── Dev/test files (not needed in production image) ─────────────────
+tests/
+pytest.ini
+
+# ── Docker files (avoid recursive copies) ──────────────────────────
+Dockerfile
+.dockerignore
+
+# ── Data files (not needed in production) ──────────────────────────
+data/
+
+# ── Training artifacts ─────────────────────────────────────────────
+models/adapters/
+models/训练
+

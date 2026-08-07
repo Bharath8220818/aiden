@@ -5,10 +5,12 @@ from contextlib import asynccontextmanager
 from app.config import settings
 from app.database import engine, Base
 from app.models import Pipeline, User, ApprovalRequest, AuditLogEntry, AnalyticsEvent  # noqa: F401 — register models with Base.metadata
-from app.api.v1 import pipelines, auth, analytics, approvals, audit, executions
+from app.api.v1 import pipelines, auth, analytics, approvals, audit, executions, supabase_auth
 from app.api.v1 import multimodal as multimodal_router
 from app.api.v1 import agents, schemas, architecture, coding, learning, team, templates, voice, health
 from app.api.v1.websocket import websocket_endpoint
+from app.middleware.rate_limit import RateLimitMiddleware
+from app.middleware.logging import RequestLoggingMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +19,14 @@ async def lifespan(app: FastAPI):
     # Startup: Log key configuration status
     logger.info("=" * 50)
     logger.info(f"{settings.APP_NAME} v{settings.APP_VERSION} starting up")
+
+    # ── Environment validation ──
+    logger.info("Validating environment...")
+    if not settings.DATABASE_URL:
+        raise RuntimeError("DATABASE_URL is not set")
+    if len(settings.JWT_SECRET_KEY) < 32:
+        logger.warning("JWT_SECRET_KEY is short — consider using a longer key.")
+    logger.info("✅ Environment validation passed")
 
     # CUDA / Multimodal status
     try:
@@ -32,6 +42,21 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("Multimodal: ⏸️  DISABLED (enable with MULTIMODAL_ENABLED=True + CUDA GPU)")
     logger.info("=" * 50)
+
+    # ── Database connection status ──
+    from app.database import _database_url
+    if "supabase" in _database_url:
+        logger.info("Database: Supabase PostgreSQL (hosted)")
+    elif "sqlite" in _database_url:
+        logger.warning("Database: SQLite (local file) — not recommended for production")
+    else:
+        logger.info("Database: PostgreSQL")
+
+    # ── Supabase client status ──
+    if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
+        logger.info(f"Supabase client: ✅ configured ({settings.SUPABASE_URL})")
+    else:
+        logger.warning("Supabase client: ⚠️  not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing)")
 
     # Create database tables
     async with engine.begin() as conn:
@@ -83,9 +108,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Rate limiting & request logging ──
+# Starlette applies middleware in reverse order: added first = runs last.
+# So logging is added first (runs after rate limiting) so rejected 429s are logged.
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(RateLimitMiddleware, requests_per_minute=settings.RATE_LIMIT_REQUESTS_PER_MINUTE)
+
 # Include routers
 # ── Core ──
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(supabase_auth.router, prefix="/api/v1/auth/supabase", tags=["auth", "supabase"])
 app.include_router(pipelines.router, prefix="/api/v1/pipelines", tags=["pipelines"])
 app.include_router(executions.router, prefix="/api/v1/executions", tags=["executions"])
 

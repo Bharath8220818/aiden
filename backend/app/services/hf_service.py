@@ -24,31 +24,55 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# ── Conditional imports ────────────────────────────────────────────────
-try:
-    import torch
-    from sentence_transformers import SentenceTransformer
-    from transformers import (
-        AutoModelForCausalLM,
-        AutoTokenizer,
-        BitsAndBytesConfig,
-        pipeline as hf_pipeline,
-    )
-    HF_AVAILABLE = True
-except ImportError as exc:
-    torch = None
-    SentenceTransformer = None
-    AutoModelForCausalLM = AutoTokenizer = BitsAndBytesConfig = hf_pipeline = None
-    HF_AVAILABLE = False
-    HF_IMPORT_ERROR = exc
+# ── Deferred heavy imports (loaded on first use, not at import time) ──────
+# This avoids importing torch/transformers at module load, saving ~200-500 MB RAM
+# on startup — critical for Render free tier (512 MiB).
+torch = None
+SentenceTransformer = None
+AutoModelForCausalLM = AutoTokenizer = BitsAndBytesConfig = hf_pipeline = None
+PeftModel = PeftConfig = None
+HF_AVAILABLE = False
+PEFT_AVAILABLE = False
+_HF_IMPORTS_LOADED = False
 
-# peft is optional — only needed for loading fine-tuned (LoRA) models
-try:
-    from peft import PeftModel, PeftConfig
-    PEFT_AVAILABLE = True
-except ImportError:
-    PeftModel = PeftConfig = None
-    PEFT_AVAILABLE = False
+
+def _load_hf_imports():
+    """Lazily import torch, transformers, and related libraries."""
+    global torch, SentenceTransformer, AutoModelForCausalLM, AutoTokenizer
+    global BitsAndBytesConfig, hf_pipeline, PeftModel, PeftConfig
+    global HF_AVAILABLE, PEFT_AVAILABLE, _HF_IMPORTS_LOADED
+    if _HF_IMPORTS_LOADED:
+        return
+    _HF_IMPORTS_LOADED = True
+
+    try:
+        import torch as _torch
+        from sentence_transformers import SentenceTransformer as ST
+        from transformers import (
+            AutoModelForCausalLM as AF,
+            AutoTokenizer as AT,
+            BitsAndBytesConfig as BQ,
+            pipeline as hp,
+        )
+        torch = _torch
+        SentenceTransformer = ST
+        AutoModelForCausalLM = AF
+        AutoTokenizer = AT
+        BitsAndBytesConfig = BQ
+        hf_pipeline = hp
+        HF_AVAILABLE = True
+        logger.info("HuggingFace dependencies loaded successfully")
+    except ImportError as exc:
+        HF_AVAILABLE = False
+        logger.warning(f"HuggingFace dependencies not fully installed: {exc}")
+
+    try:
+        from peft import PeftModel as PM, PeftConfig as PC
+        PeftModel = PM
+        PeftConfig = PC
+        PEFT_AVAILABLE = True
+    except ImportError:
+        PEFT_AVAILABLE = False
 
 
 class HuggingFaceService:
@@ -93,11 +117,13 @@ class HuggingFaceService:
         # Ensure cache directory exists
         os.makedirs(settings.HF_CACHE_DIR, exist_ok=True)
 
+        # ── Load heavy imports lazily (torch, transformers, sentence_transformers) ──
+        _load_hf_imports()
+
         if not HF_AVAILABLE:
             logger.warning(
-                "HuggingFace dependencies not fully installed (%s). "
-                "The service will run in fallback mode.",
-                getattr(HF_IMPORT_ERROR, "__name__", "unknown"),
+                "HuggingFace dependencies not fully installed. "
+                "The service will run in fallback mode."
             )
             return
 

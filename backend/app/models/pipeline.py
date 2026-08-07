@@ -19,7 +19,7 @@ class Pipeline(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False, index=True)
     description = Column(Text, nullable=True)
-    status = Column(Enum(PipelineStatus), default=PipelineStatus.DRAFT)
+    status = Column(Enum(PipelineStatus, native_enum=False), default=PipelineStatus.DRAFT)
     schedule = Column(String(100), nullable=True)
     config = Column(JSON, default=dict)
     source_type = Column(String(50), nullable=False)

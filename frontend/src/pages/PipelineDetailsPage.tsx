@@ -259,10 +259,10 @@ const PipelineDetailsPage: React.FC = () => {
               <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Data Quality Tests</h3>
                 <div className="space-y-1">
-                  {p.tests.map((test: string, i: number) => (
+                  {p.tests.map((test: any, i: number) => (
                     <div key={i} className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                       <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />
-                      {test}
+                      {typeof test === 'string' ? test : (test.name || test.description || test.type || JSON.stringify(test))}
                     </div>
                   ))}
                 </div>
@@ -355,8 +355,13 @@ const PipelineDetailsPage: React.FC = () => {
                               className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
                               title="View logs"
                               onClick={() => {
-                                if (exec.logs && exec.logs.length > 0) {
-                                  addNotification({ type: 'info', message: exec.logs.slice(0, 3).join(' | ') });
+                                if (exec.logs) {
+                                  const logsText = Array.isArray(exec.logs)
+                                    ? exec.logs.slice(0, 3).join(' | ')
+                                    : Object.keys(exec.logs).slice(0, 3).join(' | ');
+                                  if (logsText) {
+                                    addNotification({ type: 'info', message: logsText });
+                                  }
                                 }
                               }}
                             >

@@ -18,7 +18,7 @@ async def test_signup_success(client: AsyncClient):
             "username": "newuser",
             "email": "newuser@example.com",
             "full_name": "New User",
-            "password": "SecurePass123",
+            "password": "SecurePass123!",
         },
     )
     assert response.status_code in (200, 201)
@@ -42,7 +42,7 @@ async def test_signup_duplicate_username(client: AsyncClient):
             "username": "dupeuser",
             "email": "dupe1@example.com",
             "full_name": "Duplicate User",
-            "password": "SecurePass123",
+            "password": "SecurePass123!",
         },
     )
     # Try creating with same username
@@ -52,7 +52,7 @@ async def test_signup_duplicate_username(client: AsyncClient):
             "username": "dupeuser",
             "email": "dupe2@example.com",
             "full_name": "Duplicate User 2",
-            "password": "SecurePass123",
+            "password": "SecurePass123!",
         },
     )
     assert response.status_code == 400
@@ -68,7 +68,7 @@ async def test_signup_duplicate_email(client: AsyncClient):
             "username": "emaildupe1",
             "email": "shared@example.com",
             "full_name": "Email Dupe 1",
-            "password": "SecurePass123",
+            "password": "SecurePass123!",
         },
     )
     response = await client.post(
@@ -77,7 +77,7 @@ async def test_signup_duplicate_email(client: AsyncClient):
             "username": "emaildupe2",
             "email": "shared@example.com",
             "full_name": "Email Dupe 2",
-            "password": "SecurePass123",
+            "password": "SecurePass123!",
         },
     )
     assert response.status_code == 400
@@ -109,7 +109,7 @@ async def test_signup_invalid_email(client: AsyncClient):
             "username": "bademail",
             "email": "not-an-email",
             "full_name": "Bad Email",
-            "password": "SecurePass123",
+            "password": "SecurePass123!",
         },
     )
     assert response.status_code == 422
@@ -125,13 +125,13 @@ async def test_login_success(client: AsyncClient):
             "username": "loginuser",
             "email": "loginuser@example.com",
             "full_name": "Login User",
-            "password": "SecurePass123",
+            "password": "SecurePass123!",
         },
     )
     # Login
     response = await client.post(
         "/api/v1/auth/login",
-        data={"username": "loginuser", "password": "SecurePass123"},
+        data={"username": "loginuser", "password": "SecurePass123!"},
     )
     assert response.status_code == 200
     data = response.json()
@@ -150,12 +150,12 @@ async def test_login_wrong_password(client: AsyncClient):
             "username": "wrongpwuser",
             "email": "wrongpw@example.com",
             "full_name": "Wrong PW User",
-            "password": "SecurePass123",
+            "password": "SecurePass123!",
         },
     )
     response = await client.post(
         "/api/v1/auth/login",
-        data={"username": "wrongpwuser", "password": "WrongPassword123"},
+        data={"username": "wrongpwuser", "password": "WrongPassword123!"},
     )
     assert response.status_code == 401
 
@@ -190,13 +190,13 @@ async def test_me_success(client: AsyncClient):
             "username": "meuser",
             "email": "meuser@example.com",
             "full_name": "Me User",
-            "password": "SecurePass123",
+            "password": "SecurePass123!",
         },
     )
     # Login to get token
     login_resp = await client.post(
         "/api/v1/auth/login",
-        data={"username": "meuser", "password": "SecurePass123"},
+        data={"username": "meuser", "password": "SecurePass123!"},
     )
     token = login_resp.json()["access_token"]
 

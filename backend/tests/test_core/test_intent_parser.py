@@ -8,6 +8,21 @@ import pytest
 from app.core.intent_parser import IntentParser
 
 
+@pytest.fixture(autouse=True)
+def _force_rule_based(monkeypatch):
+    """These tests validate the deterministic rule-based parser.
+
+    Without this, each parse() call waits on Ollama (local LLM) or the HF
+    model — both slow or timing out on CI/dev machines — making the suite
+    hang for minutes. Disable the AI paths so the fallback runs instantly.
+    """
+    monkeypatch.setattr(IntentParser, "_check_ollama", lambda self: False)
+    monkeypatch.setattr(
+        "app.core.intent_parser.hf_service.is_available",
+        lambda: False,
+    )
+
+
 @pytest.mark.asyncio
 async def test_intent_parser_rule_based_postgres_to_snowflake():
     """Test rule-based parser detects PostgreSQL -> Snowflake."""
@@ -109,6 +124,35 @@ async def test_intent_parser_unknown_source_destination():
     # Accept fallback defaults
     assert result["source_type"] in ["unknown", "postgres"]
     assert result["destination_type"] in ["unknown", "snowflake"]
+
+
+@pytest.mark.asyncio
+async def test_intent_parser_reversed_phrasing_to_from():
+    """Destination-first phrasing ("to X from Y") must not mislabel.
+
+    Regression test for the positional-matching fix: pure mention order
+    would label BigQuery as the source in "Load data to BigQuery from
+    MySQL", because BigQuery is mentioned first.
+    """
+    parser = IntentParser()
+    result = await parser.parse("Load data to BigQuery from MySQL")
+
+    assert result["source_type"] == "mysql", result
+    assert result["destination_type"] == "bigquery", result
+
+
+@pytest.mark.asyncio
+async def test_intent_parser_to_snowflake_not_source():
+    """"s3 to snowflake" must resolve s3 as the source.
+
+    Regression test: dict-order matching used to pick snowflake as the
+    source because it was checked before s3.
+    """
+    parser = IntentParser()
+    result = await parser.parse("Stream s3 to snowflake hourly")
+
+    assert result["source_type"] == "s3", result
+    assert result["destination_type"] == "snowflake", result
 
 
 @pytest.mark.asyncio

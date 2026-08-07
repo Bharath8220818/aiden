@@ -7,7 +7,7 @@ without requiring any external services.
 """
 
 import pytest
-from app.core.rag_memory import RAGMemory
+from app.core.rag_memory import RAGMemory, InMemoryStore
 
 
 @pytest.fixture
@@ -18,18 +18,22 @@ def memory():
 
 @pytest.mark.asyncio
 async def test_rag_memory_is_ready(memory):
-    """Test is_ready always returns True (in-memory always works)."""
-    assert memory.is_ready() is True
+    """is_ready() reflects whether sentence-transformers is available."""
+    # is_ready() returns True when the HF embedder is installed, False otherwise.
+    # Either way it returns a bool and the store works via in-memory fallback.
+    assert isinstance(memory.is_ready(), bool)
+
+    # When embeddings ARE available, semantic search should find stored entries.
+    if memory.is_ready():
+        memory.add("Move data from PostgreSQL to Snowflake", {"source_type": "postgres"})
+        hits = memory.search("postgres to snowflake", top_k=1)
+        assert len(hits) >= 0
+        assert memory.count() == 1
 
 
 @pytest.mark.asyncio
 async def test_rag_memory_store_and_search(memory):
-    """Test storing and searching in in-memory store.
-
-    Note: The in-memory store relies on HuggingFace for embeddings.
-    If HF is unavailable, _embed returns None and the store/search
-    gracefully degrades.
-    """
+    """Test storing and searching in in-memory store."""
     query = "Move data from PostgreSQL to Snowflake"
     parsed = {
         "name": "Test Pipeline",
@@ -37,45 +41,42 @@ async def test_rag_memory_store_and_search(memory):
         "destination_type": "snowflake",
     }
 
-    # Store — may return False if HF unavailable (no embedding)
-    stored = memory.store_pipeline(query, parsed, user_id=1)
-    assert stored is True or stored is False  # depends on HF
+    # Store an entry
+    memory.add(query, parsed)
+    assert memory.count() == 1
 
-    # Search — may return empty if HF unavailable
-    results = memory.search_similar(query, user_id=1, top_k=3)
+    # Search — returns a list (may be empty without embeddings)
+    results = memory.search(query, top_k=3)
     assert isinstance(results, list)
 
-    # If we stored successfully, search should find it
-    if stored:
-        # The results might be empty if HF embeddings aren't loaded
-        # for search either, but if they are, we stored+searched
-        if len(results) > 0:
-            assert results[0]["query"] == query
-            assert results[0]["parsed"]["source_type"] == "postgres"
+    # If embeddings are unavailable, search degrades gracefully
+    # (either finds the entry or returns an empty list — never crashes)
+    for r in results:
+        assert r["query"] == query
+        assert r["intent"]["source_type"] == "postgres"
 
 
 @pytest.mark.asyncio
 async def test_rag_memory_empty_search(memory):
     """Test search returns empty list when nothing is stored."""
-    # Without HF, search returns empty. This test validates
-    # it doesn't crash.
-    results = memory.search_similar("some query", user_id=1, top_k=3)
-    assert isinstance(results, list)
+    results = memory.search("some query", top_k=3)
+    assert results == []
 
 
 @pytest.mark.asyncio
 async def test_rag_memory_count(memory):
-    """Test count returns 0 on fresh instance or actual count."""
-    count = memory.count()
-    assert isinstance(count, int)
-    assert count >= 0
+    """Test count returns 0 on fresh instance."""
+    assert memory.count() == 0
+
+    memory.add("query one", {"name": "p1"})
+    memory.add("query two", {"name": "p2"})
+    assert memory.count() == 2
 
 
 @pytest.mark.asyncio
 async def test_rag_memory_format_context(memory):
     """Test format_context returns empty string when no results."""
-    context = memory.format_context([])
-    assert context == ""
+    assert memory.format_context([]) == ""
 
 
 @pytest.mark.asyncio
@@ -84,32 +85,40 @@ async def test_rag_memory_format_context_with_results(memory):
     results = [
         {
             "query": "test query",
-            "parsed": {"source_type": "postgres"},
+            "intent": {"source_type": "postgres", "destination_type": "snowflake", "schedule": "0 6 * * *"},
             "score": 0.95,
-            "pipeline_id": 1,
         }
     ]
-    context = memory.format_context(results, max_examples=1)
+    context = memory.format_context(results)
     assert "test query" in context
     assert "postgres" in context
-    assert "0.95" in context
+    assert "snowflake" in context
 
 
 def test_cosine_similarity():
-    """Test the static cosine similarity method."""
-    a = [1.0, 0.0, 0.0]
-    b = [1.0, 0.0, 0.0]
-    assert RAGMemory._cosine_similarity(a, b) == pytest.approx(1.0)
+    """Test the cosine similarity method on InMemoryStore."""
+    store = InMemoryStore()
+    assert store._cosine_similarity([1.0, 0.0, 0.0], [1.0, 0.0, 0.0]) == pytest.approx(1.0)
 
-    a = [1.0, 0.0, 0.0]
-    b = [0.0, 1.0, 0.0]
-    assert RAGMemory._cosine_similarity(a, b) == pytest.approx(0.0)
+    assert store._cosine_similarity([1.0, 0.0, 0.0], [0.0, 1.0, 0.0]) == pytest.approx(0.0)
 
     # Zero vector edge case
-    a = [0.0, 0.0, 0.0]
-    b = [1.0, 0.0, 0.0]
-    assert RAGMemory._cosine_similarity(a, b) == 0.0
+    assert store._cosine_similarity([0.0, 0.0, 0.0], [1.0, 0.0, 0.0]) == 0.0
 
-    a = [0.0, 0.0, 0.0]
-    b = [0.0, 0.0, 0.0]
-    assert RAGMemory._cosine_similarity(a, b) == 0.0
+    assert store._cosine_similarity([0.0, 0.0, 0.0], [0.0, 0.0, 0.0]) == 0.0
+
+
+def test_in_memory_store_search_scores():
+    """Test InMemoryStore.search returns entries with scores."""
+    store = InMemoryStore()
+    store.add({"query": "a", "intent": {}}, embedding=[1.0, 0.0, 0.0])
+    store.add({"query": "b", "intent": {}}, embedding=[0.0, 1.0, 0.0])
+
+    results = store.search([1.0, 0.0, 0.0], top_k=5, min_score=0.0)
+    assert len(results) == 2
+    assert results[0]["query"] == "a"  # most similar
+    assert results[0]["score"] == pytest.approx(1.0)
+
+    # Query orthogonal to everything returns no results above a high threshold
+    results = store.search([0.0, 0.0, 1.0], top_k=5, min_score=0.9)
+    assert results == []

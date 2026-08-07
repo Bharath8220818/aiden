@@ -15,34 +15,57 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 from PIL import Image
 
-import torch
-
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# ── Conditional imports (local inference only) ─────────────────────────
-try:
-    from transformers import (
-        LlavaNextProcessor,
-        LlavaNextForConditionalGeneration,
-        BitsAndBytesConfig,
-        AutoProcessor,
-        Qwen2VLForConditionalGeneration,
-    )
-    from peft import PeftModel
-    MULTIMODAL_AVAILABLE = True
-except ImportError as exc:
-    MULTIMODAL_AVAILABLE = False
-    MULTIMODAL_IMPORT_ERROR = exc
-    logger.warning(f"Multimodal dependencies not fully installed: {exc}")
+# ── Deferred heavy imports (loaded on first use, not at import time) ──────
+# This avoids importing torch/transformers at module load, saving ~200-500 MB RAM
+# on startup — critical for Render free tier (512 MiB).
+torch = None
+httpx = None  # loaded lazily in _load_heavy_imports; module-level so methods can use it
+TRANSFORMERS_AVAILABLE = False
+MULTIMODAL_AVAILABLE = False
+HTTPX_AVAILABLE = False
+_MULTIMODAL_IMPORTS_LOADED = False
 
-try:
-    import httpx
-    HTTPX_AVAILABLE = True
-except ImportError:
-    HTTPX_AVAILABLE = False
-    logger.warning("httpx not installed — remote proxy mode disabled")
+
+def _load_heavy_imports():
+    """Lazily import torch, transformers, and httpx on first use."""
+    global torch, httpx, TRANSFORMERS_AVAILABLE, MULTIMODAL_AVAILABLE, HTTPX_AVAILABLE, _MULTIMODAL_IMPORTS_LOADED
+    if _MULTIMODAL_IMPORTS_LOADED:
+        return
+    _MULTIMODAL_IMPORTS_LOADED = True
+
+    try:
+        import torch as _torch
+        torch = _torch
+        TRANSFORMERS_AVAILABLE = True
+        logger.info("torch loaded successfully (GPU: %s)", torch.cuda.is_available())
+    except ImportError as exc:
+        logger.warning(f"torch not installed: {exc}")
+        return
+
+    try:
+        from transformers import (
+            LlavaNextProcessor,
+            LlavaNextForConditionalGeneration,
+            BitsAndBytesConfig,
+            AutoProcessor,
+            Qwen2VLForConditionalGeneration,
+        )
+        from peft import PeftModel
+        MULTIMODAL_AVAILABLE = True
+    except ImportError as exc:
+        MULTIMODAL_AVAILABLE = False
+        logger.warning(f"Multimodal dependencies not fully installed: {exc}")
+
+    try:
+        import httpx
+        HTTPX_AVAILABLE = True
+    except ImportError:
+        HTTPX_AVAILABLE = False
+        logger.warning("httpx not installed — remote proxy mode disabled")
 
 
 class MultimodalService:
@@ -76,6 +99,9 @@ class MultimodalService:
         self.model_type = None
         self._loaded = False
         self._remote_url: Optional[str] = None
+
+        # ── Load heavy imports lazily (torch, transformers, httpx) ─────────
+        _load_heavy_imports()
 
         # ── Mode 2: Remote proxy (check first — works without local GPU) ──
         remote_url = settings.MULTIMODAL_REMOTE_URL

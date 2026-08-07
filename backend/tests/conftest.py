@@ -6,11 +6,19 @@ Fixtures are function-scoped (not session-scoped) to avoid issues with
 pytest-asyncio strict mode and session-scoped async fixtures.
 """
 
+import os
 import uuid
 import pytest
+
+# Keep RAG tests hermetic: force the in-memory store even when a live Qdrant
+# server is reachable, so tests never read/write the shared dev database.
+# Unconditional (not setdefault) so a dev-exported QDRANT_ENABLED=true cannot
+# leak the live vector DB into the test run.
+os.environ["QDRANT_ENABLED"] = "false"
 from typing import AsyncGenerator
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from app.main import app
 from app.database import Base, get_db
@@ -19,12 +27,17 @@ from app.core.security import get_password_hash
 
 # ─── Test Database (in-memory to avoid file locking) ────────────────────
 TEST_DATABASE_URL = "sqlite+aiosqlite://"
-# Note: in-memory SQLite means each engine creates an isolated DB.
-# Because the engine is module-scoped, all tests within the same
-# process share the same in-memory DB. Fixtures handle table creation
-# and cleanup per test via create_all / drop_all.
+# StaticPool keeps ONE shared in-memory DB across ALL connections/sessions.
+# This is required because the run endpoint spawns a background executor
+# with its own session factory (patched to TestingSessionLocal below) —
+# without StaticPool, each new connection would get a fresh empty DB.
 
-engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+engine = create_async_engine(
+    TEST_DATABASE_URL,
+    echo=False,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
 TestingSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
@@ -93,3 +106,16 @@ async def auth_headers(client, test_user):
     )
     token = response.json().get("access_token")
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture(scope="function", autouse=True)
+def patch_background_session(monkeypatch):
+    """Point the run endpoint's background executor at the test database.
+
+    ``run_pipeline`` creates a dedicated session via ``AsyncSessionLocal``
+    (imported from ``app.database``) so the request-scoped session is never
+    shared with the background task. Tests must therefore redirect that
+    factory to the in-memory test DB, or the executor would silently look
+    for pipeline/execution rows in the real Supabase database.
+    """
+    monkeypatch.setattr("app.database.AsyncSessionLocal", TestingSessionLocal)
