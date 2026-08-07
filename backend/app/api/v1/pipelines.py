@@ -1,5 +1,7 @@
 import asyncio
+import json
 import logging
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -34,6 +36,42 @@ router = APIRouter()
 executions_router = APIRouter()
 intent_parser = IntentParser()
 
+# backend/data/feedback_dataset.jsonl — independent of the process CWD.
+BACKEND_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
+FEEDBACK_DATASET_PATH = os.path.join(BACKEND_ROOT, "data", "feedback_dataset.jsonl")
+
+
+def _log_parse_failure(prompt: str, fallback: dict, note: str) -> None:
+    """Best-effort record of AI-parse failures for the fine-tuning feedback loop.
+
+    Writes to ``data/feedback_dataset.jsonl`` (Phase 8 of the training
+    pipeline) so a later merge + re-train learns from prompts the AI model
+    got wrong.  Loaded via importlib so ``scripts/collect_feedback.py`` stays
+    the single source of the entry format — and this never raises, because
+    feedback collection must not break pipeline creation.
+    """
+    try:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "aiden_feedback",
+            os.path.join(BACKEND_ROOT, "scripts", "collect_feedback.py"),
+        )
+        if spec is None or spec.loader is None:
+            return
+        feedback_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(feedback_mod)
+        feedback_mod.log_failure(
+            prompt,
+            json.dumps(fallback, ensure_ascii=False, default=str),
+            feedback_path=FEEDBACK_DATASET_PATH,
+            note=note,
+        )
+    except Exception as exc:  # defensive — never break the request
+        logger.info("Feedback capture skipped: %s", exc)
+
 
 @router.post("/from-prompt", response_model=PipelineResponse)
 async def create_pipeline_from_prompt(
@@ -61,9 +99,14 @@ async def create_pipeline_from_prompt(
             intent_parser.parse(prompt),
             timeout=5.0,
         )
-    except (asyncio.TimeoutError, Exception):
+    except asyncio.TimeoutError:
         logger.info("AI intent parsing timed out — using rule-based fallback")
         parsed_intent = intent_parser._rule_based_parse(prompt)
+        _log_parse_failure(prompt, parsed_intent, note="ai_timeout")
+    except Exception as exc:
+        logger.info("AI intent parsing failed (%s) — using rule-based fallback", exc)
+        parsed_intent = intent_parser._rule_based_parse(prompt)
+        _log_parse_failure(prompt, parsed_intent, note=f"ai_error:{type(exc).__name__}")
 
     # 2. Generate DAG code, dbt code, and tests
     #    Uses a lightweight CodeGenerator that imports instantly (no smolagents dependency).

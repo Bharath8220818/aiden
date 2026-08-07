@@ -8,6 +8,7 @@ from app.models import Pipeline, User, ApprovalRequest, AuditLogEntry, Analytics
 from app.api.v1 import pipelines, auth, analytics, approvals, audit, executions, supabase_auth
 from app.api.v1 import multimodal as multimodal_router
 from app.api.v1 import agents, schemas, architecture, coding, learning, team, templates, voice, health
+from app.api.v1 import nfl_prediction
 from app.api.v1.websocket import websocket_endpoint
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.logging import RequestLoggingMiddleware
@@ -129,6 +130,7 @@ app.include_router(audit.router, prefix="/api/v1/audit", tags=["audit"])
 # ── AI & Agents ──
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
 app.include_router(multimodal_router.router, prefix="/api/v1/multimodal", tags=["multimodal"])
+app.include_router(nfl_prediction.router, prefix="/api/v1/predictions", tags=["predictions"])
 
 # ── Design & Architecture ──
 app.include_router(schemas.router, prefix="/api/v1/schemas", tags=["schemas"])

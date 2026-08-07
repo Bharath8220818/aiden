@@ -20,6 +20,9 @@ exactly how to run a full train → evaluate → integrate → improve loop.
 | Schema (intents + entities) | `app/core/intent_parser.py` (`base_system_prompt`, rule parser) | ✅ |
 | Base dataset (instruction format) | `data/intent_dataset.jsonl` (200 examples) | ✅ |
 | Learnable dataset v2 (transforms/rules in prompts) | `data/intent_dataset_v2.jsonl` | ✅ added Aug 5 |
+| **Expanded dataset (600 examples)** | `data/intent_dataset_v3.jsonl` | ✅ added Aug 6 |
+| **Public dataset fetcher (sql-create-context, spider)** | `scripts/fetch_public_datasets.py` | ✅ added Aug 6 |
+| **Automatic failure capture (backend)** | `_log_parse_failure` in `app/api/v1/pipelines.py` | ✅ added Aug 6 |
 | Synthetic data generator | `scripts/generate_synthetic_data.py` | ✅ |
 | Training script (LoRA/QLoRA, all 5 agents) | `scripts/train_agent.py` | ✅ |
 | Fine-tuning module (intent-specific) | `app/fine_tuning/train.py` | ✅ |
@@ -57,7 +60,7 @@ Dataset format (both `intent_dataset.jsonl` and `intent_dataset_v2.jsonl`):
 cd backend
 
 # Regenerate / expand the intent dataset (template mode, no API key)
-python scripts/generate_synthetic_data.py --agent intent --count 200 \
+python scripts/generate_synthetic_data.py --agent intent --count 600 \
     --output data/intent_dataset_v3.jsonl
 
 # LLM mode for more realistic variety (needs OPENAI_API_KEY or --api-base for Ollama)
@@ -69,10 +72,48 @@ transformations or quality rules (they existed only in the labels), so those
 fields were permanently unlearnable (0% in evaluation). v2+ prompts now name
 the exact transforms/rules that appear in the label.
 
-External datasets (Banking77, CLINC150, ATIS) are optional; they teach general
-intent structure but need conversion to this instruction format and filtering
-for data-engineering examples. The internal 200-example set is the primary
-source.
+### Public datasets (Phase 2 — SQL / pipeline-builder agents)
+
+The internal intent set (now **600 examples** in `intent_dataset_v3.jsonl`) is
+the primary source for the Intent Agent. For the SQL and Pipeline-Builder
+agents, fetch real text→SQL data with the new fetcher (uses the `datasets`
+library, already in `requirements.txt`):
+
+```bash
+cd backend
+
+# 500 text->SQL examples from b-mc2/sql-create-context
+python scripts/fetch_public_datasets.py --limit 500
+
+# Spider (needs HF auth; terms agreement on the Hub)
+python scripts/fetch_public_datasets.py --dataset spider --limit 200
+
+# Deterministic sample to a custom path
+python scripts/fetch_public_datasets.py --limit 300 --seed 7 --output data/public/sql_generation.jsonl
+```
+
+Output rows use the same `{instruction, output}` JSONL format. **The 500 rows
+are wired into the Pipeline-Builder agent's dataset**
+(`data/pipeline_builder_dataset.jsonl`, now **590 rows**: 90 existing
+DAG/dbt-generation rows + 500 real text→SQL rows), so
+`--agent pipeline_builder` trains on both code-generation domains. The raw
+fetch is preserved at `data/public/sql_generation.jsonl` for regeneration.
+
+### Why SQL rows do NOT go into the intent dataset (the split)
+
+| Agent | Dataset | Input → Output | Rows |
+|---|---|---|---|
+| Intent | `intent_dataset_v3.jsonl` | prompt → pipeline config JSON (sources, schedule, transforms, rules) | 600 |
+| Pipeline-Builder | `pipeline_builder_dataset.jsonl` | config/request → DAG + dbt code **and** question + schema → SQL | 590 |
+| SQL subset (raw fetch) | `data/public/sql_generation.jsonl` | question + schema context → SQL query | 500 |
+
+The domains are deliberately separate: intent extraction is *semantic
+classification* (which connectors, cadence, transforms), while SQL generation
+is *code synthesis* (translate a schema + question into an executable query).
+Mixing them would teach the Intent Agent to emit SQL instead of pipeline JSON
+(and vice versa). `fetch_public_datasets.py`'s docstring enforces the split.
+Banking77/CLINC150/ATIS remain optional — general intent structure, but they
+need conversion + filtering for data-engineering examples.
 
 ---
 
@@ -106,6 +147,11 @@ python -m app.fine_tuning.train --dataset-path data/intent_dataset_v2.jsonl
   parser's default probe path won't find. Prefer `--output ./models` or set
   `INTENT_ADAPTER_PATH` to the actual written path.
 - LoRA defaults: `r=16, alpha=32`, all `q/k/v/o/gate/up/down` projections.
+- Loss supervises the whole formatted sequence (system + instruction + response)
+  — there is no completion-only masking yet. Acceptable for a first adapter; a
+  production round should mask the prompt (chat format / completion-only loss).
+- Gradient checkpointing is enabled only under 4-bit QLoRA (`--use-4bit`); plain
+  fp32 CPU/GPU runs skip it (pure recompute overhead when memory is not tight).
 
 ---
 
@@ -182,18 +228,25 @@ Restart the backend after training; the parser logs
 
 ## 7. Continuous improvement (Phase 8)
 
+**Automatic capture (added Aug 6):** when the AI intent parser times out or
+errors on `/api/v1/pipelines/from-prompt`, the backend now appends the prompt
+together with the rule-based fallback result to `data/feedback_dataset.jsonl`
+(`note: ai_timeout` / `ai_error:*`) via `_log_parse_failure` — no manual
+intervention needed. These are the prompts the model gets wrong, which is
+exactly what a re-training round should learn from.
+
 ```bash
-# Record a user correction
+# Manual record of a user correction
 python scripts/collect_feedback.py add \
     --input "Build a daily sales ETL from PostgreSQL to Snowflake" \
     --original '{"source_type": "postgresql"}' \
     --output '{"source_type": "postgres"}'
 
-# Merge base + feedback for the next training round
+# Merge base + feedback for the next training round (feedback wins on dupes)
 python scripts/collect_feedback.py merge \
-    --base data/intent_dataset.jsonl \
+    --base data/intent_dataset_v3.jsonl \
     --feedback data/feedback_dataset.jsonl \
-    --out data/intent_dataset_v2.jsonl
+    --out data/intent_dataset_v3.jsonl
 ```
 
 Re-train with the merged dataset, re-evaluate with `scripts/evaluate_intent.py`,
@@ -206,8 +259,8 @@ and ship the improved adapter.
 | Step | Task | Status |
 |------|------|--------|
 | 1 | Define schema (intents + entities) | ✅ exists (`intent_parser.py`) |
-| 2 | Internal dataset | ✅ 200 examples |
-| 3 | External data (Banking77/CLINC150) | ⬜ optional |
+| 2 | Internal dataset | ✅ 600 examples (`intent_dataset_v3.jsonl`) |
+| 3 | External data | ✅ `fetch_public_datasets.py` (sql-create-context, spider) |
 | 4 | Convert to instruction format | ✅ already in format |
 | 5 | Train/test split | ✅ 90/10 in `train_agent.py` |
 | 6 | Base model | ✅ `TinyLlama-1.1B-Chat` (configurable) |

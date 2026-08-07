@@ -110,6 +110,8 @@ AIDEN is a full-stack AI-assisted data pipeline platform at a **near-production-
 | Qdrant vector DB enabled: QdrantStore wired into RAG, `query_points` API fix, lazy reconnect, health reporting, hermetic tests | ✅ Done | Uncommitted (Aug 5) |
 | Docker Desktop stability root-caused + fixed: detached launch (no job-object kill), qdrant `/readyz` healthcheck, `ensure-qdrant.ps1`, `docs/QDRANT_WINDOWS.md` (incl. native Windows Qdrant v1.19.0 alternative) | ✅ Done | Uncommitted (Aug 5) |
 | Intent Agent fine-tuning pipeline: adapter auto-load (`INTENT_ADAPTER_PATH`), `evaluate_intent.py` accuracy harness, `collect_feedback.py` loop, learnable dataset v2, positional source/dest parser fix | ✅ Done | Uncommitted (Aug 5) |
+| Intent fine-tuning Phase 2+8: `fetch_public_datasets.py` (sql-create-context/spider), automatic AI-parse-failure capture in `/from-prompt`, intent dataset expanded to 600 examples (`intent_dataset_v3.jsonl`) | ✅ Done | Uncommitted (Aug 6) |
+| 500 real text→SQL rows (sql-create-context) fetched & wired into `pipeline_builder_dataset.jsonl` (90→**590**) — SQL-gen rows split from the intent dataset, documented in `INTENT_AGENT_FINETUNING.md` | ✅ Done | Uncommitted (Aug 6) |
 
 ### 2.4 Architecture Summary
 
@@ -224,11 +226,12 @@ AI Agents (smolagents + LoRA adapters)
 **AI/ML Fine-Tuning**
 | # | Task | Effort | Owner | Status |
 |---|------|--------|-------|--------|
-| 16 | Fine-tune Intent Agent – `intent_dataset.jsonl` (200 examples) | 2-3 hr GPU | AI/ML | ⬜ |
+| 16 | Fine-tune Intent Agent – `intent_dataset_v3.jsonl` (**600** examples) | 2-3 hr GPU | AI/ML | ⬜ |
 | 17 | Fine-tune Extraction Agent – `extraction_dataset.jsonl` (80 examples) | 2-3 hr GPU | AI/ML | ⬜ |
 | 18 | Fine-tune Analysis Agent – `monitoring_dataset.jsonl` (100 examples) | 2-3 hr GPU | AI/ML | ⬜ |
 | 19 | Fine-tune Self-Healing Agent – `self_healing_dataset.jsonl` (150 examples) | 2-3 hr GPU | AI/ML | ⬜ |
 | 20 | Integrate fine-tuned adapters – set `*_ADAPTER_PATH` in `.env` | 15 min | AI/ML | ⬜ |
+| 21 | Fine-tune Pipeline-Builder Agent – `pipeline_builder_dataset.jsonl` (**590** examples: 90 DAG/dbt + 500 real text→SQL) | 2-3 hr GPU | AI/ML | ⬜ |
 
 **Infrastructure & Deployment**
 | # | Task | Effort | Owner | Status |
@@ -598,6 +601,7 @@ Executed against the **live** backend (127.0.0.1:8000, Supabase pooler) + fronte
 19. **Docker Desktop flakiness (new Aug 5):** the container dies/restarts on this Windows box → boot-time `WinError 10061`. Stores now retry 5× at init and **lazily reconnect** on every op; `QDRANT_URL` pinned to `127.0.0.1`; `/health/full` reports Qdrant; tests force `QDRANT_ENABLED=false`.
 20. **Docker Desktop "crash cycle" root-caused (new Aug 5):** the ~70s restart cycle was NOT an engine/WSL2 crash — the engine ran continuously with zero container restarts and the Windows event log has no Docker/WSL crash records. The Docker Desktop host process was being killed by the spawning shell's process-tree cleanup (~70s after launch via `nohup`/job object). Fixed by launching detached (`Start-Process`) — stable 1h+. Added a qdrant `/readyz` healthcheck to compose, an `infrastructure/docker/ensure-qdrant.ps1` helper, and `docs/QDRANT_WINDOWS.md` (WSL2 `.wslconfig` tuning + native Windows Qdrant v1.19.0 binary alternative).
 20. **Intent fine-tuning infra (new Aug 5):** parser never loaded a fine-tuned adapter → added `INTENT_ADAPTER_PATH` + `_resolve_intent_model()` (auto-loads `./models/intent-parser`). Added `scripts/evaluate_intent.py` (field accuracy harness) and `scripts/collect_feedback.py` (retrain loop). Dataset v2 surfaces transforms/rules in prompts (v1 kept them label-only → unlearnable 0%). Rule parser source/dest now uses keyword position, not dict order ("s3 to snowflake" no longer misparses).
+21. **Fine-tuning Phase 2/3/8 gaps (new Aug 6):** no public-data path, feedback was manual-only, dataset capped at 200 → added `scripts/fetch_public_datasets.py` (sql-create-context + spider → instruction JSONL, `--limit`/`--seed`, offline-safe), `log_failure()` in `collect_feedback.py` + `_log_parse_failure` in `app/api/v1/pipelines.py` (auto-records AI parse timeouts/errors to `data/feedback_dataset.jsonl`), and expanded the intent dataset to 600 examples (`intent_dataset_v3.jsonl`). SQL rows are kept out of the intent dataset (text→SQL ≠ text→pipeline-JSON).
 
 ---
 

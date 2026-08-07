@@ -49,6 +49,37 @@ def add_entry(
     print(f"✅ Feedback appended to {feedback_path}")
 
 
+def log_failure(
+    user_input: str,
+    fallback_output: str,
+    feedback_path: str = DEFAULT_FEEDBACK_PATH,
+    note: str = "ai_parse_failed",
+) -> None:
+    """Record an automatic parse failure (Phase 8, backend-invoked).
+
+    Unlike ``add_entry`` (a human correction), this is called by
+    ``app/api/v1/pipelines.py`` when the AI intent parser times out or errors
+    and the rule-based fallback is used.  ``output`` holds the fallback result
+    that was actually used, so a later training pass learns from prompts the
+    model got wrong.  The backend wraps this in try/except and never lets a
+    write failure break the request.
+    """
+    entry: Dict[str, Any] = {
+        "instruction": "Extract the pipeline requirements from the user request.",
+        "input": user_input,
+        "output": fallback_output,
+        "original_output": "",
+        "note": note,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+    os.makedirs(os.path.dirname(feedback_path) or ".", exist_ok=True)
+    with open(feedback_path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    print(f"Feedback logged -> {feedback_path}")
+
+
 def merge_datasets(
     base_path: str,
     feedback_path: str = DEFAULT_FEEDBACK_PATH,
@@ -61,24 +92,43 @@ def merge_datasets(
 
     merged: Dict[str, Dict[str, Any]] = {}
 
-    for path in (base_path, feedback_path):
-        if not os.path.exists(path):
-            print(f"⚠️  Skipping missing dataset: {path}")
-            continue
+    def _key(entry: Dict[str, Any]) -> str:
+        # Dedupe key: the natural-language prompt. Base rows carry it in
+        # ``instruction``; feedback rows in ``input`` (the shared fixed
+        # ``instruction`` string would collapse all feedback to one key).
+        return entry.get("input") or entry.get("instruction") or json.dumps(entry, sort_keys=True)
+
+    def _load(path: str):
         with open(path, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line:
                     continue
                 try:
-                    entry = json.loads(line)
+                    yield json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                # Dedupe key: the natural-language prompt (input). Using
-                # ``instruction`` first would collapse every feedback entry to
-                # one key — they all share the fixed instruction string.
-                key = entry.get("input") or entry.get("instruction") or json.dumps(entry, sort_keys=True)
-                merged[key] = entry  # later files (feedback) overwrite base
+
+    # Base first — its labels are ground truth.
+    if not os.path.exists(base_path):
+        print(f"❌ Base dataset not found: {base_path}")
+        return 1
+    for entry in _load(base_path):
+        merged[_key(entry)] = entry
+
+    # Feedback second:
+    #   • user corrections (add_entry, no ``note``) WIN on duplicate prompts;
+    #   • automatic failures (log_failure, ``note`` field) only fill prompts
+    #     MISSING from the base — their output is the rule-based FALLBACK, not
+    #     ground truth, so they must never override a correct label.
+    if os.path.exists(feedback_path):
+        for entry in _load(feedback_path):
+            if "note" in entry:
+                merged.setdefault(_key(entry), entry)
+            else:
+                merged[_key(entry)] = entry
+    else:
+        print(f"⚠️  Skipping missing dataset: {feedback_path}")
 
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:

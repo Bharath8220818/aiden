@@ -197,7 +197,7 @@ class HuggingFaceService:
                 config = PeftConfig.from_pretrained(model_name)
                 base_model = AutoModelForCausalLM.from_pretrained(
                     config.base_model_name_or_path,
-                    device_map="auto",
+                    device_map="auto" if torch.cuda.is_available() else None,
                     trust_remote_code=True,
                     cache_dir=settings.HF_CACHE_DIR,
                 )
@@ -205,12 +205,21 @@ class HuggingFaceService:
             else:
                 # Load from Hugging Face Hub
                 model_kwargs = {
-                    "device_map": "auto",
+                    # Pin placement on CPU boxes: ``auto`` may try to offload
+                    # layers and fail without an offload_dir (see train_agent.py).
+                    "device_map": "auto" if torch.cuda.is_available() else None,
                     "trust_remote_code": True,
                     "cache_dir": settings.HF_CACHE_DIR,
                 }
 
-                if use_quantization and settings.USE_4BIT_QUANTIZATION:
+                # bnb 4-bit is GPU-only: on CPU it segfaults during shard load
+                # (bitsandbytes needs CUDA). Mirror train_agent.py — quantize
+                # only when CUDA is actually available.
+                if (
+                    use_quantization
+                    and settings.USE_4BIT_QUANTIZATION
+                    and torch.cuda.is_available()
+                ):
                     model_kwargs["quantization_config"] = self.quant_config
 
                 model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs)
