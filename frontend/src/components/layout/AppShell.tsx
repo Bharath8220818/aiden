@@ -3,11 +3,11 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, GitBranch, Database,
-  BarChart3, Brain, Shield, Users, BookOpen,
+  BarChart3, Brain, Shield, Users,
   Settings, Bell, LogOut, Menu, X, ChevronRight,
   Sparkles, Layers, FileJson, Activity, CheckSquare,
   FileText, Globe, HelpCircle, MonitorSmartphone,
-  Terminal, Workflow, Library
+  Workflow, Library
 } from 'lucide-react';
 import ThemeToggle from '../common/ThemeToggle';
 import { useAuthStore } from '../../store/authStore';
@@ -29,10 +29,6 @@ const navSections: NavSection[] = [
     title: 'Core',
     items: [
       { label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" />, href: '/dashboard' },
-      { label: 'Learning Paths', icon: <BookOpen className="h-4 w-4" />, href: '/learning-paths' },
-      { label: 'Coding Problems', icon: <Terminal className="h-4 w-4" />, href: '/coding-problems' },
-      { label: 'Data Modeling', icon: <Database className="h-4 w-4" />, href: '/data-modeling' },
-      { label: 'Cloud Labs', icon: <Globe className="h-4 w-4" />, href: '/cloud-labs' },
     ],
   },
   {

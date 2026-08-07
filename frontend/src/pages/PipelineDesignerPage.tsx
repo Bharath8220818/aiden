@@ -69,7 +69,11 @@ with DAG('pipeline_design', default_args=default_args, schedule_interval='0 6 * 
 
       <div className="flex gap-4" style={{ height: '600px' }}>
         {/* Canvas */}
-        <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
+        {/* NOTE: no `scale`/`transform` on this wrapper — React Flow computes
+            pointer coordinates from getBoundingClientRect() and assumes no CSS
+            transform on ancestors. A scale animation on this div makes nodes
+            jump to the corner on the first drag gesture. */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
           className="flex-1 rounded-2xl border border-[var(--color-border)] overflow-hidden relative">
           <ReactFlow
             nodes={nodes} edges={edges}

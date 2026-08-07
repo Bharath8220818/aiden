@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   Database, Plus, Sparkles,
@@ -67,6 +67,7 @@ export default function SchemaDesignerPage() {
   const [tables, setTables] = useState<Table[]>(initialTables);
   const [aiPrompt, setAiPrompt] = useState('');
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   const handleAddTable = useCallback(() => {
     const newId = String(Date.now());
@@ -140,13 +141,21 @@ export default function SchemaDesignerPage() {
     if (!table) return;
     setDragging(id);
     const rect = (e.target as HTMLElement).closest('[data-table-id]')?.getBoundingClientRect();
-    setDragOffset({ x: e.clientX - (rect?.left || table.x), y: e.clientY - (rect?.top || table.y) });
+    // Grab offset is viewport px *within the node* — keeps the card under the cursor.
+    setDragOffset({ x: e.clientX - (rect?.left || 0), y: e.clientY - (rect?.top || 0) });
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!dragging) return;
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    if (!canvasRect) return;
+    // Convert viewport coords (clientX/clientY) into canvas-local coords by
+    // subtracting the canvas origin — otherwise the node jumps by the canvas
+    // offset from the viewport on the first drag.
     setTables(prev => prev.map(t =>
-      t.id === dragging ? { ...t, x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y } : t
+      t.id === dragging
+        ? { ...t, x: e.clientX - canvasRect.left - dragOffset.x, y: e.clientY - canvasRect.top - dragOffset.y }
+        : t
     ));
   };
 
@@ -179,10 +188,13 @@ export default function SchemaDesignerPage() {
       </motion.div>
 
       {/* Canvas */}
+      {/* Opacity-only animation: a scale transform here would scale
+          getBoundingClientRect() during mount and corrupt drag coordinates. */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
-        className="relative overflow-hidden rounded-2xl border border-[var(--color-border)]"
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+        className={`relative overflow-hidden rounded-2xl border border-[var(--color-border)] ${dragging ? 'cursor-grabbing select-none' : ''}`}
         style={{ height: '520px' }}
+        ref={canvasRef}
         onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
       >
         <div className="absolute inset-0 opacity-[0.03]" style={{
@@ -193,11 +205,12 @@ export default function SchemaDesignerPage() {
         {/* Table Cards */}
         {tables.map((table) => {
           const colors = typeColors[table.type];
+          const isCurrentDragging = dragging === table.id;
           return (
             <div
               key={table.id}
               data-table-id={table.id}
-              className={`absolute w-72 rounded-xl border-2 ${colors.border} cursor-grab active:cursor-grabbing overflow-hidden transition-shadow hover:shadow-xl hover:shadow-purple-500/10`}
+              className={`absolute w-72 rounded-xl border-2 ${colors.border} ${isCurrentDragging ? 'cursor-grabbing select-none shadow-2xl' : 'cursor-grab active:cursor-grabbing'} overflow-hidden transition-shadow hover:shadow-xl hover:shadow-purple-500/10`}
               style={{ left: table.x, top: table.y }}
               onMouseDown={(e) => handleMouseDown(e, table.id)}
             >
