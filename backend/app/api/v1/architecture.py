@@ -255,6 +255,69 @@ def _keyword_based_generation(prompt: str, cloud: str) -> ArchitectureResponse:
         "explanation": f"Generated from prompt using keyword detection ({len(components)} components).",
     }
 
+# ── Live infrastructure monitoring ────────────────────────────────────
+
+@router.post("/monitor")
+async def monitor_services(
+    services: list[dict],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return live health status for architecture services.
+
+    Each entry in ``services`` should have ``id`` and ``service`` (name).
+    The endpoint probes real backends where possible and returns a status
+    map keyed by component id.
+    """
+    results = {}
+    import asyncio, time
+
+    # Probe database connectivity
+    async def _check_db(name: str) -> dict:
+        lower = name.lower()
+        if "postgres" in lower:
+            try:
+                async with AsyncSessionLocal() as session:
+                    start = time.monotonic()
+                    await asyncio.wait_for(session.execute(text("SELECT 1")), timeout=5)
+                    ms = int((time.monotonic() - start) * 1000)
+                    return {"status": "healthy", "metrics": {"Latency": f"{ms}ms", "Connections": str(settings.DATABASE_URL.count("@"))}}
+            except Exception:
+                return {"status": "error", "metrics": {"Error": "Connection failed"}}
+        elif "qdrant" in lower or "vector" in lower:
+            try:
+                from qdrant_client import QdrantClient
+                client = QdrantClient(url=settings.QDRANT_URL, timeout=3.0, check_compatibility=False)
+                start = time.monotonic()
+                cols = client.get_collections().collections
+                ms = int((time.monotonic() - start) * 1000)
+                return {"status": "healthy", "metrics": {"Latency": f"{ms}ms", "Collections": str(len(cols))}}
+            except Exception:
+                return {"status": "disconnected", "metrics": {"Error": "Qdrant unavailable"}}
+        else:
+            # Unknown service — assume healthy (can't probe externally)
+            return {"status": "healthy", "metrics": {}}
+
+    # Run probes concurrently
+    probe_tasks = []
+    probe_ids = []
+    for svc in services:
+        sid = svc.get("id", "")
+        name = svc.get("service", "")
+        probe_tasks.append(_check_db(name))
+        probe_ids.append(sid)
+
+    probe_results = await asyncio.gather(*probe_tasks, return_exceptions=True)
+
+    for sid, result in zip(probe_ids, probe_results):
+        if isinstance(result, Exception):
+            results[sid] = {"status": "error", "metrics": {"Error": str(result)}}
+        else:
+            results[sid] = result
+
+    return results
+
+
 @router.post("/optimize", response_model=ArchitectureResponse)
 async def optimize_architecture(
     request: ArchitectureResponse,

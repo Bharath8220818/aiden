@@ -15,7 +15,7 @@ import 'reactflow/dist/style.css';
 
 import {
   Save, Share2, Download, Sparkles, History,
-  Layers, PanelLeftClose, PanelLeftOpen
+  Layers, PanelLeftClose, PanelLeftOpen, Activity
 } from 'lucide-react';
 
 import ArchitectureNode, { type ArchitectureNodeData } from '../components/architecture/ArchitectureNode';
@@ -27,6 +27,7 @@ import ArchitectureToolbar from '../components/architecture/ArchitectureToolbar'
 import AIGenerationPanel from '../components/architecture/AIGenerationPanel';
 import { useNotificationStore } from '../store/notificationStore';
 import { architectureApi, type ArchitectureResult } from '../api/architecture';
+import { useLiveMonitor } from '../hooks/useLiveMonitor';
 
 // ── ReactFlow type registration ──────────────────────────────────────
 
@@ -186,6 +187,32 @@ export default function ArchitectureStudioPage() {
 
   const reactFlowRef = useRef<ReactFlowInstance | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  // ── Live infrastructure monitoring ────────────────────────────────
+  const liveComponents = useMemo(
+    () => nodes.map((n) => ({ id: n.id, service: n.data.service || n.data.label })),
+    [nodes]
+  );
+  const { statuses, isLive, lastUpdate, error: liveError, toggle: toggleLive } = useLiveMonitor(liveComponents, 10000);
+
+  // Apply live statuses to nodes when they change
+  useEffect(() => {
+    if (!isLive || Object.keys(statuses).length === 0) return;
+    setNodes((nds) =>
+      nds.map((n) => {
+        const live = statuses[n.id];
+        if (!live) return n;
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            status: live.status,
+            metrics: { ...n.data.metrics, ...live.metrics },
+          },
+        };
+      })
+    );
+  }, [statuses, isLive, setNodes]);
 
   // ── History (undo/redo) ──────────────────────────────────────────
 
@@ -590,6 +617,17 @@ export default function ArchitectureStudioPage() {
             <span className="text-[10px] text-[var(--color-text-muted)]">
               {stats.nodeCount} nodes · {stats.edgeCount} edges
             </span>
+            {isLive && (
+              <span className="flex items-center gap-1 text-[10px] text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                LIVE
+              </span>
+            )}
+            {liveError && isLive && (
+              <span className="text-[10px] text-amber-400" title={liveError}>
+                ⚠ Monitor error
+              </span>
+            )}
           </div>
         </div>
 
@@ -620,6 +658,23 @@ export default function ArchitectureStudioPage() {
           >
             <Sparkles size={12} />
             Generate with AI
+          </button>
+          {/* Live mode toggle */}
+          <button
+            onClick={toggleLive}
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+              isLive
+                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                : 'border-[#1F2937] text-[var(--color-text-muted)] hover:bg-white/5'
+            }`}
+          >
+            <Activity size={12} className={isLive ? 'animate-pulse' : ''} />
+            {isLive ? 'Live' : 'Static'}
+            {isLive && lastUpdate && (
+              <span className="text-[9px] opacity-60">
+                {Math.round((Date.now() - lastUpdate) / 1000)}s ago
+              </span>
+            )}
           </button>
           <button className="flex items-center gap-1.5 rounded-lg border border-[#1F2937] px-2.5 py-1.5 text-xs text-[var(--color-text-muted)] hover:bg-white/5 transition">
             <History size={12} />
