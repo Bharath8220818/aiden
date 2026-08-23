@@ -17,7 +17,6 @@ import { useScrollRestoration } from './hooks/useScrollRestoration';
 // Lazy loaded pages — split into separate JS chunks
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const SignupPage = lazy(() => import('./pages/SignupPage'));
-const AuthCallback = lazy(() => import('./components/auth/AuthCallback'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const PipelinesPage = lazy(() => import('./pages/PipelinesPage'));
@@ -39,7 +38,7 @@ const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const ChangelogPage = lazy(() => import('./pages/ChangelogPage'));
 
 // ── NEW PAGES (30-pages spec) ──
-const ArchitectureCanvasPage = lazy(() => import('./pages/ArchitectureCanvasPage'));
+const ArchitectureStudioPage = lazy(() => import('./pages/ArchitectureStudioPage'));
 const SchemaDesignerPage = lazy(() => import('./pages/SchemaDesignerPage'));
 const AIWorkspacePage = lazy(() => import('./pages/AIWorkspacePage'));
 const PipelineStudioPage = lazy(() => import('./pages/PipelineStudioPage'));
@@ -111,7 +110,8 @@ function AppShellWithRoutes() {
                   <Route path="/studio" element={<ProtectedRoute><PageTransition variant="scale"><PipelineStudioPage /></PageTransition></ProtectedRoute>} />
 
                   {/* Design & Build */}
-                  <Route path="/architecture-canvas" element={<ProtectedRoute><PageTransition variant="scale"><ArchitectureCanvasPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/architecture" element={<ProtectedRoute><PageTransition variant="scale"><ArchitectureStudioPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/architecture-canvas" element={<ProtectedRoute><PageTransition variant="scale"><ArchitectureStudioPage /></PageTransition></ProtectedRoute>} />
                   <Route path="/schema-designer" element={<ProtectedRoute><PageTransition variant="scale"><SchemaDesignerPage /></PageTransition></ProtectedRoute>} />
                   <Route path="/pipeline-designer" element={<ProtectedRoute><PageTransition variant="scale"><PipelineDesignerPage /></PageTransition></ProtectedRoute>} />
 

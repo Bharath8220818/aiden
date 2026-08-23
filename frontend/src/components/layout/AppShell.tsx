@@ -34,6 +34,7 @@ const navSections: NavSection[] = [
   {
     title: 'Design & Build',
     items: [
+      { label: 'Architecture Studio', icon: <Layers className="h-4 w-4" />, href: '/architecture' },
       { label: 'Architecture Canvas', icon: <Layers className="h-4 w-4" />, href: '/architecture-canvas' },
       { label: 'Schema Designer', icon: <Database className="h-4 w-4" />, href: '/schema-designer' },
       { label: 'Pipeline Builder', icon: <Workflow className="h-4 w-4" />, href: '/builder' },
