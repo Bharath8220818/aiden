@@ -26,6 +26,7 @@ import ArchitecturePropertiesPanel from '../components/architecture/Architecture
 import ArchitectureToolbar from '../components/architecture/ArchitectureToolbar';
 import AIGenerationPanel from '../components/architecture/AIGenerationPanel';
 import { useNotificationStore } from '../store/notificationStore';
+import { architectureApi, type ArchitectureResult } from '../api/architecture';
 
 // ── ReactFlow type registration ──────────────────────────────────────
 
@@ -416,110 +417,89 @@ export default function ArchitectureStudioPage() {
 
   // ── AI Generation ────────────────────────────────────────────────
 
+  /**
+   * Convert backend ArchitectureResult into ReactFlow nodes + edges,
+   * arranging them in a left-to-right flow based on their position in the array.
+   */
+  const mapResultToGraph = useCallback((result: ArchitectureResult) => {
+    const GAP_X = 260;
+    const START_X = 60;
+    const START_Y = 120;
+    const VERTICAL_OFFSET = 160;
+
+    const nodes: Node<ArchitectureNodeData>[] = result.components.map((comp, i) => {
+      // Arrange in a left-to-right pipeline; stagger vertically for variety
+      const col = i;
+      const row = i % 2 === 0 ? 0 : 1;
+      return {
+        id: comp.id || `gen-${i}`,
+        type: 'architectureNode',
+        position: {
+          x: START_X + col * GAP_X,
+          y: START_Y + row * VERTICAL_OFFSET,
+        },
+        data: {
+          label: comp.name,
+          category: comp.category || comp.type || 'processing',
+          service: comp.service || comp.name,
+          icon: comp.icon || '\U0001f4e6',
+          status: (comp.status as ArchitectureNodeData['status']) || 'healthy',
+          metrics: comp.metrics || {},
+        },
+      };
+    });
+
+    const edges: Edge[] = result.connections.map((conn, i) => ({
+      id: conn.id || `edge-${i}`,
+      source: conn.source || conn.from_id || '',
+      target: conn.target || conn.to_id || '',
+      type: 'animatedEdge',
+      data: {
+        edgeType: conn.edgeType || 'dataflow',
+        label: conn.label || '',
+        animated: true,
+      },
+    }));
+
+    return { nodes, edges };
+  }, []);
+
   const handleAIGenerate = useCallback(
-    (_prompt: string) => {
+    async (prompt: string) => {
       setIsGenerating(true);
       setGenerationSteps([]);
       setShowAIPanel(false);
 
-      // Simulate AI generation with animated steps
+      // Show animated steps while waiting for the backend
       AI_GENERATION_STEPS.forEach((step, i) => {
         setTimeout(() => {
           setGenerationSteps((prev) => [...prev, step]);
-        }, (i + 1) * 800);
+        }, (i + 1) * 600);
       });
 
-      // After all steps, generate the architecture
-      setTimeout(() => {
+      try {
+        const result = await architectureApi.generate(prompt, 'aws');
+        const { nodes: newNodes, edges: newEdges } = mapResultToGraph(result);
+
         pushHistory();
-        const generatedNodes: Node<ArchitectureNodeData>[] = [
-          {
-            id: 'ai-pg-1',
-            type: 'architectureNode',
-            position: { x: 60, y: 120 },
-            data: {
-              label: 'PostgreSQL',
-              category: 'databases',
-              service: 'PostgreSQL 15',
-              icon: '🐘',
-              status: 'healthy',
-              metrics: { Connections: '124', CPU: '42%' },
-            },
-          },
-          {
-            id: 'ai-kafka-1',
-            type: 'architectureNode',
-            position: { x: 320, y: 120 },
-            data: {
-              label: 'Apache Kafka',
-              category: 'streaming',
-              service: 'Kafka Cluster',
-              icon: '📡',
-              status: 'healthy',
-              metrics: { Topics: '42', Throughput: '18K msg/s' },
-            },
-          },
-          {
-            id: 'ai-spark-1',
-            type: 'architectureNode',
-            position: { x: 580, y: 120 },
-            data: {
-              label: 'Apache Spark',
-              category: 'processing',
-              service: 'Spark 3.5',
-              icon: '✨',
-              status: 'healthy',
-              metrics: { Jobs: '12', Executors: '8' },
-            },
-          },
-          {
-            id: 'ai-snow-1',
-            type: 'architectureNode',
-            position: { x: 840, y: 120 },
-            data: {
-              label: 'Snowflake',
-              category: 'databases',
-              service: 'Snowflake Enterprise',
-              icon: '❄️',
-              status: 'healthy',
-              metrics: { Tables: '234', Queries: '1.2K/day' },
-            },
-          },
-          {
-            id: 'ai-grafana-1',
-            type: 'architectureNode',
-            position: { x: 840, y: 300 },
-            data: {
-              label: 'Grafana',
-              category: 'monitoring',
-              service: 'Grafana 10',
-              icon: '📈',
-              status: 'healthy',
-              metrics: { Dashboards: '12' },
-            },
-          },
-        ];
+        setNodes(newNodes);
+        setEdges(newEdges);
 
-        const generatedEdges: Edge[] = [
-          { id: 'ai-e-1', source: 'ai-pg-1', target: 'ai-kafka-1', type: 'animatedEdge', data: { edgeType: 'dataflow', label: 'CDC', animated: true } },
-          { id: 'ai-e-2', source: 'ai-kafka-1', target: 'ai-spark-1', type: 'animatedEdge', data: { edgeType: 'dataflow', label: 'Stream', animated: true } },
-          { id: 'ai-e-3', source: 'ai-spark-1', target: 'ai-snow-1', type: 'animatedEdge', data: { edgeType: 'dataflow', label: 'Load', animated: true } },
-          { id: 'ai-e-4', source: 'ai-snow-1', target: 'ai-grafana-1', type: 'animatedEdge', data: { edgeType: 'monitoring', label: 'Metrics' } },
-        ];
-
-        setNodes(generatedNodes);
-        setEdges(generatedEdges);
-        setIsGenerating(false);
-        setGenerationSteps([]);
         addNotification({
           type: 'success',
-          message: 'Architecture generated! 5 components, 4 connections',
+          message: `${result.title || 'Architecture'} generated! ${newNodes.length} components, ${newEdges.length} connections`,
         });
 
         setTimeout(() => reactFlowRef.current?.fitView({ padding: 0.2, duration: 500 }), 100);
-      }, AI_GENERATION_STEPS.length * 800 + 600);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Generation failed';
+        addNotification({ type: 'error', message: `AI generation failed: ${msg}` });
+      } finally {
+        setIsGenerating(false);
+        setGenerationSteps([]);
+      }
     },
-    [setNodes, setEdges, pushHistory, addNotification]
+    [mapResultToGraph, setNodes, setEdges, pushHistory, addNotification]
   );
 
   // ── Keyboard shortcuts ───────────────────────────────────────────
