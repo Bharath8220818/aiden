@@ -4,7 +4,10 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+import httpx
 from app.database import get_db
 from app.models.user import User
 from app.api.v1.deps import get_current_user
@@ -339,3 +342,164 @@ async def list_architectures(
 ):
     """List saved architectures."""
     return []
+
+
+# ── AI Architecture Copilot ─────────────────────────────────────────
+
+class CopilotRequest(BaseModel):
+    message: str
+    architecture: dict
+
+
+class CopilotMessage(BaseModel):
+    response: str
+    suggestions: list[str] = []
+    actions: list[dict] = []
+
+
+COPILOT_SYSTEM_PROMPT = """You are AIDEN Copilot, an expert data-engineering architecture advisor.
+The user has an architecture with the components and connections listed below.
+Answer concisely. When you suggest improvements, format suggestions as a short list.
+When recommending actions (add a component, remove a component, modify a connection),
+return them in the 'actions' array with fields: label, type, payload.
+Always respond in valid JSON with keys: response, suggestions, actions."""
+
+
+@router.post("/copilot", response_model=CopilotMessage)
+async def architecture_copilot(
+    request: CopilotRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """AI copilot that answers questions about an architecture."""
+    import json as _json
+    import asyncio, time
+
+    arch = request.architecture
+    components_summary = []
+    for c in arch.get("components", []):
+        status_str = c.get("status", "unknown")
+        components_summary.append(
+            f"- {c.get('name', 'Unknown')} ({c.get('category', 'unknown')}, {c.get('service', '')}) [{status_str}]"
+        )
+    connections_summary = []
+    for e in arch.get("connections", []):
+        src = e.get("source", "?")
+        tgt = e.get("target", "?")
+        connections_summary.append(f"- {src} → {tgt} ({e.get('label', 'data')})")
+
+    user_context = (
+        f"Architecture: {arch.get('name', 'Untitled')}\n"
+        f"Components ({len(components_summary)}):\n" + "\n".join(components_summary) + "\n"
+        f"Connections ({len(connections_summary)}):\n" + "\n".join(connections_summary)
+    )
+
+    full_prompt = f"{COPILOT_SYSTEM_PROMPT}\n\n{user_context}\n\nUser question: {request.message}"
+
+    # Try Ollama first (fast), then keyword fallback
+    ollama_url = getattr(settings, "OLLAMA_URL", "http://localhost:11434")
+    try:
+        start = time.monotonic()
+        resp = await asyncio.wait_for(
+            httpx.AsyncClient(timeout=20.0).post(
+                f"{ollama_url}/api/generate",
+                json={"model": "qwen2.5:3b", "prompt": full_prompt, "stream": False},
+            ),
+            timeout=25.0,
+        )
+        if resp.status_code == 200:
+            raw = resp.json().get("response", "{}")
+            try:
+                parsed = _json.loads(raw)
+                return CopilotMessage(
+                    response=parsed.get("response", ""),
+                    suggestions=parsed.get("suggestions", []),
+                    actions=parsed.get("actions", []),
+                )
+            except _json.JSONDecodeError:
+                return CopilotMessage(response=raw.strip(), suggestions=[], actions=[])
+    except Exception:
+        pass
+
+    # Keyword-based fallback
+    msg_lower = request.message.lower()
+    components = arch.get("components", [])
+    response_text = ""
+    suggestions: list[str] = []
+    actions: list[dict] = []
+
+    if any(w in msg_lower for w in ["bottleneck", "bottlenecks", "slow", "performance"]):
+        response_text = (
+            f"Analyzing {len(components)} components for potential bottlenecks:\n\n"
+            "1. Check data flow between ingestion and processing layers\n"
+            "2. Look for single points of failure\n"
+            "3. Verify parallelism in processing components"
+        )
+        suggestions = ["Add monitoring", "Check consumer lag", "Scale processors"]
+    elif any(w in msg_lower for w in ["monitor", "monitoring", "observability"]):
+        has_monitoring = any(c.get("category") == "monitoring" for c in components)
+        if has_monitoring:
+            response_text = "A monitoring component already exists. Consider adding Prometheus for metrics collection and an alerting layer."
+        else:
+            response_text = "No monitoring detected. Adding monitoring is critical for production systems."
+            suggestions = ["Add Prometheus", "Add Grafana dashboard", "Add OpenTelemetry"]
+            actions.append({"label": "Add Monitoring Component", "type": "add-node", "payload": {"category": "monitoring", "name": "Prometheus"}})
+    elif any(w in msg_lower for w in ["security", "secure", "vault", "iam"]):
+        has_security = any(c.get("category") == "security" for c in components)
+        if has_security:
+            response_text = "A security component exists. Review access policies and secrets management."
+        else:
+            response_text = "No security layer detected. Production architectures need IAM, secrets management, and network policies."
+            suggestions = ["Add Vault", "Add IAM", "Add network policies"]
+            actions.append({"label": "Add Security Component", "type": "add-node", "payload": {"category": "security", "name": "Vault"}})
+    elif any(w in msg_lower for w in ["production", "prod", "hardening"]):
+        response_text = "Production readiness checklist:\n"
+        cats = set(c.get("category", "") for c in components)
+        missing = []
+        if "monitoring" not in cats:
+            missing.append("monitoring")
+        if "security" not in cats:
+            missing.append("security")
+        if missing:
+            response_text += f"Missing: {', '.join(missing)}\n"
+            suggestions = [f"Add {m}" for m in missing]
+        else:
+            response_text += "Core layers present. Add disaster recovery and data quality gates."
+            suggestions = ["Add DR", "Add data quality"]
+    elif any(w in msg_lower for w in ["cost", "expensive", "optimize", "cheap"]):
+        response_text = (
+            f"Architecture has {len(components)} components. Key cost factors:\n"
+            "- Storage and compute in processing layer\n"
+            "- Streaming throughput\n"
+            "- Warehouse query volume"
+        )
+        suggestions = ["Right-size instances", "Use spot instances", "Archive old data"]
+    elif any(w in msg_lower for w in ["disaster", "recovery", "backup", "dr"]):
+        response_text = "Disaster recovery recommendations:\n"
+        response_text += "- Implement cross-region replication\n- Set up automated backups\n- Create failover procedures"
+        suggestions = ["Add cross-region replication", "Enable automated backups"]
+    elif any(w in msg_lower for w in ["terrarform", "iac", "infrastructure as code"]):
+        response_text = "I can help generate Terraform for the components in this architecture. The current setup includes:\n"
+        for c in components[:5]:
+            response_text += f"- {c.get('name', 'Unknown')}\n"
+        response_text += "\nWould you like me to generate Terraform for a specific cloud provider?"
+        suggestions = ["Generate AWS Terraform", "Generate GCP Terraform", "Generate Azure Terraform"]
+    else:
+        # General analysis
+        response_text = (
+            f"This architecture has {len(components)} components with {len(arch.get('connections', []))} connections.\n\n"
+            "Components by category:\n"
+        )
+        cat_counts: dict[str, int] = {}
+        for c in components:
+            cat = c.get("category", "other")
+            cat_counts[cat] = cat_counts.get(cat, 0) + 1
+        for cat, count in sorted(cat_counts.items()):
+            response_text += f"  {cat}: {count}\n"
+
+        healthy = sum(1 for c in components if c.get("status") == "healthy")
+        response_text += f"\nHealth: {healthy}/{len(components)} healthy"
+
+        suggestions = ["Find bottlenecks", "Add monitoring", "Improve security"]
+
+    return CopilotMessage(response=response_text, suggestions=suggestions, actions=actions)

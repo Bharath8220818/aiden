@@ -20,19 +20,23 @@ import {
 
 import ArchitectureNode, { type ArchitectureNodeData } from '../components/architecture/ArchitectureNode';
 import AnimatedEdge from '../components/architecture/AnimatedEdge';
+import ArchitectureZone, { type ZoneData } from '../components/architecture/ArchitectureZone';
 import AssetLibraryPanel from '../components/architecture/AssetLibraryPanel';
 import type { AssetItem } from '../components/architecture/AssetLibraryPanel';
 import ArchitecturePropertiesPanel from '../components/architecture/ArchitecturePropertiesPanel';
 import ArchitectureToolbar from '../components/architecture/ArchitectureToolbar';
 import AIGenerationPanel from '../components/architecture/AIGenerationPanel';
+import AICopilotPanel from '../components/architecture/AICopilotPanel';
 import { useNotificationStore } from '../store/notificationStore';
 import { architectureApi, type ArchitectureResult } from '../api/architecture';
 import { useLiveMonitor } from '../hooks/useLiveMonitor';
+import { Bot } from 'lucide-react';
 
 // ── ReactFlow type registration ──────────────────────────────────────
 
 const nodeTypes: NodeTypes = {
   architectureNode: ArchitectureNode,
+  architectureZone: ArchitectureZone,
 };
 
 const edgeTypes: EdgeTypes = {
@@ -49,7 +53,37 @@ const generateNodeId = (type: string): string => {
 
 // ── Default architecture (E-Commerce Data Platform) ───────────────────
 
-const DEFAULT_NODES: Node<ArchitectureNodeData>[] = [
+const DEFAULT_NODES: Node<ArchitectureNodeData | ZoneData>[] = [
+  // Zones (group containers)
+  {
+    id: 'zone-sources',
+    type: 'architectureZone',
+    position: { x: 0, y: 20 },
+    data: { label: 'Data Sources', color: 'blue', collapsed: false, nodeCount: 1, description: 'Source databases and APIs' } as ZoneData,
+    style: { width: 320, height: 260, zIndex: -1 },
+  },
+  {
+    id: 'zone-streaming',
+    type: 'architectureZone',
+    position: { x: 320, y: 20 },
+    data: { label: 'Ingestion & Streaming', color: 'cyan', collapsed: false, nodeCount: 2, description: 'Event streaming and orchestration' } as ZoneData,
+    style: { width: 320, height: 260, zIndex: -1 },
+  },
+  {
+    id: 'zone-processing',
+    type: 'architectureZone',
+    position: { x: 640, y: 20 },
+    data: { label: 'Processing', color: 'amber', collapsed: false, nodeCount: 2, description: 'Transform and process data' } as ZoneData,
+    style: { width: 320, height: 260, zIndex: -1 },
+  },
+  {
+    id: 'zone-analytics',
+    type: 'architectureZone',
+    position: { x: 960, y: 20 },
+    data: { label: 'Analytics & Monitoring', color: 'violet', collapsed: false, nodeCount: 2, description: 'Warehouse and dashboards' } as ZoneData,
+    style: { width: 320, height: 320, zIndex: -1 },
+  },
+  // Nodes
   {
     id: 'pg-1',
     type: 'architectureNode',
@@ -180,6 +214,7 @@ export default function ArchitectureStudioPage() {
   const [showGrid, setShowGrid] = useState(true);
   const [zoom, setZoom] = useState(1);
   const [showAIPanel, setShowAIPanel] = useState(false);
+  const [showCopilot, setShowCopilot] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationSteps, setGenerationSteps] = useState<string[]>([]);
   const [history, setHistory] = useState<{ nodes: Node[]; edges: Edge[] }[]>([]);
@@ -659,6 +694,17 @@ export default function ArchitectureStudioPage() {
             <Sparkles size={12} />
             Generate with AI
           </button>
+          <button
+            onClick={() => setShowCopilot(!showCopilot)}
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+              showCopilot
+                ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-400'
+                : 'border-[#1F2937] text-[var(--color-text-muted)] hover:bg-white/5'
+            }`}
+          >
+            <Bot size={12} />
+            Copilot
+          </button>
           {/* Live mode toggle */}
           <button
             onClick={toggleLive}
@@ -702,7 +748,7 @@ export default function ArchitectureStudioPage() {
       </div>
 
       {/* ── Main Content (3-panel layout) ──────────────────────── */}
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 relative">
         {/* Asset Library (left) */}
         <AnimatePresence mode="wait">
           {showAssetLibrary && (
@@ -811,6 +857,33 @@ export default function ArchitectureStudioPage() {
             canRedo={historyIndex < history.length - 1}
           />
         </div>
+
+        {/* AI Copilot Panel (outside canvas to avoid ReactFlow event capture) */}
+        <AICopilotPanel
+          isOpen={showCopilot}
+          onClose={() => setShowCopilot(false)}
+          architectureContext={
+            {
+              nodes: nodes
+                .filter((n) => n.type === 'architectureNode')
+                .map((n) => ({
+                  id: n.id,
+                  label: n.data.label,
+                  category: n.data.category || '',
+                  service: n.data.service || '',
+                  status: n.data.status || 'unknown',
+                  metrics: n.data.metrics,
+                })),
+              edges: edges.map((e) => ({
+                source: e.source,
+                target: e.target,
+                label: e.data?.label,
+                edgeType: e.data?.edgeType,
+              })),
+              architectureName: 'E-Commerce Data Platform',
+            }
+          }
+        />
 
         {/* Properties Panel (right) */}
         <AnimatePresence mode="wait">
