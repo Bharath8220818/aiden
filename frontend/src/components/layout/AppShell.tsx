@@ -114,7 +114,7 @@ export function AppShell({ children }: AppShellProps) {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen overflow-x-hidden">
       {/* ── Sidebar ── */}
       <>
         {/* Mobile overlay */}
@@ -265,7 +265,7 @@ export function AppShell({ children }: AppShellProps) {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 px-4 py-6 md:px-6 md:py-8 lg:px-8">
+        <main className="flex-1 px-4 py-6 md:px-6 md:py-8 lg:px-8 overflow-x-hidden">
           {children}
         </main>
       </div>

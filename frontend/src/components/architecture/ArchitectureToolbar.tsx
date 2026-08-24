@@ -49,9 +49,12 @@ const ArchitectureToolbar: React.FC<ArchitectureToolbarProps> = ({
   canUndo,
   canRedo,
 }) => {
+  // On mobile, only show essential tools (select, pan, add, connect)
+  const essentialToolIds = new Set(['select', 'pan', 'add', 'connect']);
+
   return (
-    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
-      <div className="flex items-center gap-1 rounded-xl border border-[#1F2937] bg-[#0E131D]/95 backdrop-blur-md shadow-xl shadow-black/30 px-2 py-1.5">
+    <div className="absolute bottom-4 sm:bottom-4 left-1/2 -translate-x-1/2 z-20 max-sm:bottom-20">
+      <div className="flex items-center gap-0.5 sm:gap-1 rounded-xl border border-[#1F2937] bg-[#0E131D]/95 backdrop-blur-md shadow-xl shadow-black/30 px-1.5 sm:px-2 py-1.5">
         {/* Drawing tools */}
         {tools.map((tool) => (
           <button
@@ -59,6 +62,7 @@ const ArchitectureToolbar: React.FC<ArchitectureToolbarProps> = ({
             onClick={() => onToolChange(tool.id)}
             title={`${tool.label} (${tool.shortcut})`}
             className={`relative flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+              !essentialToolIds.has(tool.id) ? 'max-sm:hidden' : ''} ${
               activeTool === tool.id
                 ? 'bg-purple-500/20 text-purple-400 shadow-sm shadow-purple-500/10'
                 : 'text-[var(--color-text-muted)] hover:bg-white/5 hover:text-[var(--color-text-secondary)]'
@@ -72,7 +76,7 @@ const ArchitectureToolbar: React.FC<ArchitectureToolbarProps> = ({
         ))}
 
         {/* Divider */}
-        <div className="w-px h-5 bg-[#1F2937] mx-1" />
+        <div className="w-px h-5 bg-[#1F2937] mx-0.5 sm:mx-1" />
 
         {/* Undo / Redo */}
         <button
@@ -92,13 +96,13 @@ const ArchitectureToolbar: React.FC<ArchitectureToolbarProps> = ({
           <Redo2 size={14} />
         </button>
 
-        <div className="w-px h-5 bg-[#1F2937] mx-1" />
+        <div className="w-px h-5 bg-[#1F2937] mx-0.5 sm:mx-1" />
 
         {/* Auto Layout */}
         <button
           onClick={onAutoLayout}
           title="Auto Layout (L)"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-muted)] hover:bg-white/5 hover:text-[var(--color-text-secondary)] transition"
+          className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-muted)] hover:bg-white/5 hover:text-[var(--color-text-secondary)] transition"
         >
           <LayoutGrid size={14} />
         </button>
@@ -107,7 +111,7 @@ const ArchitectureToolbar: React.FC<ArchitectureToolbarProps> = ({
         <button
           onClick={onToggleGrid}
           title="Toggle Grid (G)"
-          className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
+          className={`hidden sm:flex h-8 w-8 items-center justify-center rounded-lg transition ${
             showGrid
               ? 'bg-purple-500/20 text-purple-400'
               : 'text-[var(--color-text-muted)] hover:bg-white/5 hover:text-[var(--color-text-secondary)]'
@@ -120,28 +124,28 @@ const ArchitectureToolbar: React.FC<ArchitectureToolbarProps> = ({
         <button
           onClick={onFitView}
           title="Fit View (F)"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-muted)] hover:bg-white/5 hover:text-[var(--color-text-secondary)] transition"
+          className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-muted)] hover:bg-white/5 hover:text-[var(--color-text-secondary)] transition"
         >
           <Scan size={14} />
         </button>
 
-        <div className="w-px h-5 bg-[#1F2937] mx-1" />
+        <div className="w-px h-5 bg-[#1F2937] mx-0.5 sm:mx-1" />
 
         {/* Zoom */}
         <button
           onClick={onZoomOut}
           title="Zoom Out"
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--color-text-muted)] hover:bg-white/5 hover:text-[var(--color-text-secondary)] transition"
+          className="hidden sm:flex h-7 w-7 items-center justify-center rounded-lg text-[var(--color-text-muted)] hover:bg-white/5 hover:text-[var(--color-text-secondary)] transition"
         >
           <ZoomOut size={12} />
         </button>
-        <span className="w-10 text-center text-[10px] font-mono text-[var(--color-text-muted)] select-none">
+        <span className="hidden sm:block w-10 text-center text-[10px] font-mono text-[var(--color-text-muted)] select-none">
           {Math.round(zoom * 100)}%
         </span>
         <button
           onClick={onZoomIn}
           title="Zoom In"
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--color-text-muted)] hover:bg-white/5 hover:text-[var(--color-text-secondary)] transition"
+          className="hidden sm:flex h-7 w-7 items-center justify-center rounded-lg text-[var(--color-text-muted)] hover:bg-white/5 hover:text-[var(--color-text-secondary)] transition"
         >
           <ZoomIn size={12} />
         </button>

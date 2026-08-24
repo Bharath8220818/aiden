@@ -17,8 +17,8 @@ const MobileNav = () => {
   }
 
   return (
-    <nav className="fixed inset-x-3 bottom-3 z-50 md:hidden" aria-label="Mobile navigation">
-      <div className="rounded-[1.5rem] border border-white/70 bg-slate-900/90 px-1.5 py-1.5 shadow-[0_20px_60px_-20px_rgba(15,23,42,0.55)] backdrop-blur-xl">
+    <nav className="fixed inset-x-3 bottom-3 z-50 md:hidden" aria-label="Mobile navigation" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <div className="rounded-[1.5rem] border border-white/10 bg-[#111827]/95 px-1.5 py-1.5 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.55)] backdrop-blur-xl">
         <div className="grid grid-cols-4 gap-1">
           {items.map((item) => {
             const active = pathname === item.to || (item.to !== '/' && pathname.startsWith(item.to));

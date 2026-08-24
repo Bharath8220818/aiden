@@ -209,7 +209,7 @@ export default function ArchitectureStudioPage() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(DEFAULT_EDGES);
   const [selectedNode, setSelectedNode] = useState<Node<ArchitectureNodeData> | null>(null);
   const [showProperties, setShowProperties] = useState(false);
-  const [showAssetLibrary, setShowAssetLibrary] = useState(true);
+  const [showAssetLibrary, setShowAssetLibrary] = useState(() => window.innerWidth >= 768);
   const [activeTool, setActiveTool] = useState<Tool>('select');
   const [showGrid, setShowGrid] = useState(true);
   const [zoom, setZoom] = useState(1);
@@ -730,22 +730,22 @@ export default function ArchitectureStudioPage() {
   // ── Render ───────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] -mt-4 -mx-4 md:-mx-6 md:-mt-6 lg:-mx-8 lg:-mt-8">
+    <div className="flex flex-col h-[calc(100vh-8rem)] -mt-4 -mx-4 md:-mx-6 md:-mt-6 lg:-mx-8 lg:-mt-8 max-w-full">
       {/* ── Top Bar ──────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#1F2937] bg-[#0E131D] shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-cyan-500">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[#1F2937] bg-[#0E131D] shrink-0 gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 shrink-0">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-cyan-500 shrink-0">
             <Layers size={14} className="text-white" />
           </div>
-          <div>
-            <h1 className="text-sm font-bold text-[var(--color-text)]">Architecture Studio</h1>
-            <p className="text-[10px] text-[var(--color-text-muted)]">E-Commerce Data Platform</p>
+          <div className="min-w-0">
+            <h1 className="text-sm font-bold text-[var(--color-text)] truncate">Architecture Studio</h1>
+            <p className="text-[10px] text-[var(--color-text-muted)] truncate">E-Commerce Data Platform</p>
           </div>
-          <div className="flex items-center gap-1.5 ml-4">
+          <div className="hidden lg:flex items-center gap-1.5">
             <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20">
               v1.0
             </span>
-            <span className="text-[10px] text-[var(--color-text-muted)]">
+            <span className="text-[10px] text-[var(--color-text-muted)] whitespace-nowrap">
               {stats.nodeCount} nodes · {stats.edgeCount} edges
             </span>
             {isLive && (
@@ -756,15 +756,15 @@ export default function ArchitectureStudioPage() {
             )}
             {liveError && isLive && (
               <span className="text-[10px] text-amber-400" title={liveError}>
-                ⚠ Monitor error
+                ⚠
               </span>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap justify-end min-w-0">
           {/* Status indicators */}
-          <div className="flex items-center gap-2 mr-2">
+          <div className="hidden lg:flex items-center gap-1.5 mr-1">
             <span className="flex items-center gap-1 text-[10px] text-emerald-400">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               {stats.healthy}
@@ -785,26 +785,27 @@ export default function ArchitectureStudioPage() {
 
           <button
             onClick={() => setShowAIPanel(true)}
-            className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-purple-600/20 to-cyan-600/20 border border-purple-500/20 px-3 py-1.5 text-xs font-medium text-purple-300 hover:from-purple-600/30 hover:to-cyan-600/30 transition"
+            className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-purple-600/20 to-cyan-600/20 border border-purple-500/20 px-2.5 py-1.5 text-xs font-medium text-purple-300 hover:from-purple-600/30 hover:to-cyan-600/30 transition whitespace-nowrap"
           >
             <Sparkles size={12} />
-            Generate with AI
+            <span className="hidden sm:inline">Generate with AI</span>
+            <span className="sm:hidden">AI</span>
           </button>
           <button
             onClick={() => setShowCopilot(!showCopilot)}
-            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+            className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition ${
               showCopilot
                 ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-400'
                 : 'border-[#1F2937] text-[var(--color-text-muted)] hover:bg-white/5'
             }`}
           >
             <Bot size={12} />
-            Copilot
+            <span className="hidden md:inline">Copilot</span>
           </button>
           {/* Live mode toggle */}
           <button
             onClick={toggleLive}
-            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+            className={`hidden sm:flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition ${
               isLive
                 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
                 : 'border-[#1F2937] text-[var(--color-text-muted)] hover:bg-white/5'
@@ -818,39 +819,38 @@ export default function ArchitectureStudioPage() {
               </span>
             )}
           </button>
-          <button className="flex items-center gap-1.5 rounded-lg border border-[#1F2937] px-2.5 py-1.5 text-xs text-[var(--color-text-muted)] hover:bg-white/5 transition">
+          <button className="hidden md:flex items-center gap-1.5 rounded-lg border border-[#1F2937] px-2 py-1.5 text-xs text-[var(--color-text-muted)] hover:bg-white/5 transition">
             <History size={12} />
-            History
+            <span className="hidden lg:inline">History</span>
           </button>
           <button
             onClick={onSave}
-            className="flex items-center gap-1.5 rounded-lg border border-[#1F2937] px-2.5 py-1.5 text-xs text-[var(--color-text-muted)] hover:bg-white/5 transition"
+            className="flex items-center gap-1.5 rounded-lg border border-[#1F2937] px-2 py-1.5 text-xs text-[var(--color-text-muted)] hover:bg-white/5 transition"
           >
             <Save size={12} />
-            Save
+            <span className="hidden md:inline">Save</span>
           </button>
-          <button className="flex items-center gap-1.5 rounded-lg border border-[#1F2937] px-2.5 py-1.5 text-xs text-[var(--color-text-muted)] hover:bg-white/5 transition">
+          <button className="hidden md:flex items-center gap-1.5 rounded-lg border border-[#1F2937] px-2 py-1.5 text-xs text-[var(--color-text-muted)] hover:bg-white/5 transition">
             <Share2 size={12} />
-            Share
           </button>
           <button
             onClick={onExport}
-            className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-500 transition"
+            className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-purple-500 transition"
           >
             <Download size={12} />
-            Export
+            <span className="hidden sm:inline">Export</span>
           </button>
         </div>
       </div>
 
       {/* ── Main Content (3-panel layout) ──────────────────────── */}
-      <div className="flex flex-1 min-h-0 relative">
+      <div className="flex flex-1 min-h-0 relative overflow-hidden">
         {/* Asset Library (left) */}
         <AnimatePresence mode="wait">
           {showAssetLibrary && (
             <motion.div
               initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 240, opacity: 1 }}
+              animate={{ width: typeof window !== 'undefined' && window.innerWidth < 640 ? 200 : 240, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.2 }}
               className="shrink-0 overflow-hidden"
@@ -906,7 +906,7 @@ export default function ArchitectureStudioPage() {
             />
             <MiniMap
               position="bottom-right"
-              className="!rounded-xl !border !border-[#1F2937] !bg-[#111827] !shadow-lg"
+              className="!rounded-xl !border !border-[#1F2937] !bg-[#111827] !shadow-lg max-sm:!hidden"
               nodeColor={minimapNodeColor}
               nodeBorderRadius={6}
               maskColor="rgba(8, 11, 18, 0.7)"
@@ -987,10 +987,10 @@ export default function ArchitectureStudioPage() {
           {showProperties && selectedNode && (
             <motion.div
               initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 288, opacity: 1 }}
+              animate={{ width: typeof window !== 'undefined' && window.innerWidth < 640 ? 260 : 288, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="shrink-0 overflow-hidden"
+              className="shrink-0 overflow-hidden max-sm:absolute max-sm:right-0 max-sm:top-0 max-sm:bottom-0 max-sm:z-40 max-sm:bg-[#0E131D] max-sm:border-l max-sm:border-[#1F2937] max-sm:shadow-2xl"
             >
               <ArchitecturePropertiesPanel
                 node={selectedNode}
