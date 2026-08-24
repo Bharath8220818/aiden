@@ -433,25 +433,51 @@ async def architecture_copilot(
             f"Analyzing {len(components)} components for potential bottlenecks:\n\n"
             "1. Check data flow between ingestion and processing layers\n"
             "2. Look for single points of failure\n"
-            "3. Verify parallelism in processing components"
+            "3. Verify parallelism in processing components\n\n"
+            "Recommendation: Add Prometheus + Grafana for real-time bottleneck detection."
         )
         suggestions = ["Add monitoring", "Check consumer lag", "Scale processors"]
+        has_monitoring = any(c.get("category") == "monitoring" for c in components)
+        if not has_monitoring:
+            actions.append({"label": "Add Prometheus Monitoring", "type": "add-node", "payload": {
+                "name": "Prometheus", "icon": "\U0001f525", "category": "monitoring",
+                "service": "Prometheus", "status": "healthy",
+                "metrics": {"Targets": str(len(components)), "Scrape": "15s"},
+            }})
+            actions.append({"label": "Add Grafana Dashboard", "type": "add-node", "payload": {
+                "name": "Grafana", "icon": "\U0001f4c8", "category": "monitoring",
+                "service": "Grafana 10", "status": "healthy",
+                "metrics": {"Dashboards": "6", "Panels": "48"},
+            }})
     elif any(w in msg_lower for w in ["monitor", "monitoring", "observability"]):
         has_monitoring = any(c.get("category") == "monitoring" for c in components)
         if has_monitoring:
             response_text = "A monitoring component already exists. Consider adding Prometheus for metrics collection and an alerting layer."
         else:
-            response_text = "No monitoring detected. Adding monitoring is critical for production systems."
+            response_text = "No monitoring detected. Adding monitoring is critical for production systems.\n\nI'll add Prometheus for metrics collection and Grafana for dashboards."
             suggestions = ["Add Prometheus", "Add Grafana dashboard", "Add OpenTelemetry"]
-            actions.append({"label": "Add Monitoring Component", "type": "add-node", "payload": {"category": "monitoring", "name": "Prometheus"}})
+            actions.append({"label": "Add Prometheus", "type": "add-node", "payload": {
+                "name": "Prometheus", "icon": "\U0001f525", "category": "monitoring",
+                "service": "Prometheus", "status": "healthy",
+                "metrics": {"Targets": str(len(components)), "Scrape": "15s"},
+            }})
+            actions.append({"label": "Add Grafana Dashboard", "type": "add-node", "payload": {
+                "name": "Grafana", "icon": "\U0001f4c8", "category": "monitoring",
+                "service": "Grafana 10", "status": "healthy",
+                "metrics": {"Dashboards": "6", "Panels": "48"},
+            }})
     elif any(w in msg_lower for w in ["security", "secure", "vault", "iam"]):
         has_security = any(c.get("category") == "security" for c in components)
         if has_security:
             response_text = "A security component exists. Review access policies and secrets management."
         else:
-            response_text = "No security layer detected. Production architectures need IAM, secrets management, and network policies."
+            response_text = "No security layer detected. Production architectures need IAM, secrets management, and network policies.\n\nI'll add HashiCorp Vault for secrets management."
             suggestions = ["Add Vault", "Add IAM", "Add network policies"]
-            actions.append({"label": "Add Security Component", "type": "add-node", "payload": {"category": "security", "name": "Vault"}})
+            actions.append({"label": "Add Vault (Secrets Management)", "type": "add-node", "payload": {
+                "name": "Vault", "icon": "\U0001f510", "category": "security",
+                "service": "HashiCorp Vault", "status": "healthy",
+                "metrics": {"Secrets": "128", "Leases": "1.2K"},
+            }})
     elif any(w in msg_lower for w in ["production", "prod", "hardening"]):
         response_text = "Production readiness checklist:\n"
         cats = set(c.get("category", "") for c in components)
@@ -461,10 +487,28 @@ async def architecture_copilot(
         if "security" not in cats:
             missing.append("security")
         if missing:
-            response_text += f"Missing: {', '.join(missing)}\n"
+            response_text += f"Missing: {', '.join(missing)}\n\n"
+            response_text += "I'll add the missing components to make this production-ready."
             suggestions = [f"Add {m}" for m in missing]
+            if "monitoring" in missing:
+                actions.append({"label": "Add Prometheus", "type": "add-node", "payload": {
+                    "name": "Prometheus", "icon": "\U0001f525", "category": "monitoring",
+                    "service": "Prometheus", "status": "healthy",
+                    "metrics": {"Targets": str(len(components)), "Scrape": "15s"},
+                }})
+                actions.append({"label": "Add Grafana Dashboard", "type": "add-node", "payload": {
+                    "name": "Grafana", "icon": "\U0001f4c8", "category": "monitoring",
+                    "service": "Grafana 10", "status": "healthy",
+                    "metrics": {"Dashboards": "6", "Panels": "48"},
+                }})
+            if "security" in missing:
+                actions.append({"label": "Add Vault (Secrets Management)", "type": "add-node", "payload": {
+                    "name": "Vault", "icon": "\U0001f510", "category": "security",
+                    "service": "HashiCorp Vault", "status": "healthy",
+                    "metrics": {"Secrets": "128", "Leases": "1.2K"},
+                }})
         else:
-            response_text += "Core layers present. Add disaster recovery and data quality gates."
+            response_text += "Core layers present. Consider adding disaster recovery and data quality gates."
             suggestions = ["Add DR", "Add data quality"]
     elif any(w in msg_lower for w in ["cost", "expensive", "optimize", "cheap"]):
         response_text = (
@@ -475,9 +519,53 @@ async def architecture_copilot(
         )
         suggestions = ["Right-size instances", "Use spot instances", "Archive old data"]
     elif any(w in msg_lower for w in ["disaster", "recovery", "backup", "dr"]):
-        response_text = "Disaster recovery recommendations:\n"
-        response_text += "- Implement cross-region replication\n- Set up automated backups\n- Create failover procedures"
+        response_text = (
+            "Disaster recovery recommendations:\n"
+            "- Implement cross-region replication\n"
+            "- Set up automated backups\n"
+            "- Create failover procedures\n\n"
+            "I'll add a backup storage component for disaster recovery."
+        )
         suggestions = ["Add cross-region replication", "Enable automated backups"]
+        actions.append({"label": "Add S3 Backup Storage", "type": "add-node", "payload": {
+            "name": "S3 Backup", "icon": "\U0001faa6", "category": "storage",
+            "service": "Amazon S3", "status": "healthy",
+            "metrics": {"Bucket": "dr-backup", "Versioning": "Enabled"},
+        }})
+    elif any(w in msg_lower for w in ["improve", "better", "enhance", "optimize architecture"]):
+        cats = set(c.get("category", "") for c in components)
+        missing = []
+        if "monitoring" not in cats:
+            missing.append("monitoring")
+        if "security" not in cats:
+            missing.append("security")
+        if "quality" not in cats:
+            missing.append("quality")
+        response_text = f"Current architecture has {len(components)} components. Suggestions for improvement:\n\n"
+        if missing:
+            response_text += f"Missing layers: {', '.join(missing)}\n"
+            suggestions = [f"Add {m}" for m in missing]
+            if "monitoring" in missing:
+                actions.append({"label": "Add Prometheus", "type": "add-node", "payload": {
+                    "name": "Prometheus", "icon": "\U0001f525", "category": "monitoring",
+                    "service": "Prometheus", "status": "healthy",
+                    "metrics": {"Targets": str(len(components)), "Scrape": "15s"},
+                }})
+            if "security" in missing:
+                actions.append({"label": "Add Vault (Secrets Management)", "type": "add-node", "payload": {
+                    "name": "Vault", "icon": "\U0001f510", "category": "security",
+                    "service": "HashiCorp Vault", "status": "healthy",
+                    "metrics": {"Secrets": "128", "Leases": "1.2K"},
+                }})
+            if "quality" in missing:
+                actions.append({"label": "Add Great Expectations", "type": "add-node", "payload": {
+                    "name": "Great Expectations", "icon": "\u2705", "category": "quality",
+                    "service": "Great Expectations", "status": "healthy",
+                    "metrics": {"Suites": "24", "Expectations": "156"},
+                }})
+        else:
+            response_text += "All core layers present. Consider adding disaster recovery and data quality gates."
+            suggestions = ["Add DR", "Add data quality"]
     elif any(w in msg_lower for w in ["terrarform", "iac", "infrastructure as code"]):
         response_text = "I can help generate Terraform for the components in this architecture. The current setup includes:\n"
         for c in components[:5]:

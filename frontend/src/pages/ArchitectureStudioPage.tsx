@@ -428,6 +428,102 @@ export default function ArchitectureStudioPage() {
     [nodes, setNodes, pushHistory, addNotification]
   );
 
+  // ── Copilot action handler ──────────────────────────────────────
+
+  const handleCopilotAction = useCallback(
+    (action: { type: string; payload?: unknown }) => {
+      if (action.type === 'add-node' && action.payload) {
+        const p = action.payload as {
+          name?: string; icon?: string; category?: string;
+          service?: string; status?: string; metrics?: Record<string, string>;
+        };
+        pushHistory();
+        // Read current nodes for positioning (user actions are sequential, so closure is current)
+        const archNodes = nodes.filter((n) => n.type === 'architectureNode');
+        const maxX = archNodes.length > 0
+          ? Math.max(...archNodes.map((n) => n.position.x))
+          : 0;
+        const existingAtX = archNodes.filter((n) => Math.abs(n.position.x - maxX) < 10).length;
+        const rightmost = archNodes.length > 0
+          ? archNodes.reduce((a, b) => a.position.x > b.position.x ? a : b)
+          : null;
+
+        const newNodeId = generateNodeId(p.category || 'component');
+        const newNode: Node<ArchitectureNodeData> = {
+          id: newNodeId,
+          type: 'architectureNode',
+          position: { x: maxX + 260, y: 100 + existingAtX * 160 },
+          data: {
+            label: p.name || 'New Component',
+            category: p.category || 'processing',
+            service: p.service || p.name || 'Service',
+            icon: p.icon || '\U0001f4e6',
+            status: (p.status as ArchitectureNodeData['status']) || 'healthy',
+            metrics: p.metrics || {},
+          },
+        };
+        setNodes((nds) => [...nds, newNode]);
+
+        // Auto-connect to the rightmost existing node
+        if (rightmost) {
+          setEdges((eds) => [
+            ...eds,
+            {
+              id: `e-copilot-${rightmost.id}-${newNodeId}`,
+              source: rightmost.id,
+              target: newNodeId,
+              type: 'animatedEdge',
+              data: { edgeType: 'dataflow', label: 'Added by AI', animated: true },
+            },
+          ]);
+        }
+
+        addNotification({ type: 'success', message: `Added ${p.name || 'component'} to canvas` });
+        setTimeout(() => reactFlowRef.current?.fitView({ padding: 0.2, duration: 300 }), 50);
+      } else if (action.type === 'remove-node' && action.payload) {
+        const p = action.payload as { id?: string; name?: string };
+        // Find node id from the latest state
+        let foundId = p.id || '';
+        if (!foundId) {
+          setNodes((nds) => {
+            const match = nds.find((n) =>
+              n.type === 'architectureNode' && (
+                n.data.label === p.name || n.data.service === p.name
+              )
+            );
+            if (match) foundId = match.id;
+            return nds; // Don't modify, just read
+          });
+        }
+        if (foundId) {
+          pushHistory();
+          setNodes((nds) => nds.filter((n) => n.id !== foundId));
+          setEdges((eds) => eds.filter((e) => e.source !== foundId && e.target !== foundId));
+          setSelectedNode(null);
+          setShowProperties(false);
+          addNotification({ type: 'info', message: 'Node deleted' });
+        }
+      } else if (action.type === 'add-edge' && action.payload) {
+        const p = action.payload as { source?: string; target?: string; label?: string };
+        if (p.source && p.target) {
+          pushHistory();
+          setEdges((eds) => [
+            ...eds,
+            {
+              id: `e-copilot-${p.source}-${p.target}`,
+              source: p.source,
+              target: p.target,
+              type: 'animatedEdge',
+              data: { edgeType: 'dataflow', label: p.label || '', animated: true },
+            },
+          ]);
+          addNotification({ type: 'success', message: `Connected ${p.source} → ${p.target}` });
+        }
+      }
+    },
+    [nodes, setNodes, setEdges, pushHistory, addNotification, setSelectedNode, setShowProperties]
+  );
+
   // ── Canvas actions ───────────────────────────────────────────────
 
   const onFitView = useCallback(() => {
@@ -862,6 +958,7 @@ export default function ArchitectureStudioPage() {
         <AICopilotPanel
           isOpen={showCopilot}
           onClose={() => setShowCopilot(false)}
+          onAction={handleCopilotAction}
           architectureContext={
             {
               nodes: nodes
