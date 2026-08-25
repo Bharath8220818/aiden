@@ -47,6 +47,7 @@ const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 const PipelineDesignerPage = lazy(() => import('./pages/PipelineDesignerPage'));
 const KnowledgeBasePage = lazy(() => import('./pages/KnowledgeBasePage'));
 const AgentActivityPage = lazy(() => import('./pages/AgentActivityPage'));
+const ToolGatewayPage = lazy(() => import('./pages/ToolGatewayPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -117,6 +118,7 @@ function AppShellWithRoutes() {
                   <Route path="/pipeline-designer" element={<ProtectedRoute><PageTransition variant="scale"><PipelineDesignerPage /></PageTransition></ProtectedRoute>} />
 
                   {/* Operations */}
+                  <Route path="/tool-gateway" element={<ProtectedRoute><PageTransition variant="fade"><ToolGatewayPage /></PageTransition></ProtectedRoute>} />
                   <Route path="/monitoring" element={<ProtectedRoute><PageTransition variant="fade"><MonitoringPage /></PageTransition></ProtectedRoute>} />
                   <Route path="/analytics" element={<ProtectedRoute><PageTransition variant="fade"><AnalyticsPage /></PageTransition></ProtectedRoute>} />
 

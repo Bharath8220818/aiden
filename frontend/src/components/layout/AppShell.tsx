@@ -7,7 +7,7 @@ import {
   Settings, Bell, LogOut, Menu, X, ChevronRight,
   Sparkles, Layers, FileJson, Activity, CheckSquare,
   FileText, Globe, HelpCircle, MonitorSmartphone,
-  Workflow, Library
+  Workflow, Library, Plug
 } from 'lucide-react';
 import ThemeToggle from '../common/ThemeToggle';
 import { useAuthStore } from '../../store/authStore';
@@ -45,6 +45,7 @@ const navSections: NavSection[] = [
   {
     title: 'Operations',
     items: [
+      { label: 'Tool Gateway', icon: <Plug className="h-4 w-4" />, href: '/tool-gateway' },
       { label: 'Pipelines', icon: <GitBranch className="h-4 w-4" />, href: '/pipelines' },
       { label: 'Monitoring', icon: <Activity className="h-4 w-4" />, href: '/monitoring' },
       { label: 'Analytics', icon: <BarChart3 className="h-4 w-4" />, href: '/analytics' },
