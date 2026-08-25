@@ -395,7 +395,7 @@ const DashboardPage: React.FC = () => {
       </motion.section>
 
       {/* ═══════════════════════════════════════════════════════════ */}
-      {/* ENTERPRISE QUICK ACTIONS */}
+      {/* QUICK ACTIONS — Operational cards with pipeline flow */}
       {/* ═══════════════════════════════════════════════════════════ */}
       <motion.section
         initial={{ opacity: 0, y: 20 }}
@@ -403,26 +403,31 @@ const DashboardPage: React.FC = () => {
         transition={{ delay: 0.6 }}
       >
         <h2 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">Quick Actions</h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { to: '/builder', label: 'New Pipeline', desc: 'Build with AI', color: 'from-purple-600 to-purple-500 shadow-purple-500/30', icon: Sparkles },
-            { to: '/agents', label: 'AI Agents', desc: 'View agent fleet', color: 'from-cyan-600 to-cyan-500 shadow-cyan-500/30', icon: Zap },
-            { to: '/monitoring', label: 'Monitoring', desc: 'View metrics', color: 'from-green-600 to-green-500 shadow-green-500/30', icon: Activity },
-            { to: '/pipelines', label: 'All Pipelines', desc: 'Browse list', color: 'from-amber-500 to-amber-400 shadow-amber-400/30', icon: Database },
+            { to: '/builder', label: 'Build Pipeline', desc: 'AI-assisted', flow: 'NL → DAG → Run', icon: Sparkles, accent: 'text-purple-500 dark:text-purple-400' },
+            { to: '/agents', label: 'AI Agents', desc: '15 active', flow: 'Monitor → Diagnose → Fix', icon: Zap, accent: 'text-cyan-500 dark:text-cyan-400' },
+            { to: '/monitoring', label: 'Monitoring', desc: 'Real-time', flow: 'Metrics → Alerts → Email', icon: Activity, accent: 'text-emerald-500 dark:text-emerald-400' },
+            { to: '/pipelines', label: 'All Pipelines', desc: `${totalPipelines || 126} total`, flow: 'Source → Transform → Load', icon: Database, accent: 'text-amber-500 dark:text-amber-400' },
           ].map((action) => {
             const Icon = action.icon;
             return (
               <Link
                 key={action.label}
                 to={action.to}
-                className="glass-card flex flex-col items-center gap-3 text-center p-5 group transition-all duration-300 hover:scale-[1.02]"
+                className="group relative overflow-hidden rounded-xl border border-[var(--color-card-border)] bg-[var(--color-card)] p-4 text-left transition-all duration-200 hover:border-[var(--color-border-hover)]"
               >
-                <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${action.color} shadow-lg transition-transform duration-300 group-hover:scale-110`}>
-                  <Icon size={20} className="text-white" />
+                <div className="flex items-center gap-3">
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-card)] border border-[var(--color-card-border)] ${action.accent}`}>
+                    <Icon size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[var(--color-text)]">{action.label}</p>
+                    <p className="text-[11px] text-[var(--color-text-muted)]">{action.desc}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{action.label}</p>
-                  <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">{action.desc}</p>
+                <div className="mt-3 font-mono text-[10px] text-[var(--color-text-muted)] tracking-wide">
+                  {action.flow}
                 </div>
               </Link>
             );
@@ -512,7 +517,9 @@ const DashboardPage: React.FC = () => {
               })
             ) : (
               <div className="rounded-xl border-2 border-dashed border-white/10 p-8 text-center">
-                <div className="text-3xl">🚀</div>
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500 dark:text-purple-400">
+                  <GitBranch size={18} />
+                </div>
                 <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">No activity yet. Create your first pipeline!</p>
                 <Link to="/builder" className="mt-3 inline-block text-sm font-semibold text-purple-400 hover:text-purple-300">
                   Describe a pipeline →

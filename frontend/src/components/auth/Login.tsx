@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { useAuthStore } from '../../store/authStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { signInWithGitHub } from '../../lib/supabase';
+import { Database, GitBranch, Activity, ArrowRight } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email'),
@@ -18,7 +19,7 @@ const EyeIcon = ({ visible, onClick }: { visible: boolean; onClick: () => void }
   <button
     type="button"
     onClick={onClick}
-    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-gray-600"
+    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-500 transition-colors hover:text-gray-300"
     tabIndex={-1}
   >
     {visible ? (
@@ -67,19 +68,25 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#EBF3FB] px-4 py-12 font-sans">
-      <div className="w-full max-w-md animate-slide-up">
+    <div className="flex min-h-screen items-center justify-center bg-[#050816] px-4 py-12 font-sans">
+      {/* Background grid */}
+      <div className="pointer-events-none fixed inset-0 bg-grid opacity-[0.03]" />
+      {/* Decorative orbs */}
+      <div className="pointer-events-none fixed -right-40 -top-40 h-[600px] w-[600px] rounded-full bg-purple-500/8 blur-[150px]" />
+      <div className="pointer-events-none fixed -bottom-40 left-1/4 h-[500px] w-[500px] rounded-full bg-cyan-500/5 blur-[120px]" />
+
+      <div className="relative w-full max-w-md animate-slide-up">
         {/* Main Card */}
-        <div className="rounded-[32px] bg-white px-8 py-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:px-12 sm:py-12">
+        <div className="rounded-2xl border border-white/[0.06] bg-[#111827]/80 px-8 py-10 shadow-2xl backdrop-blur-xl sm:px-10 sm:py-10">
           
           {/* Logo & Header */}
           <div className="flex flex-col items-center text-center">
-            <div className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-[#1149C9]">
-              <span className="text-2xl font-bold text-white">A</span>
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-purple-500/20 bg-purple-500/10">
+              <span className="font-mono text-lg font-bold text-purple-400">A</span>
             </div>
-            <h1 className="mt-5 text-lg font-bold tracking-wide text-[#1A2B49]">AIDEN</h1>
-            <h2 className="mt-1 text-2xl font-extrabold text-[#1A2B49]">Welcome Back</h2>
-            <p className="mt-2 text-[13px] text-gray-500">Please enter your details to sign in.</p>
+            <h1 className="mt-4 font-mono text-sm font-semibold tracking-[0.2em] text-purple-400">AIDEN</h1>
+            <h2 className="mt-2 text-xl font-bold text-white">Welcome back</h2>
+            <p className="mt-1.5 text-[13px] text-gray-400">Sign in to your data engineering control plane</p>
           </div>
 
           {/* Form */}
@@ -87,12 +94,12 @@ const Login: React.FC = () => {
             
             {/* Email Field */}
             <div>
-              <label htmlFor="email" className="mb-2 block text-sm font-semibold text-[#1A2B49]">
-                Email Address
+              <label htmlFor="email" className="mb-2 block text-[13px] font-medium text-gray-300">
+                Email address
               </label>
               <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-blue-600">
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-gray-500">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                   </svg>
                 </div>
@@ -100,27 +107,27 @@ const Login: React.FC = () => {
                   id="email"
                   type="email"
                   {...register('email')}
-                  className={`block w-full rounded-xl border border-gray-200 bg-gray-50/50 py-3 pl-11 pr-4 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-1 focus:ring-blue-500 ${
-                    errors.email ? 'border-red-500' : ''
+                  className={`block w-full rounded-xl border bg-[#0F172A] py-3 pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-gray-600 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 ${
+                    errors.email ? 'border-red-500/50' : 'border-white/[0.06] hover:border-white/10'
                   }`}
-                  placeholder="name@company.com"
+                  placeholder="you@company.com"
                   disabled={isLoading}
                   autoComplete="email"
                 />
               </div>
               {errors.email && (
-                <p className="mt-1.5 text-xs text-red-600">{errors.email.message}</p>
+                <p className="mt-1.5 text-xs text-red-400">{errors.email.message}</p>
               )}
             </div>
 
             {/* Password Field */}
             <div>
-              <label htmlFor="password" className="mb-2 block text-sm font-semibold text-[#1A2B49]">
+              <label htmlFor="password" className="mb-2 block text-[13px] font-medium text-gray-300">
                 Password
               </label>
               <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-blue-600">
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-gray-500">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
                 </div>
@@ -128,8 +135,8 @@ const Login: React.FC = () => {
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   {...register('password')}
-                  className={`block w-full rounded-xl border border-gray-200 bg-gray-50/50 py-3 pl-11 pr-11 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-1 focus:ring-blue-500 tracking-widest placeholder:tracking-normal ${
-                    errors.password ? 'border-red-500' : ''
+                  className={`block w-full rounded-xl border bg-[#0F172A] py-3 pl-11 pr-11 text-sm text-white outline-none transition placeholder:text-gray-600 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 tracking-widest placeholder:tracking-normal ${
+                    errors.password ? 'border-red-500/50' : 'border-white/[0.06] hover:border-white/10'
                   }`}
                   placeholder="••••••••"
                   disabled={isLoading}
@@ -138,7 +145,7 @@ const Login: React.FC = () => {
                 <EyeIcon visible={showPassword} onClick={() => setShowPassword(!showPassword)} />
               </div>
               {errors.password && (
-                <p className="mt-1.5 text-xs text-red-600">{errors.password.message}</p>
+                <p className="mt-1.5 text-xs text-red-400">{errors.password.message}</p>
               )}
             </div>
 
@@ -153,14 +160,14 @@ const Login: React.FC = () => {
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
                   />
-                  <div className="block h-5 w-9 rounded-full bg-gray-200 transition peer-checked:bg-blue-600"></div>
+                  <div className="block h-5 w-9 rounded-full bg-white/10 transition peer-checked:bg-purple-600"></div>
                   <div className="absolute left-1 top-1 h-3 w-3 rounded-full bg-white transition peer-checked:translate-x-4"></div>
                 </div>
-                <span className="text-sm font-medium text-[#1A2B49]">Remember me</span>
+                <span className="text-[13px] text-gray-400">Remember me</span>
               </label>
               <a
                 href="#"
-                className="text-sm font-semibold text-[#1149C9] hover:underline"
+                className="text-[13px] font-medium text-purple-400 hover:text-purple-300 transition-colors"
               >
                 Forgot password?
               </a>
@@ -171,18 +178,21 @@ const Login: React.FC = () => {
               id="login-submit-btn"
               type="submit"
               disabled={isLoading}
-              className="mt-4 flex w-full items-center justify-center rounded-xl bg-[#1F54DA] py-3.5 text-[15px] font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:opacity-70"
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-purple-500 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-600/20 transition-all hover:shadow-purple-500/30 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-70"
             >
               {isLoading ? (
                 <>
-                  <svg className="mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
                   Signing in...
                 </>
               ) : (
-                'Sign In'
+                <>
+                  Sign in
+                  <ArrowRight size={16} />
+                </>
               )}
             </button>
           </form>
@@ -190,23 +200,23 @@ const Login: React.FC = () => {
           {/* Social Logins */}
           <div className="mt-8 relative">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-100"></div>
+              <div className="w-full border-t border-white/[0.06]"></div>
             </div>
             <div className="relative flex justify-center">
-              <span className="bg-white px-3 text-[11px] font-bold uppercase tracking-widest text-gray-400">
+              <span className="bg-[#111827]/80 px-3 text-[11px] font-semibold uppercase tracking-widest text-gray-500">
                 Or continue with
               </span>
             </div>
           </div>
           
-          <div className="mt-6 grid grid-cols-2 gap-4">
+          <div className="mt-6 grid grid-cols-2 gap-3">
             <button
               type="button"
-              className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 opacity-50 cursor-not-allowed"
+              className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-[#0F172A]/50 py-2.5 text-sm font-medium text-gray-400 transition hover:border-white/10 hover:bg-[#0F172A] opacity-50 cursor-not-allowed"
               disabled
               title="Google login coming soon"
             >
-              <svg className="h-5 w-5" viewBox="0 0 24 24">
+              <svg className="h-4 w-4" viewBox="0 0 24 24">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
                 <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
@@ -216,12 +226,12 @@ const Login: React.FC = () => {
             </button>
             <button
               type="button"
-              className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+              className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-[#0F172A]/50 py-2.5 text-sm font-medium text-gray-400 transition hover:border-white/10 hover:bg-[#0F172A] hover:text-gray-200"
               onClick={() => {
                 signInWithGitHub();
               }}
             >
-              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
                 <path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" />
               </svg>
               GitHub
@@ -230,15 +240,15 @@ const Login: React.FC = () => {
 
           <p className="mt-8 text-center text-[13px] text-gray-500">
             Don't have an account?{' '}
-            <Link to="/signup" className="font-semibold text-[#1149C9] hover:underline">
+            <Link to="/signup" className="font-semibold text-purple-400 hover:text-purple-300 transition-colors">
               Create one now
             </Link>
           </p>
         </div>
 
         {/* Footer */}
-        <p className="mt-6 text-center text-xs font-medium text-gray-400">
-          © 2026 AIDEN. All rights reserved.
+        <p className="mt-6 text-center font-mono text-[11px] text-gray-600">
+          © 2026 AIDEN · Autonomous Intelligence Data Engineering Nexus
         </p>
       </div>
     </div>
