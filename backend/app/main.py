@@ -8,7 +8,7 @@ from app.models import Pipeline, User, ApprovalRequest, AuditLogEntry, Analytics
 from app.api.v1 import pipelines, auth, analytics, approvals, audit, executions, supabase_auth
 from app.api.v1 import multimodal as multimodal_router
 from app.api.v1 import agents, schemas, architecture, coding, learning, team, templates, voice, health
-from app.api.v1 import nfl_prediction, tools as tools_router, alerts, agent_execution
+from app.api.v1 import nfl_prediction, tools as tools_router, alerts, agent_execution, memory as memory_router
 from app.api.v1.websocket import websocket_endpoint
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.logging import RequestLoggingMiddleware
@@ -173,6 +173,9 @@ app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["alerts"])
 
 # ── Agent Execution (Orchestrator) ──
 app.include_router(agent_execution.router, prefix="/api/v1/execution", tags=["execution", "orchestrator"])
+
+# ── Memory System ──
+app.include_router(memory_router.router, prefix="/api/v1/memory", tags=["memory"])
 
 # ── Voice & Health ──
 app.include_router(voice.router, prefix="/api/v1/voice", tags=["voice"])
