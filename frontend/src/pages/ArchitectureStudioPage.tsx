@@ -27,6 +27,7 @@ import ArchitecturePropertiesPanel from '../components/architecture/Architecture
 import ArchitectureToolbar from '../components/architecture/ArchitectureToolbar';
 import AIGenerationPanel from '../components/architecture/AIGenerationPanel';
 import AICopilotPanel from '../components/architecture/AICopilotPanel';
+import { ExportModal } from '../components/architecture/ExportModal';
 import { useNotificationStore } from '../store/notificationStore';
 import { architectureApi, type ArchitectureResult } from '../api/architecture';
 import { useLiveMonitor } from '../hooks/useLiveMonitor';
@@ -564,9 +565,11 @@ export default function ArchitectureStudioPage() {
     reactFlowRef.current?.zoomOut({ duration: 200 });
   }, []);
 
+  const [showExport, setShowExport] = useState(false);
+
   const onExport = useCallback(() => {
-    addNotification({ type: 'success', message: 'Architecture exported! (PNG)' });
-  }, [addNotification]);
+    setShowExport(true);
+  }, []);
 
   const onSave = useCallback(() => {
     pushHistory();
@@ -1003,6 +1006,16 @@ export default function ArchitectureStudioPage() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Export Modal */}
+      <ExportModal
+        isOpen={showExport}
+        onClose={() => setShowExport(false)}
+        reactFlowWrapper={canvasRef}
+        nodes={nodes}
+        edges={edges}
+        architectureName={architectureName}
+      />
     </div>
   );
 }
