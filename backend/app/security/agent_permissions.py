@@ -1,0 +1,3 @@
+from app.schemas.agent_communication import AgentType
+AGENT_PERMISSIONS = {AgentType.SQL: ["database.schema.read","database.query.read"], AgentType.PIPELINE: ["airflow.dag.read","airflow.dag.generate"], AgentType.ARCHITECTURE: [], AgentType.MONITORING: ["monitoring.read","alerts.create"], AgentType.DEBUG: ["logs.read","incidents.read","incidents.create"], AgentType.ORCHESTRATOR: [], AgentType.EXTRACTION: ["database.schema.read"], AgentType.QUALITY: ["database.schema.read","database.query.read"], AgentType.SECURITY: ["security.read"], AgentType.RAG: ["knowledge.read","knowledge.write"], AgentType.SELF_HEALING: ["logs.read","incidents.read","incidents.create"]}
+def has_permission(agent_type, required): return required in AGENT_PERMISSIONS.get(agent_type, [])
