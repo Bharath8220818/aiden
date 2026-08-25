@@ -298,14 +298,27 @@ class AidenOrchestrator:
         # 1. Classify intent
         intent = self.classify_intent(objective)
 
-        # 2. Create plan
+        # 2. Broadcast execution started
+        try:
+            from app.api.v1.websocket import broadcast_execution_update
+            await broadcast_execution_update(
+                run_id=run_id,
+                objective=objective,
+                status="running",
+                intent=intent,
+                agents_used=intent["agents"],
+            )
+        except Exception:
+            pass
+
+        # 3. Create plan
         plan = self.create_plan(
             objective=objective,
             agent_names=intent["agents"],
             context=context,
         )
 
-        # 3. Execute plan
+        # 4. Execute plan
         result = await self.execute_plan(plan, context)
 
         elapsed_ms = (time.monotonic() - start) * 1000
@@ -330,6 +343,22 @@ class AidenOrchestrator:
         # Keep only last 100 runs
         if len(self._run_history) > 100:
             self._run_history = self._run_history[-100:]
+
+        # 5. Broadcast execution completed
+        try:
+            from app.api.v1.websocket import broadcast_execution_update
+            await broadcast_execution_update(
+                run_id=run_id,
+                objective=objective,
+                status=run_record["status"],
+                intent=intent,
+                agents_used=run_record["agents_used"],
+                tools_used=run_record["tools_used"],
+                confidence=run_record["confidence"],
+                execution_time_ms=elapsed_ms,
+            )
+        except Exception:
+            pass
 
         return run_record
 
