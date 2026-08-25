@@ -12,8 +12,20 @@ from app.api.v1 import nfl_prediction, tools as tools_router, alerts, agent_exec
 from app.api.v1.websocket import websocket_endpoint
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.logging import RequestLoggingMiddleware
+import asyncio
 
 logger = logging.getLogger(__name__)
+
+async def _start_background_tasks():
+    """Start background tasks like connector health polling."""
+    try:
+        from app.api.v1.websocket import start_connector_health_poller
+        await start_connector_health_poller(interval_seconds=60)
+    except asyncio.CancelledError:
+        pass
+    except Exception as e:
+        logger.warning(f"Background task error: {e}")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -70,8 +82,17 @@ async def lifespan(app: FastAPI):
     async with AsyncSessionLocal() as session:
         await ensure_default_users(session)
 
+    # Start connector health poller in background
+    poller_task = asyncio.create_task(_start_background_tasks())
+
     yield
-    # Shutdown: Dispose engine
+
+    # Shutdown
+    poller_task.cancel()
+    try:
+        await poller_task
+    except asyncio.CancelledError:
+        pass
     await engine.dispose()
 
 app = FastAPI(

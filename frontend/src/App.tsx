@@ -46,6 +46,7 @@ const TeamPage = lazy(() => import('./pages/TeamPage'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 const PipelineDesignerPage = lazy(() => import('./pages/PipelineDesignerPage'));
 const KnowledgeBasePage = lazy(() => import('./pages/KnowledgeBasePage'));
+const AgentActivityPage = lazy(() => import('./pages/AgentActivityPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -122,6 +123,7 @@ function AppShellWithRoutes() {
                   {/* AI & Automation */}
                   <Route path="/ai-workspace" element={<ProtectedRoute><PageTransition variant="rotate"><AIWorkspacePage /></PageTransition></ProtectedRoute>} />
                   <Route path="/agents" element={<ProtectedRoute><PageTransition variant="fade"><AgentsPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/agent-activity" element={<ProtectedRoute><PageTransition variant="fade"><AgentActivityPage /></PageTransition></ProtectedRoute>} />
                   <Route path="/multimodal" element={<ProtectedRoute><PageTransition variant="fade"><MultimodalPage /></PageTransition></ProtectedRoute>} />
 
                   {/* Governance */}

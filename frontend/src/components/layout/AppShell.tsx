@@ -55,6 +55,7 @@ const navSections: NavSection[] = [
     items: [
       { label: 'AI Workspace', icon: <Brain className="h-4 w-4" />, href: '/ai-workspace' },
       { label: 'Agents', icon: <Sparkles className="h-4 w-4" />, href: '/agents', badge: '15' },
+      { label: 'Agent Activity', icon: <Activity className="h-4 w-4" />, href: '/agent-activity', badge: 'LIVE' },
       { label: 'Multimodal', icon: <MonitorSmartphone className="h-4 w-4" />, href: '/multimodal' },
     ],
   },
