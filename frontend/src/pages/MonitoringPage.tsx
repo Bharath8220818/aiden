@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { Activity, Zap, CheckCircle, AlertTriangle, Radio } from 'lucide-react';
 
 type TimeRange = '1H' | '6H' | '24H' | '7D';
 
@@ -230,19 +231,29 @@ const MonitoringPage: React.FC = () => {
       {/* ── Metric Cards ─────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
-          { label: 'Total Runs', value: stats.totalRuns.toLocaleString(), sub: `Last ${timeRange}`, icon: '🔄', color: 'from-blue-50 to-white border-blue-100' },
-          { label: 'Running Now', value: stats.running.toString(), sub: `${pipelineRuns.length > 0 ? Math.round(stats.avgDuration) : '—'}s avg`, icon: '⚡', color: 'from-purple-50 to-white border-purple-100' },
-          { label: 'Success Rate', value: pipelineRuns.length > 0 ? `${Math.round(stats.successRate)}%` : '—', sub: `${stats.success} completed`, icon: '✅', color: 'from-green-50 to-white border-green-100' },
-          { label: 'Failed', value: stats.failed.toString(), sub: `${alerts.length} active alerts`, icon: '❌', color: 'from-red-50 to-white border-red-100' },
+          { label: 'Total Runs', value: stats.totalRuns.toLocaleString(), sub: `Last ${timeRange}`, icon: <Activity size={16} />, status: 'healthy' as const, sparkline: [5, 8, 12, 10, 14, stats.totalRuns || 11] },
+          { label: 'Running Now', value: stats.running.toString(), sub: `${pipelineRuns.length > 0 ? Math.round(stats.avgDuration) : '—'}s avg`, icon: <Zap size={16} />, status: stats.running > 0 ? 'healthy' as const : 'healthy' as const, sparkline: [2, 3, 1, 4, 2, stats.running || 2] },
+          { label: 'Success Rate', value: pipelineRuns.length > 0 ? `${Math.round(stats.successRate)}%` : '—', sub: `${stats.success} completed`, icon: <CheckCircle size={16} />, status: 'healthy' as const, sparkline: [90, 92, 95, 94, 96, stats.successRate || 95] },
+          { label: 'Failed', value: stats.failed.toString(), sub: `${alerts.length} active alerts`, icon: <AlertTriangle size={16} />, status: stats.failed > 0 ? 'warning' as const : 'healthy' as const, sparkline: [3, 2, 4, 1, 2, stats.failed || 2] },
         ].map((m) => (
-          <div key={m.label} className={`rounded-2xl border bg-gradient-to-br p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 ${m.color}`}>
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{m.label}</p>
-                <p className="mt-2 text-3xl font-bold text-gray-900">{m.value}</p>
-                <p className="mt-1 text-xs text-gray-400">{m.sub}</p>
+          <div key={m.label} className="relative overflow-hidden rounded-xl border border-[var(--color-card-border)] bg-[var(--color-card)] p-4 transition-all hover:border-[var(--color-border-hover)]">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">{m.label}</span>
+              <span className="flex items-center gap-1.5">
+                <span className={`h-1.5 w-1.5 rounded-full ${m.status === 'healthy' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                <span className={`text-[10px] font-medium ${m.status === 'healthy' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>{m.status}</span>
+              </span>
+            </div>
+            <div className="mt-2 flex items-end justify-between">
+              <div className="flex items-baseline gap-1">
+                <span className="font-mono text-2xl font-bold tracking-tight text-[var(--color-text)]">{m.value}</span>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/80 text-xl shadow-sm">{m.icon}</div>
+              <div className="flex items-center gap-2">
+                <span className="text-[var(--color-text-muted)]">{m.icon}</span>
+              </div>
+            </div>
+            <div className="mt-2">
+              <span className="text-[11px] text-[var(--color-text-muted)]">{m.sub}</span>
             </div>
           </div>
         ))}
@@ -266,8 +277,10 @@ const MonitoringPage: React.FC = () => {
         <div className="mt-4 space-y-4">
           {pipelineRuns.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="text-4xl mb-2">📡</div>
-              <p className="text-sm font-medium text-gray-500">Waiting for pipeline executions...</p>
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500 dark:text-purple-400">
+                <Radio size={20} />
+              </div>
+              <p className="mt-3 text-sm font-medium text-gray-500">Waiting for pipeline executions...</p>
               <p className="text-xs text-gray-400 mt-1">Run a pipeline from the Pipelines page to see live task-by-task progress here.</p>
               <Link to="/pipelines" className="btn-primary mt-4 text-sm">Go to Pipelines</Link>
             </div>

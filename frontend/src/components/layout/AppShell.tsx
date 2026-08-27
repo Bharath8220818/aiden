@@ -7,7 +7,7 @@ import {
   Settings, Bell, LogOut, Menu, X, ChevronRight,
   Sparkles, Layers, FileJson, Activity, CheckSquare,
   FileText, Globe, HelpCircle, MonitorSmartphone,
-  Workflow, Library
+  Workflow, Library, Plug
 } from 'lucide-react';
 import ThemeToggle from '../common/ThemeToggle';
 import { useAuthStore } from '../../store/authStore';
@@ -34,6 +34,7 @@ const navSections: NavSection[] = [
   {
     title: 'Design & Build',
     items: [
+      { label: 'Architecture Studio', icon: <Layers className="h-4 w-4" />, href: '/architecture' },
       { label: 'Architecture Canvas', icon: <Layers className="h-4 w-4" />, href: '/architecture-canvas' },
       { label: 'Schema Designer', icon: <Database className="h-4 w-4" />, href: '/schema-designer' },
       { label: 'Pipeline Builder', icon: <Workflow className="h-4 w-4" />, href: '/builder' },
@@ -44,6 +45,7 @@ const navSections: NavSection[] = [
   {
     title: 'Operations',
     items: [
+      { label: 'Tool Gateway', icon: <Plug className="h-4 w-4" />, href: '/tool-gateway' },
       { label: 'Pipelines', icon: <GitBranch className="h-4 w-4" />, href: '/pipelines' },
       { label: 'Monitoring', icon: <Activity className="h-4 w-4" />, href: '/monitoring' },
       { label: 'Analytics', icon: <BarChart3 className="h-4 w-4" />, href: '/analytics' },
@@ -54,6 +56,7 @@ const navSections: NavSection[] = [
     items: [
       { label: 'AI Workspace', icon: <Brain className="h-4 w-4" />, href: '/ai-workspace' },
       { label: 'Agents', icon: <Sparkles className="h-4 w-4" />, href: '/agents', badge: '15' },
+      { label: 'Agent Activity', icon: <Activity className="h-4 w-4" />, href: '/agent-activity', badge: 'LIVE' },
       { label: 'Multimodal', icon: <MonitorSmartphone className="h-4 w-4" />, href: '/multimodal' },
     ],
   },
@@ -113,7 +116,7 @@ export function AppShell({ children }: AppShellProps) {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen overflow-x-hidden">
       {/* ── Sidebar ── */}
       <>
         {/* Mobile overlay */}
@@ -264,7 +267,7 @@ export function AppShell({ children }: AppShellProps) {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 px-4 py-6 md:px-6 md:py-8 lg:px-8">
+        <main className="flex-1 px-4 py-6 md:px-6 md:py-8 lg:px-8 overflow-x-hidden">
           {children}
         </main>
       </div>

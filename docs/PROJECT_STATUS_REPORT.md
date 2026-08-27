@@ -1,5 +1,5 @@
 # AIDEN Project Status Report
-**Date:** August 4, 2026
+**Date:** August 23, 2026
 **Updated By:** Buffy (AI Assistant)
 
 ---
@@ -139,7 +139,7 @@ AI Agents (smolagents + LoRA adapters)
 | Pipeline Management | 5 | ✅ Complete |
 | AI & Agents | 3 | ✅ Complete |
 | Learning & Coding | 4 | ✅ Complete |
-| Design & Architecture | 3 | ✅ Complete |
+| Design & Architecture | 3 | ✅ Complete (Architecture Studio rebuilt with ReactFlow) |
 | Operations & Monitoring | 2 | ✅ Complete |
 | Governance & Team | 2 | ✅ Complete |
 | Authentication | 3 | ✅ Complete |
@@ -232,6 +232,39 @@ AI Agents (smolagents + LoRA adapters)
 | 19 | Fine-tune Self-Healing Agent – `self_healing_dataset.jsonl` (150 examples) | 2-3 hr GPU | AI/ML | ⬜ |
 | 20 | Integrate fine-tuned adapters – set `*_ADAPTER_PATH` in `.env` | 15 min | AI/ML | ⬜ |
 | 21 | Fine-tune Pipeline-Builder Agent – `pipeline_builder_dataset.jsonl` (**590** examples: 90 DAG/dbt + 500 real text→SQL) | 2-3 hr GPU | AI/ML | ⬜ |
+
+### 🔵 Architecture Studio (New — Aug 23)
+
+| Feature | Status | Details |
+|---------|--------|--------|
+| ReactFlow-based editable canvas | ✅ Done | Replaced raw-div mock with proper ReactFlow 11 canvas |
+| 3-panel layout (Asset Library | Canvas | Properties) | ✅ Done | Responsive with animated show/hide |
+| Custom architecture nodes | ✅ Done | 11 categories (DB, streaming, processing, storage, cloud, containers, monitoring, AI, security, quality, orchestration) with status indicators |
+| Animated data-flow edges | ✅ Done | 7 edge types (dataflow, control, API, event, dependency, monitoring, security) with flowing particles |
+| Asset Library panel | ✅ Done | 60+ components, searchable, drag-and-drop to canvas |
+| Properties panel | ✅ Done | Status picker, name/service editing, metrics display, AI suggestions, duplicate/delete |
+| AI Generation panel | ✅ Done | Prompt input, environment/style selectors, animated step-by-step generation |
+| Floating toolbar | ✅ Done | Select, Pan, Add, Connect, Text, Group, Comment tools + undo/redo, auto-layout, grid, zoom, fit |
+| Undo/Redo history | ✅ Done | 50-state history stack |
+| Auto-layout | ✅ Done | Category-based left-to-right layout |
+| Keyboard shortcuts | ✅ Done | Delete, Ctrl+Z/Shift+Z, Ctrl+S, F=fit, L=layout |
+| Drag-and-drop from library | ✅ Done | Native drag API with ReactFlow screen-to-flow coordinates |
+| Default E-Commerce architecture | ✅ Done | 7 nodes (PG, Kafka, Airflow, Spark, dbt, Snowflake, Grafana) pre-wired |
+| Sidebar updated | ✅ Done | 'Architecture Studio' as primary nav, old URL still works |
+| Build passes | ✅ Done | TypeScript 0 errors, Vite build success |
+
+**New files created:**
+- `frontend/src/pages/ArchitectureStudioPage.tsx` (main page)
+- `frontend/src/components/architecture/ArchitectureNode.tsx` (custom ReactFlow node)
+- `frontend/src/components/architecture/AnimatedEdge.tsx` (animated edge with particles)
+- `frontend/src/components/architecture/AssetLibraryPanel.tsx` (60+ component library)
+- `frontend/src/components/architecture/ArchitecturePropertiesPanel.tsx` (node properties)
+- `frontend/src/components/architecture/AIGenerationPanel.tsx` (AI generation UI)
+- `frontend/src/components/architecture/ArchitectureToolbar.tsx` (floating toolbar)
+
+**Removed:**
+- `frontend/src/pages/ArchitectureCanvasPage.tsx` (replaced by ArchitectureStudioPage)
+- `backend/inspect_nfl_artifacts_temp.py` (temporary inspection script)
 
 **Infrastructure & Deployment**
 | # | Task | Effort | Owner | Status |
@@ -466,7 +499,7 @@ curl http://localhost:8000/api/v1/health/full
 
 | Category | Done | Pending | Notes |
 |----------|------|---------|-------|
-| Frontend Pages | ✅ 34 | – | All built |
+| Frontend Pages | ✅ 34 | – | All built (Architecture Studio rebuilt with ReactFlow) |
 | Frontend Auth UI | ✅ | – | GitHub button present |
 | Backend Routers | ✅ 18+ | – | All endpoints implemented |
 | Auth (Email) | ✅ | – | JWT works |

@@ -17,7 +17,6 @@ import { useScrollRestoration } from './hooks/useScrollRestoration';
 // Lazy loaded pages — split into separate JS chunks
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const SignupPage = lazy(() => import('./pages/SignupPage'));
-const AuthCallback = lazy(() => import('./components/auth/AuthCallback'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const PipelinesPage = lazy(() => import('./pages/PipelinesPage'));
@@ -39,7 +38,7 @@ const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const ChangelogPage = lazy(() => import('./pages/ChangelogPage'));
 
 // ── NEW PAGES (30-pages spec) ──
-const ArchitectureCanvasPage = lazy(() => import('./pages/ArchitectureCanvasPage'));
+const ArchitectureStudioPage = lazy(() => import('./pages/ArchitectureStudioPage'));
 const SchemaDesignerPage = lazy(() => import('./pages/SchemaDesignerPage'));
 const AIWorkspacePage = lazy(() => import('./pages/AIWorkspacePage'));
 const PipelineStudioPage = lazy(() => import('./pages/PipelineStudioPage'));
@@ -47,6 +46,8 @@ const TeamPage = lazy(() => import('./pages/TeamPage'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 const PipelineDesignerPage = lazy(() => import('./pages/PipelineDesignerPage'));
 const KnowledgeBasePage = lazy(() => import('./pages/KnowledgeBasePage'));
+const AgentActivityPage = lazy(() => import('./pages/AgentActivityPage'));
+const ToolGatewayPage = lazy(() => import('./pages/ToolGatewayPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -111,17 +112,20 @@ function AppShellWithRoutes() {
                   <Route path="/studio" element={<ProtectedRoute><PageTransition variant="scale"><PipelineStudioPage /></PageTransition></ProtectedRoute>} />
 
                   {/* Design & Build */}
-                  <Route path="/architecture-canvas" element={<ProtectedRoute><PageTransition variant="scale"><ArchitectureCanvasPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/architecture" element={<ProtectedRoute><PageTransition variant="scale"><ArchitectureStudioPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/architecture-canvas" element={<ProtectedRoute><PageTransition variant="scale"><ArchitectureStudioPage /></PageTransition></ProtectedRoute>} />
                   <Route path="/schema-designer" element={<ProtectedRoute><PageTransition variant="scale"><SchemaDesignerPage /></PageTransition></ProtectedRoute>} />
                   <Route path="/pipeline-designer" element={<ProtectedRoute><PageTransition variant="scale"><PipelineDesignerPage /></PageTransition></ProtectedRoute>} />
 
                   {/* Operations */}
+                  <Route path="/tool-gateway" element={<ProtectedRoute><PageTransition variant="fade"><ToolGatewayPage /></PageTransition></ProtectedRoute>} />
                   <Route path="/monitoring" element={<ProtectedRoute><PageTransition variant="fade"><MonitoringPage /></PageTransition></ProtectedRoute>} />
                   <Route path="/analytics" element={<ProtectedRoute><PageTransition variant="fade"><AnalyticsPage /></PageTransition></ProtectedRoute>} />
 
                   {/* AI & Automation */}
                   <Route path="/ai-workspace" element={<ProtectedRoute><PageTransition variant="rotate"><AIWorkspacePage /></PageTransition></ProtectedRoute>} />
                   <Route path="/agents" element={<ProtectedRoute><PageTransition variant="fade"><AgentsPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/agent-activity" element={<ProtectedRoute><PageTransition variant="fade"><AgentActivityPage /></PageTransition></ProtectedRoute>} />
                   <Route path="/multimodal" element={<ProtectedRoute><PageTransition variant="fade"><MultimodalPage /></PageTransition></ProtectedRoute>} />
 
                   {/* Governance */}

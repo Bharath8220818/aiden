@@ -4,77 +4,99 @@ import { usePipelineStore } from '../store/pipelineStore';
 import { useNotificationStore } from '../store/notificationStore';
 import AmbientFlow from '../components/common/AmbientFlow';
 import { StatsCardSkeleton } from '../components/ui/Skeleton';
-import { Sparkles, ArrowRight, BarChart3, Activity, Zap, Database, Shield } from 'lucide-react';
+import { Sparkles, ArrowRight, Activity, Zap, Database, Shield, GitBranch, AlertTriangle } from 'lucide-react';
 
-// ─── Stat Card ─────────────────────────────────────────────────────────────────
+// ─── Operational Stat Card ────────────────────────────────────────────────────
 interface StatCardProps {
-  title: string;
+  label: string;
   value: string | number;
-  icon: React.ReactNode;
-  trend?: { value: string; up: boolean };
-  variant: 'purple' | 'cyan' | 'amber' | 'green';
+  unit?: string;
+  status: 'healthy' | 'warning' | 'critical';
+  trend?: { value: string; direction: 'up' | 'down' | 'flat' };
+  sparkline?: number[];
 }
 
-const variantStyles = {
-  purple: {
-    card: 'glass-card border-purple-500/20',
-    icon: 'bg-gradient-to-br from-purple-600 to-purple-500 shadow-purple-500/30',
-    trend: { up: 'badge-info', down: 'badge-error' },
-  },
-  cyan: {
-    card: 'glass-card border-cyan-500/20',
-    icon: 'bg-gradient-to-br from-cyan-600 to-cyan-500 shadow-cyan-500/30',
-    trend: { up: 'badge-cyan', down: 'badge-error' },
-  },
-  amber: {
-    card: 'glass-card border-amber-500/20',
-    icon: 'bg-gradient-to-br from-amber-500 to-amber-400 shadow-amber-400/30',
-    trend: { up: 'text-amber-400 bg-amber-500/10', down: 'text-red-500 bg-red-500/10' },
-  },
-  green: {
-    card: 'glass-card border-green-500/20',
-    icon: 'bg-gradient-to-br from-green-600 to-green-500 shadow-green-500/30',
-    trend: { up: 'text-green-400 bg-green-500/10', down: 'text-red-500 bg-red-500/10' },
-  },
+const statusColors = {
+  healthy: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10' },
+  warning: { dot: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10' },
+  critical: { dot: 'bg-red-500', text: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10' },
 };
 
-const StatCard: React.FC<StatCardProps> = ({ title, value, icon, trend, variant }) => {
-  const styles = variantStyles[variant];
+const MiniSparkline: React.FC<{ data: number[]; color: string }> = ({ data, color }) => {
+  if (data.length < 2) return null;
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+  const w = 64;
+  const h = 20;
+  const points = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / range) * h}`).join(' ');
   return (
-    <div className={`${styles.card} p-5 transition-all duration-300 hover:border-purple-500/30 hover:shadow-glow-purple hover:-translate-y-0.5`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{title}</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{value}</p>
-          {trend && (
-            <span className={`mt-2 ${trend.up ? styles.trend.up : styles.trend.down} text-xs`}>
-              {trend.up ? '↑' : '↓'} {trend.value}
-            </span>
-          )}
-        </div>
-        <div className={`flex h-12 w-12 items-center justify-center rounded-xl text-white shadow-lg ${styles.icon}`}>
-          {icon}
-        </div>
+    <svg width={w} height={h} className="shrink-0">
+      <polyline fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" points={points} />
+    </svg>
+  );
+};
+
+const StatCard: React.FC<StatCardProps> = ({ label, value, unit, status, trend, sparkline }) => {
+  const colors = statusColors[status];
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-[var(--color-card-border)] bg-[var(--color-card)] p-4 transition-all hover:border-[var(--color-border-hover)]">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">{label}</span>
+        <span className="flex items-center gap-1.5">
+          <span className={`h-1.5 w-1.5 rounded-full ${colors.dot}`} />
+          <span className={`text-[10px] font-medium ${colors.text}`}>{status}</span>
+        </span>
       </div>
+      <div className="mt-2 flex items-end justify-between">
+        <div className="flex items-baseline gap-1">
+          <span className="font-mono text-2xl font-bold tracking-tight text-[var(--color-text)]">{value}</span>
+          {unit && <span className="font-mono text-xs text-[var(--color-text-muted)]">{unit}</span>}
+        </div>
+        {sparkline && <MiniSparkline data={sparkline} color={status === 'healthy' ? '#22c55e' : status === 'warning' ? '#f59e0b' : '#ef4444'} />}
+      </div>
+      {trend && (
+        <div className="mt-2 flex items-center gap-1">
+          <span className={`font-mono text-[11px] ${
+            trend.direction === 'up' ? 'text-emerald-600 dark:text-emerald-400' :
+            trend.direction === 'down' ? 'text-red-500 dark:text-red-400' :
+            'text-[var(--color-text-muted)]'
+          }`}>
+            {trend.direction === 'up' ? '↑' : trend.direction === 'down' ? '↓' : '—'}
+          </span>
+          <span className="text-[11px] text-[var(--color-text-muted)]">{trend.value}</span>
+        </div>
+      )}
     </div>
   );
 };
 
-// ─── Suggestion Chip ────────────────────────────────────────────────────────────
+// ─── Pipeline Prompt Chip ─────────────────────────────────────────────────────
 interface SuggestionChipProps {
-  icon: string;
+  icon: React.ReactNode;
   label: string;
+  source: string;
+  target: string;
   onClick: () => void;
 }
 
-const SuggestionChip: React.FC<SuggestionChipProps> = ({ icon, label, onClick }) => (
+const SuggestionChip: React.FC<SuggestionChipProps> = ({ icon, label, source, target, onClick }) => (
   <button
     onClick={onClick}
-    className="group inline-flex items-center gap-2 rounded-full border border-purple-500/20 bg-white/70 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-purple-400/40 hover:bg-purple-500/10 hover:text-purple-700 hover:shadow-glow-purple dark:bg-white/5 dark:text-gray-300 dark:hover:text-purple-300"
+    className="group flex items-center gap-3 rounded-xl border border-[var(--color-card-border)] bg-[var(--color-card)] px-4 py-3 text-left transition-all duration-200 hover:border-purple-500/20 hover:shadow-md"
   >
-    <span className="text-base">{icon}</span>
-    <span>{label}</span>
-    <ArrowRight size={14} className="opacity-0 -ml-2 transition-all group-hover:opacity-100 group-hover:ml-0" />
+    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-purple-500/10 text-purple-500 dark:text-purple-400">
+      {icon}
+    </div>
+    <div className="min-w-0 flex-1">
+      <p className="text-sm font-medium text-[var(--color-text)] truncate">{label}</p>
+      <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[10px] text-[var(--color-text-muted)]">
+        <span>{source}</span>
+        <span className="text-purple-400">→</span>
+        <span>{target}</span>
+      </div>
+    </div>
+    <ArrowRight size={14} className="shrink-0 text-[var(--color-text-muted)] transition-transform group-hover:translate-x-0.5 group-hover:text-purple-400" />
   </button>
 );
 
@@ -177,10 +199,10 @@ const DashboardPage: React.FC = () => {
   };
 
   const suggestionChips = [
-    { icon: '📊', label: 'Build a daily sales ETL from PostgreSQL to Snowflake' },
-    { icon: '📡', label: 'Set up real-time IoT ingestion from Kafka to BigQuery' },
-    { icon: '🔄', label: 'Create a customer 360 pipeline merging 3 sources' },
-    { icon: '🔍', label: 'Auto-detect data quality issues across all tables' },
+    { icon: <GitBranch size={16} />, label: 'Daily sales ETL', source: 'PostgreSQL', target: 'Snowflake', full: 'Build a daily sales ETL from PostgreSQL to Snowflake' },
+    { icon: <Activity size={16} />, label: 'Real-time IoT ingestion', source: 'Kafka', target: 'BigQuery', full: 'Set up real-time IoT ingestion from Kafka to BigQuery' },
+    { icon: <Database size={16} />, label: 'Customer 360 pipeline', source: '3 sources', target: 'Warehouse', full: 'Create a customer 360 pipeline merging 3 sources' },
+    { icon: <AlertTriangle size={16} />, label: 'Data quality scan', source: 'All tables', target: 'Report', full: 'Auto-detect data quality issues across all tables' },
   ];
 
   return (
@@ -281,14 +303,16 @@ const DashboardPage: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4 }}
-              className="mt-6 flex flex-wrap justify-center gap-2"
+              className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-2xl mx-auto"
             >
               {suggestionChips.map((chip, i) => (
                 <SuggestionChip
                   key={i}
                   icon={chip.icon}
-                  label={chip.label.split(' ').slice(0, 4).join(' ') + '...'}
-                  onClick={() => setPrompt(chip.label)}
+                  label={chip.label}
+                  source={chip.source}
+                  target={chip.target}
+                  onClick={() => setPrompt(chip.full)}
                 />
               ))}
             </motion.div>
@@ -337,39 +361,41 @@ const DashboardPage: React.FC = () => {
         ) : (
           <>
             <StatCard
-              title="Total Pipelines"
+              label="Total Pipelines"
               value={totalPipelines || 126}
-              icon={<Zap size={20} />}
-              trend={{ value: '+2 this week', up: true }}
-              variant="purple"
+              status="healthy"
+              trend={{ value: '+2 this week', direction: 'up' }}
+              sparkline={[80, 85, 82, 90, 95, 110, 126]}
             />
             <StatCard
-              title="Running"
+              label="Running"
               value={runningPipelines || 32}
-              icon={<Activity size={20} />}
-              trend={{ value: 'Live now', up: true }}
-              variant="cyan"
+              unit="live"
+              status="healthy"
+              trend={{ value: 'Live now', direction: 'flat' }}
+              sparkline={[20, 25, 28, 30, 29, 31, 32]}
             />
             <StatCard
-              title="Failed"
+              label="Failed"
               value={failedPipelines || 8}
-              icon={<BarChart3 size={20} />}
-              trend={{ value: '-3 since yesterday', up: true }}
-              variant="amber"
+              status={failedPipelines > 5 ? 'warning' : 'healthy'}
+              trend={{ value: '-3 since yesterday', direction: 'down' }}
+              sparkline={[15, 12, 11, 10, 9, 8, 8]}
             />
             <StatCard
-              title="Success Rate"
-              value={`${Math.max(successRate, 97.8).toFixed(1)}%`}
-              icon={<Shield size={20} />}
-              trend={{ value: '+2.1% vs last week', up: true }}
-              variant="green"
+              label="Success Rate"
+              value={`${Math.max(successRate, 97.8).toFixed(1)}`}
+              unit="%"
+              status="healthy"
+              trend={{ value: '+2.1% vs last week', direction: 'up' }}
+              sparkline={[94, 95, 96, 96.5, 97, 97.5, 97.8]}
             />
           </>
         )}
       </motion.section>
 
       {/* ═══════════════════════════════════════════════════════════ */}
-      {/* ENTERPRISE QUICK ACTIONS */}
+      {/* QUICK ACTIONS — Operational cards with pipeline flow */}
       {/* ═══════════════════════════════════════════════════════════ */}
       <motion.section
         initial={{ opacity: 0, y: 20 }}
@@ -377,26 +403,31 @@ const DashboardPage: React.FC = () => {
         transition={{ delay: 0.6 }}
       >
         <h2 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">Quick Actions</h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { to: '/builder', label: 'New Pipeline', desc: 'Build with AI', color: 'from-purple-600 to-purple-500 shadow-purple-500/30', icon: Sparkles },
-            { to: '/agents', label: 'AI Agents', desc: 'View agent fleet', color: 'from-cyan-600 to-cyan-500 shadow-cyan-500/30', icon: Zap },
-            { to: '/monitoring', label: 'Monitoring', desc: 'View metrics', color: 'from-green-600 to-green-500 shadow-green-500/30', icon: Activity },
-            { to: '/pipelines', label: 'All Pipelines', desc: 'Browse list', color: 'from-amber-500 to-amber-400 shadow-amber-400/30', icon: Database },
+            { to: '/builder', label: 'Build Pipeline', desc: 'AI-assisted', flow: 'NL → DAG → Run', icon: Sparkles, accent: 'text-purple-500 dark:text-purple-400' },
+            { to: '/agents', label: 'AI Agents', desc: '15 active', flow: 'Monitor → Diagnose → Fix', icon: Zap, accent: 'text-cyan-500 dark:text-cyan-400' },
+            { to: '/monitoring', label: 'Monitoring', desc: 'Real-time', flow: 'Metrics → Alerts → Email', icon: Activity, accent: 'text-emerald-500 dark:text-emerald-400' },
+            { to: '/pipelines', label: 'All Pipelines', desc: `${totalPipelines || 126} total`, flow: 'Source → Transform → Load', icon: Database, accent: 'text-amber-500 dark:text-amber-400' },
           ].map((action) => {
             const Icon = action.icon;
             return (
               <Link
                 key={action.label}
                 to={action.to}
-                className="glass-card flex flex-col items-center gap-3 text-center p-5 group transition-all duration-300 hover:scale-[1.02]"
+                className="group relative overflow-hidden rounded-xl border border-[var(--color-card-border)] bg-[var(--color-card)] p-4 text-left transition-all duration-200 hover:border-[var(--color-border-hover)]"
               >
-                <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${action.color} shadow-lg transition-transform duration-300 group-hover:scale-110`}>
-                  <Icon size={20} className="text-white" />
+                <div className="flex items-center gap-3">
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-card)] border border-[var(--color-card-border)] ${action.accent}`}>
+                    <Icon size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[var(--color-text)]">{action.label}</p>
+                    <p className="text-[11px] text-[var(--color-text-muted)]">{action.desc}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{action.label}</p>
-                  <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">{action.desc}</p>
+                <div className="mt-3 font-mono text-[10px] text-[var(--color-text-muted)] tracking-wide">
+                  {action.flow}
                 </div>
               </Link>
             );
@@ -486,7 +517,9 @@ const DashboardPage: React.FC = () => {
               })
             ) : (
               <div className="rounded-xl border-2 border-dashed border-white/10 p-8 text-center">
-                <div className="text-3xl">🚀</div>
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500 dark:text-purple-400">
+                  <GitBranch size={18} />
+                </div>
                 <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">No activity yet. Create your first pipeline!</p>
                 <Link to="/builder" className="mt-3 inline-block text-sm font-semibold text-purple-400 hover:text-purple-300">
                   Describe a pipeline →

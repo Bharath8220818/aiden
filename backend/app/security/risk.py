@@ -1,0 +1,4 @@
+from app.schemas.agent_communication import RiskLevel
+RISK_RULES = {("database","list_tables"): RiskLevel.LOW, ("database","describe_table"): RiskLevel.LOW, ("database","execute_readonly_sql"): RiskLevel.LOW, ("airflow","list_dags"): RiskLevel.LOW, ("airflow","get_dag_status"): RiskLevel.LOW, ("airflow","get_dag_logs"): RiskLevel.LOW, ("kafka","list_topics"): RiskLevel.LOW, ("kafka","get_consumer_lag"): RiskLevel.LOW, ("airflow","trigger_dag"): RiskLevel.MEDIUM, ("database","execute_sql"): RiskLevel.MEDIUM, ("airflow","delete_dag"): RiskLevel.HIGH, ("database","drop_table"): RiskLevel.CRITICAL, ("database","delete_data"): RiskLevel.CRITICAL, ("kafka","delete_topic"): RiskLevel.CRITICAL}
+def classify_risk(tool, action): return RISK_RULES.get((tool, action), RiskLevel.MEDIUM)
+def requires_approval(risk): return risk in (RiskLevel.MEDIUM, RiskLevel.HIGH, RiskLevel.CRITICAL)

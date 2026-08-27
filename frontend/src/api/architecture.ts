@@ -1,22 +1,55 @@
-import { api } from './index';
-import type { ArchitectureModel } from '../types/architecture';
+import api from './index';
+
+export interface ArchitectureComponent {
+  id: string;
+  name: string;
+  type: string;
+  category?: string;
+  service?: string;
+  icon?: string;
+  status?: string;
+  metrics?: Record<string, string>;
+  config?: Record<string, unknown>;
+}
+
+export interface ArchitectureConnection {
+  id?: string;
+  source?: string;
+  target?: string;
+  from_id?: string;
+  to_id?: string;
+  label?: string;
+  edgeType?: string;
+  data_flow?: string;
+  protocol?: string;
+}
+
+export interface ArchitectureResult {
+  id?: string;
+  title?: string;
+  components: ArchitectureComponent[];
+  connections: ArchitectureConnection[];
+  design_principles?: string[];
+  medallion_layers?: Record<string, string>;
+  estimated_cost?: string;
+  explanation?: string;
+  terraform_code?: string;
+}
 
 export const architectureApi = {
-  generate: (prompt: string) =>
-    api.post<ArchitectureModel>('/api/v1/architecture/generate', { prompt }).then(r => r.data),
-
-  optimize: (architecture: Partial<ArchitectureModel>) =>
-    api.post<ArchitectureModel>('/api/v1/architecture/optimize', architecture).then(r => r.data),
-
-  exportTerraform: (architecture: Partial<ArchitectureModel>) =>
-    api.post<{ terraform: string }>('/api/v1/architecture/export-terraform', architecture).then(r => r.data),
-
-  exportPng: (architecture: Partial<ArchitectureModel>) =>
-    api.post<{ image: string }>('/api/v1/architecture/export-png', architecture).then(r => r.data),
-
-  save: (architecture: Partial<ArchitectureModel>) =>
-    api.post<ArchitectureModel>('/api/v1/architecture', architecture).then(r => r.data),
-
-  list: () =>
-    api.get<ArchitectureModel[]>('/api/v1/architecture').then(r => r.data),
+  /**
+   * Generate an architecture from a natural-language prompt.
+   * Calls the backend LLM (Ollama → HuggingFace → rule-based fallback).
+   */
+  generate: async (
+    prompt: string,
+    cloudProvider?: string
+  ): Promise<ArchitectureResult> => {
+    const response = await api.post(
+      '/api/v1/architecture/generate',
+      { prompt, cloud_provider: cloudProvider || 'aws' },
+      { timeout: 120000 }
+    );
+    return response.data;
+  },
 };
