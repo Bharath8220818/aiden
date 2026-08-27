@@ -10,9 +10,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Database, Radio, Zap, RefreshCw, Settings, Play, Search,
+  Database, Radio, Zap, RefreshCw, Settings, Play,
   ChevronDown, ChevronRight, CheckCircle, XCircle, Clock,
-  Wifi, WifiOff, Activity, Terminal, FileText, ArrowRight,
+  Activity, Terminal, FileText, ArrowRight,
   Plug, Server, AlertTriangle, Eye, EyeOff,
 } from 'lucide-react';
 
@@ -32,10 +32,6 @@ interface ToolHealth {
   status: string;
   latency_ms: number;
   details: Record<string, any>;
-}
-
-interface ToolMetrics {
-  [key: string]: any;
 }
 
 interface AuditEntry {
@@ -370,7 +366,7 @@ const ToolGatewayPage: React.FC = () => {
         timestamp: new Date().toISOString(),
         tool: name,
         action: 'test_connection',
-        status: 'success',
+        status: 'success' as const,
         duration_ms: Date.now() - start,
       }, ...prev].slice(0, 100));
     } catch {
@@ -382,24 +378,23 @@ const ToolGatewayPage: React.FC = () => {
         timestamp: new Date().toISOString(),
         tool: name,
         action: 'test_connection',
-        status: 'error',
+        status: 'error' as const,
         duration_ms: Date.now() - start,
       }, ...prev].slice(0, 100));
     }
     setTestingTool(null);
   };
 
-  const handleSaveConfig = async (name: string, config: Record<string, string>) => {
+  const handleSaveConfig = async (name: string, _config: Record<string, string>) => {
     setSavingTool(name);
     // In real implementation, this would POST to /api/v1/tools/{name}/config
-    await new Promise((r) => setTimeout(r, 1000));
-    setAuditLog((prev) => [{
-      timestamp: new Date().toISOString(),
-      tool: name,
-      action: 'update_config',
-      status: 'success',
-      duration_ms: 1000,
-    }, ...prev].slice(0, 100));
+    await new Promise((r) => setTimeout(r, 1000));      setAuditLog((prev) => [{
+        timestamp: new Date().toISOString(),
+        tool: name,
+        action: 'update_config',
+        status: 'success' as const,
+        duration_ms: 1000,
+      }, ...prev].slice(0, 100));
     setSavingTool(null);
     // Re-test after config save
     handleTest(name);

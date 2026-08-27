@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { useAuthStore } from '../../store/authStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { signInWithGitHub } from '../../lib/supabase';
-import { Database, GitBranch, Activity, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email'),

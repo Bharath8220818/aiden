@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Activity, Zap, Database, Bell, ArrowRight,
+  Activity, Zap, Database, Bell,
 } from 'lucide-react';
 import AgentActivityPanel from '../components/agents/AgentActivityPanel';
 import useAgentWebSocket from '../hooks/useAgentWebSocket';

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Send, X, Sparkles, AlertTriangle, CheckCircle, Info, ChevronRight } from 'lucide-react';
+import { Bot, Send, X, Sparkles, CheckCircle, ChevronRight } from 'lucide-react';
 import api from '../../api/index';
 
 export interface CopilotMessage {
@@ -115,7 +115,7 @@ export default function AICopilotPanel({ isOpen, onClose, architectureContext, o
     sendMessage(suggestion);
   }, [sendMessage]);
 
-  const handleActionClick = useCallback((action: CopilotMessage['actions'][number]) => {
+  const handleActionClick = useCallback((action: NonNullable<CopilotMessage['actions']>[number]) => {
     if (onAction) {
       onAction({ type: action.type, payload: action.payload });
     }

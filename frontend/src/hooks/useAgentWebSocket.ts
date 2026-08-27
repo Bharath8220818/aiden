@@ -74,8 +74,8 @@ export function useAgentWebSocket(
   maxRuns: number = 50,
 ): UseAgentWebSocketReturn {
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const pingIntervalRef = useRef<ReturnType<typeof setInterval>>();
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval>>(null);
   const [connected, setConnected] = useState(false);
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [latestRun, setLatestRun] = useState<AgentRun | null>(null);

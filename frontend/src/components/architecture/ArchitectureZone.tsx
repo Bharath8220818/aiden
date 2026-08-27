@@ -24,7 +24,7 @@ const zoneColorMap: Record<string, { border: string; bg: string; headerBg: strin
   gray:    { border: 'border-gray-500/30',    bg: 'bg-gray-500/5',    headerBg: 'bg-gray-500/10',    text: 'text-gray-400',    handle: 'bg-gray-500' },
 };
 
-const ArchitectureZone: React.FC<NodeProps<ZoneData>> = memo(({ data, selected, id }) => {
+const ArchitectureZone: React.FC<NodeProps<ZoneData>> = memo(({ data, selected }) => {
   const colors = zoneColorMap[data.color] || zoneColorMap.gray;
   const [isCollapsed, setIsCollapsed] = useState(data.collapsed ?? false);
 

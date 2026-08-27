@@ -5,9 +5,9 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Activity, Play, CheckCircle, XCircle, Clock, Zap, Wifi, WifiOff,
+  Activity, Play, CheckCircle, XCircle, Clock, Wifi, WifiOff,
   ChevronDown, ChevronRight, Send, RefreshCw, CircleDot,
-  ArrowRight, Terminal, Database, Radio,
+  Terminal, Database, Radio,
 } from 'lucide-react';
 import useAgentWebSocket, {
   type AgentRun,
@@ -211,7 +211,6 @@ const AgentActivityPanel: React.FC<AgentActivityPanelProps> = ({
   const {
     connected,
     runs,
-    latestRun,
     connectorHealth,
     notifications,
     execute,

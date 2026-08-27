@@ -226,7 +226,9 @@ export default function ArchitectureStudioPage() {
 
   // ── Live infrastructure monitoring ────────────────────────────────
   const liveComponents = useMemo(
-    () => nodes.map((n) => ({ id: n.id, service: n.data.service || n.data.label })),
+    () => nodes
+      .filter((n): n is Node<ArchitectureNodeData> => n.type === 'architectureNode')
+      .map((n) => ({ id: n.id, service: String(n.data.service || n.data.label) })),
     [nodes]
   );
   const { statuses, isLive, lastUpdate, error: liveError, toggle: toggleLive } = useLiveMonitor(liveComponents, 10000);
@@ -238,12 +240,13 @@ export default function ArchitectureStudioPage() {
       nds.map((n) => {
         const live = statuses[n.id];
         if (!live) return n;
+        if (n.type !== 'architectureNode') return n;
         return {
           ...n,
           data: {
             ...n.data,
-            status: live.status,
-            metrics: { ...n.data.metrics, ...live.metrics },
+            status: (live.status || n.data.status) as ArchitectureNodeData['status'],
+            metrics: { ...(n.data.metrics || {}), ...(live.metrics || {}) },
           },
         };
       })
@@ -281,10 +284,11 @@ export default function ArchitectureStudioPage() {
 
   const onConnect = useCallback(
     (params: Connection) => {
+      if (!params.source || !params.target) return;
       pushHistory();
       setEdges((eds) =>
         addEdge(
-          { ...params, type: 'animatedEdge', data: { edgeType: 'dataflow', animated: true } },
+          { ...params, source: params.source!, target: params.target!, type: 'animatedEdge', data: { edgeType: 'dataflow', animated: true } },
           eds
         )
       );
@@ -419,9 +423,9 @@ export default function ArchitectureStudioPage() {
       pushHistory();
       const newNode: Node<ArchitectureNodeData> = {
         ...node,
-        id: generateNodeId(node.data.category),
+        id: generateNodeId(node.type === 'architectureNode' ? String(node.data.category || 'component') : 'component'),
         position: { x: node.position.x + 40, y: node.position.y + 40 },
-        data: { ...node.data },
+        data: { ...node.data } as ArchitectureNodeData,
       };
       setNodes((nds) => [...nds, newNode]);
       addNotification({ type: 'info', message: `Duplicated ${node.data.label}` });
@@ -507,13 +511,15 @@ export default function ArchitectureStudioPage() {
       } else if (action.type === 'add-edge' && action.payload) {
         const p = action.payload as { source?: string; target?: string; label?: string };
         if (p.source && p.target) {
+          const edgeSource = p.source;
+          const edgeTarget = p.target;
           pushHistory();
           setEdges((eds) => [
             ...eds,
             {
-              id: `e-copilot-${p.source}-${p.target}`,
-              source: p.source,
-              target: p.target,
+              id: `e-copilot-${edgeSource}-${edgeTarget}`,
+              source: edgeSource,
+              target: edgeTarget,
               type: 'animatedEdge',
               data: { edgeType: 'dataflow', label: p.label || '', animated: true },
             },
@@ -534,16 +540,16 @@ export default function ArchitectureStudioPage() {
   const onAutoLayout = useCallback(() => {
     // Simple left-to-right layout based on categories
     const categoryOrder = ['databases', 'streaming', 'orchestration', 'processing', 'storage', 'monitoring'];
-    const grouped: Record<string, Node<ArchitectureNodeData>[]> = {};
+    const grouped: Record<string, Node[]> = {};
     nodes.forEach((n) => {
-      const cat = n.data.category || 'default';
+      const cat = (n.type === 'architectureNode' ? String(n.data.category || 'default') : 'default');
       if (!grouped[cat]) grouped[cat] = [];
       grouped[cat].push(n);
     });
 
     pushHistory();
     const newNodes = nodes.map((n) => {
-      const cat = n.data.category || 'default';
+      const cat = (n.type === 'architectureNode' ? String(n.data.category || 'default') : 'default');
       const catIdx = categoryOrder.indexOf(cat);
       const col = catIdx >= 0 ? catIdx : categoryOrder.length;
       const rowIdx = (grouped[cat] || []).indexOf(n);
@@ -566,6 +572,7 @@ export default function ArchitectureStudioPage() {
   }, []);
 
   const [showExport, setShowExport] = useState(false);
+  const architectureName = 'E-Commerce Data Platform';
 
   const onExport = useCallback(() => {
     setShowExport(true);
@@ -965,13 +972,13 @@ export default function ArchitectureStudioPage() {
           architectureContext={
             {
               nodes: nodes
-                .filter((n) => n.type === 'architectureNode')
+                .filter((n): n is Node<ArchitectureNodeData> => n.type === 'architectureNode')
                 .map((n) => ({
                   id: n.id,
                   label: n.data.label,
-                  category: n.data.category || '',
-                  service: n.data.service || '',
-                  status: n.data.status || 'unknown',
+                  category: String(n.data.category || ''),
+                  service: String(n.data.service || ''),
+                  status: String(n.data.status || 'unknown'),
                   metrics: n.data.metrics,
                 })),
               edges: edges.map((e) => ({
