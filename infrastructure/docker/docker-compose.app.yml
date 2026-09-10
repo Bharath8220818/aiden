@@ -1,0 +1,85 @@
+version: "3.9"
+
+# AIDEN full-stack local development stack (Stage 3.1).
+# Usage:  docker compose -f infrastructure/docker/docker-compose.yml up -d
+#
+# The existing compose file in this directory starts the *infrastructure*
+# services (postgres, redis, qdrant, kafka). This file adds the application
+# containers and an observability stack on top of it:
+#   docker compose -f infrastructure/docker/docker-compose.yml \
+#                  -f infrastructure/docker/docker-compose.app.yml up -d
+
+services:
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    container_name: aiden-backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://aiden:aiden123@postgres:5432/aiden
+      REDIS_URL: redis://redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production-0123456789abcdef}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/v1/health/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aiden-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+    container_name: aiden-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - aiden-network
+    restart: unless-stopped
+
+  # ── Observability (Stage 3.3) ──
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: aiden-prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - aiden-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: aiden-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - aiden-network
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  grafana_data:

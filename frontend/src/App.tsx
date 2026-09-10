@@ -49,6 +49,16 @@ const KnowledgeBasePage = lazy(() => import('./pages/KnowledgeBasePage'));
 const AgentActivityPage = lazy(() => import('./pages/AgentActivityPage'));
 const ToolGatewayPage = lazy(() => import('./pages/ToolGatewayPage'));
 
+// ── Stage-1 pages ──
+const DataQualityPage = lazy(() => import('./pages/DataQualityPage'));
+const DataSourcesPage = lazy(() => import('./pages/DataSourcesPage'));
+const IncidentsPage = lazy(() => import('./pages/IncidentsPage'));
+const DataLineagePage = lazy(() => import('./pages/DataLineagePage'));
+const ProjectMemoryPage = lazy(() => import('./pages/ProjectMemoryPage'));
+const SecurityPage = lazy(() => import('./pages/SecurityPage'));
+const CLITerminalPage = lazy(() => import('./pages/CLITerminalPage'));
+const IntegrationsPage = lazy(() => import('./pages/IntegrationsPage'));
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -119,6 +129,12 @@ function AppShellWithRoutes() {
 
                   {/* Operations */}
                   <Route path="/tool-gateway" element={<ProtectedRoute><PageTransition variant="fade"><ToolGatewayPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/data-quality" element={<ProtectedRoute><PageTransition variant="fade"><DataQualityPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/data-sources" element={<ProtectedRoute><PageTransition variant="fade"><DataSourcesPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/data-lineage" element={<ProtectedRoute><PageTransition variant="fade"><DataLineagePage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/incidents" element={<ProtectedRoute><PageTransition variant="fade"><IncidentsPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/integrations" element={<ProtectedRoute><PageTransition variant="fade"><IntegrationsPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/cli-terminal" element={<ProtectedRoute><PageTransition variant="fade"><CLITerminalPage /></PageTransition></ProtectedRoute>} />
                   <Route path="/monitoring" element={<ProtectedRoute><PageTransition variant="fade"><MonitoringPage /></PageTransition></ProtectedRoute>} />
                   <Route path="/analytics" element={<ProtectedRoute><PageTransition variant="fade"><AnalyticsPage /></PageTransition></ProtectedRoute>} />
 
@@ -141,6 +157,8 @@ function AppShellWithRoutes() {
 
                   {/* Settings & Admin */}
                   <Route path="/settings" element={<ProtectedRoute><PageTransition variant="fade"><SettingsPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/security" element={<ProtectedRoute><PageTransition variant="fade"><SecurityPage /></PageTransition></ProtectedRoute>} />
+                  <Route path="/project-memory" element={<ProtectedRoute><PageTransition variant="fade"><ProjectMemoryPage /></PageTransition></ProtectedRoute>} />
                   <Route path="/admin" element={<ProtectedRoute><PageTransition variant="fade"><AdminDashboardPage /></PageTransition></ProtectedRoute>} />
 
                   {/* Info pages (public) */}

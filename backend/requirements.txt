@@ -47,3 +47,6 @@ torch>=2.13.0
 supabase>=2.31.0
 google-cloud-bigquery>=3.42.2,<3.43.0
 pyarrow>=25.0.0
+
+# ─── Observability (Stage 3.3) ───
+prometheus-client>=0.21.0
