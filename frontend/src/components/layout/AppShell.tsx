@@ -7,7 +7,8 @@ import {
   Settings, Bell, LogOut, Menu, X, ChevronRight,
   Sparkles, Layers, FileJson, Activity, CheckSquare,
   FileText, Globe, HelpCircle, MonitorSmartphone,
-  Workflow, Library, Plug
+  Workflow, Library, Plug, Siren, GitMerge,
+  TerminalSquare, Lock, HardDrive
 } from 'lucide-react';
 import ThemeToggle from '../common/ThemeToggle';
 import { useAuthStore } from '../../store/authStore';
@@ -46,8 +47,13 @@ const navSections: NavSection[] = [
     title: 'Operations',
     items: [
       { label: 'Tool Gateway', icon: <Plug className="h-4 w-4" />, href: '/tool-gateway' },
+      { label: 'Data Sources', icon: <HardDrive className="h-4 w-4" />, href: '/data-sources' },
       { label: 'Pipelines', icon: <GitBranch className="h-4 w-4" />, href: '/pipelines' },
       { label: 'Monitoring', icon: <Activity className="h-4 w-4" />, href: '/monitoring' },
+      { label: 'Data Quality', icon: <CheckSquare className="h-4 w-4" />, href: '/data-quality' },
+      { label: 'Data Lineage', icon: <GitMerge className="h-4 w-4" />, href: '/data-lineage' },
+      { label: 'Incidents', icon: <Siren className="h-4 w-4" />, href: '/incidents' },
+      { label: 'Integrations', icon: <Plug className="h-4 w-4" />, href: '/integrations' },
       { label: 'Analytics', icon: <BarChart3 className="h-4 w-4" />, href: '/analytics' },
     ],
   },
@@ -64,6 +70,7 @@ const navSections: NavSection[] = [
     title: 'Governance',
     items: [
       { label: 'Approvals', icon: <CheckSquare className="h-4 w-4" />, href: '/approvals' },
+      { label: 'Security', icon: <Lock className="h-4 w-4" />, href: '/security' },
       { label: 'Audit Logs', icon: <FileJson className="h-4 w-4" />, href: '/audit-logs' },
       { label: 'Team', icon: <Users className="h-4 w-4" />, href: '/team' },
     ],
@@ -74,6 +81,8 @@ const navSections: NavSection[] = [
       { label: 'Templates', icon: <FileText className="h-4 w-4" />, href: '/templates' },
       { label: 'Getting Started', icon: <HelpCircle className="h-4 w-4" />, href: '/getting-started' },
       { label: 'Knowledge Base', icon: <Library className="h-4 w-4" />, href: '/knowledge-base' },
+      { label: 'Project Memory', icon: <Brain className="h-4 w-4" />, href: '/project-memory' },
+      { label: 'CLI Terminal', icon: <TerminalSquare className="h-4 w-4" />, href: '/cli-terminal' },
       { label: 'Settings', icon: <Settings className="h-4 w-4" />, href: '/settings' },
     ],
   },

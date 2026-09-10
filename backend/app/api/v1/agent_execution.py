@@ -146,6 +146,21 @@ async def get_run(
     return run
 
 
+@router.get("/runs/{run_id}/graph")
+async def get_run_graph(
+    run_id: str,
+    current_user=Depends(get_current_user),
+):
+    """Get the execution DAG (nodes + edges) of a specific run."""
+    run = aiden_orchestrator.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
+    graph = run.get("execution_graph")
+    if not graph:
+        raise HTTPException(status_code=404, detail=f"Run '{run_id}' has no execution graph")
+    return graph
+
+
 # ── Agent Endpoints ─────────────────────────────────────────────────
 
 @router.get("/agents")

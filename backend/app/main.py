@@ -9,6 +9,9 @@ from app.api.v1 import pipelines, auth, analytics, approvals, audit, executions,
 from app.api.v1 import multimodal as multimodal_router
 from app.api.v1 import agents, schemas, architecture, coding, learning, team, templates, voice, health
 from app.api.v1 import nfl_prediction, tools as tools_router, alerts, agent_execution, memory as memory_router
+from app.api.v1 import projects as projects_router, environments as environments_router, connections as connections_router
+from app.api.v1 import incidents as incidents_router, monitoring as monitoring_router, webhooks as webhooks_router, admin as admin_router
+from app.api.v1 import mcp as mcp_router, metrics as metrics_router
 from app.api.v1.websocket import websocket_endpoint
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.logging import RequestLoggingMiddleware
@@ -75,6 +78,20 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+        # Lightweight startup migrations: create_all does not ALTER existing
+        # tables, so add columns introduced after the first deployment here.
+        # Idempotent — duplicate-column errors are swallowed.
+        from sqlalchemy import text
+        for _table, _column, _coltype in (
+            ("users", "organization_id", "INTEGER"),
+        ):
+            try:
+                await conn.execute(
+                    text(f"ALTER TABLE {_table} ADD COLUMN {_column} {_coltype}")
+                )
+            except Exception:
+                pass  # column already exists
+
     # Seed default users so team members can log in immediately
     from app.core.init_db import ensure_default_users
     from app.database import AsyncSessionLocal
@@ -84,6 +101,13 @@ async def lifespan(app: FastAPI):
 
     # Start connector health poller in background
     poller_task = asyncio.create_task(_start_background_tasks())
+
+    # Start event bus Redis listener (no-op when Redis is unavailable)
+    try:
+        from app.services.event_bus import EventBus
+        await EventBus.start_redis_listener()
+    except Exception as e:
+        logger.warning(f"Event bus listener not started: {e}")
 
     yield
 
@@ -177,9 +201,26 @@ app.include_router(agent_execution.router, prefix="/api/v1/execution", tags=["ex
 # ── Memory System ──
 app.include_router(memory_router.router, prefix="/api/v1/memory", tags=["memory"])
 
+# ── Projects & Infrastructure ──
+app.include_router(projects_router.router, prefix="/api/v1/projects", tags=["projects"])
+app.include_router(environments_router.router, prefix="/api/v1/environments", tags=["environments"])
+app.include_router(connections_router.router, prefix="/api/v1/connections", tags=["connections"])
+
+# ── Operations ──
+app.include_router(incidents_router.router, prefix="/api/v1/incidents", tags=["incidents"])
+app.include_router(monitoring_router.router, prefix="/api/v1/monitoring", tags=["monitoring"])
+app.include_router(webhooks_router.router, prefix="/api/v1/webhooks", tags=["webhooks"])
+app.include_router(admin_router.router, prefix="/api/v1/admin", tags=["admin"])
+
 # ── Voice & Health ──
 app.include_router(voice.router, prefix="/api/v1/voice", tags=["voice"])
 app.include_router(health.router, prefix="/api/v1/health", tags=["health"])
+
+# ── MCP (Stage 4.3) ──
+app.include_router(mcp_router.router, prefix="/api/v1/mcp", tags=["mcp"])
+
+# ── Observability (Stage 3.3/3.4) ──
+app.include_router(metrics_router.router, prefix="/api/v1/observability", tags=["observability"])
 
 # WebSocket endpoint
 app.add_api_websocket_route("/api/v1/ws/{client_id}", websocket_endpoint)

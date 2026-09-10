@@ -24,6 +24,8 @@ from app.schemas.agent_communication import (
     ExecutionPlan,
     ExecutionStep,
 )
+from app.services.planner import Planner
+from app.services.executor import Executor
 from app.agents.sql_agent_v2 import SQLAgentV2
 from app.agents.pipeline_agent_v2 import PipelineAgentV2
 from app.agents.architecture_agent_v2 import ArchitectureAgentV2
@@ -82,6 +84,7 @@ class AidenOrchestrator:
         self._agents: Dict[str, Any] = {}
         self._connectors = TOOL_REGISTRY
         self._run_history: List[Dict[str, Any]] = []
+        self._planner = Planner()
         self._initialize_agents()
 
     def _initialize_agents(self):
@@ -311,15 +314,14 @@ class AidenOrchestrator:
         except Exception:
             pass
 
-        # 3. Create plan
-        plan = self.create_plan(
-            objective=objective,
-            agent_names=intent["agents"],
-            context=context,
-        )
+        # 3. Create DAG plan via the Planner service (dependency graph)
+        plan = self._planner.create_plan(objective, context=context)
 
-        # 4. Execute plan
-        result = await self.execute_plan(plan, context)
+        # 4. Execute plan DAG through the Executor (waves + graph broadcast)
+        dag_result = await Executor.execute_plan(plan, context)
+
+        # 5. Map DAG results into the AgentResult shape for history/compat
+        result = self._dag_to_agent_result(plan, dag_result)
 
         elapsed_ms = (time.monotonic() - start) * 1000
 
@@ -335,6 +337,7 @@ class AidenOrchestrator:
             "tools_used": result.tools_used,
             "evidence": result.evidence,
             "output": result.output,
+            "execution_graph": self._execution_graph(plan, dag_result),
             "execution_time_ms": elapsed_ms,
             "created_at": datetime.utcnow().isoformat(),
         }
@@ -361,6 +364,67 @@ class AidenOrchestrator:
             pass
 
         return run_record
+
+    # ── Execution Graph (DAG) ─────────────────────────────────────
+
+    def _dag_to_agent_result(self, plan: dict, dag_result: dict) -> AgentResult:
+        """Convert the Executor's aggregated DAG output into an AgentResult for history."""
+        status_map = {
+            "success": TaskStatus.SUCCESS,
+            "partial": TaskStatus.PARTIAL,
+            "failure": TaskStatus.FAILURE,
+        }
+        return AgentResult(
+            task_id=plan.get("plan_id", ""),
+            agent_name="orchestrator",
+            agent_type=AgentType.ORCHESTRATOR,
+            status=status_map.get(dag_result.get("status"), TaskStatus.FAILURE),
+            output={
+                "plan_id": plan.get("plan_id"),
+                "objective": plan.get("objective"),
+                "results": dag_result.get("results", {}),
+                "summary": dag_result.get("summary", ""),
+                "total_steps": dag_result.get("total_steps", 0),
+            },
+            confidence=(
+                max(
+                    (r.get("confidence", 0) for r in dag_result.get("results", {}).values()),
+                    default=0.0,
+                )
+                if dag_result.get("status") == "success"
+                else 0.3
+            ),
+            tools_used=dag_result.get("tools_used", []),
+            execution_time_ms=dag_result.get("execution_time_ms", 0),
+        )
+
+    def _execution_graph(self, plan: dict, dag_result: dict) -> Dict[str, Any]:
+        """Node/edge representation of the executed DAG for the activity feed."""
+        results = dag_result.get("results", {})
+        nodes = []
+        edges = []
+        for step in plan.get("steps", []):
+            sid = step["step_id"]
+            r = results.get(sid, {})
+            nodes.append({
+                "step_id": sid,
+                "agent": step.get("agent", ""),
+                "objective": step.get("objective", ""),
+                "status": r.get("status", "pending"),
+                "detail": (r.get("output", {}) or {}).get("response", ""),
+                "confidence": r.get("confidence", 0),
+                "execution_time_ms": r.get("execution_time_ms", 0),
+                "depends_on": step.get("depends_on", []),
+            })
+            for dep in step.get("depends_on", []):
+                edges.append({"source": dep, "target": sid})
+        return {
+            "plan_id": plan.get("plan_id"),
+            "intent": plan.get("intent"),
+            "status": dag_result.get("status"),
+            "nodes": nodes,
+            "edges": edges,
+        }
 
     # ── Connector Helpers ───────────────────────────────────────────
 

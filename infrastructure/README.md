@@ -1,74 +1,67 @@
 # Infrastructure — AIDEN
 
-This folder contains infrastructure and runtime support for AIDEN. Use it to start the project with Docker Compose and manage local service dependencies.
+Infrastructure and runtime support for AIDEN: Docker Compose stacks, nginx, Prometheus config, and Windows helpers.
 
 ---
 
-## Docker Compose
+## Docker Compose files
 
-The primary Docker Compose file is:
+| File | Purpose |
+|------|---------|
+| `docker/docker-compose.yml` | Dev stack — postgres, redis, qdrant, minio, backend, frontend |
+| `docker/docker-compose.app.yml` | App-only overrides (backend + frontend) |
+| `docker/docker-compose.prod.yml` | Production configuration |
 
-- `infrastructure/docker/docker-compose.yml`
+### Services (dev stack)
 
-It defines the following services:
-
-- `postgres` — PostgreSQL database on port `5432`
-- `redis` — Redis cache on port `6379`
-- `qdrant` — Qdrant vector database on port `6333`
-- `minio` — S3-compatible storage on port `9000`
-- `backend` — FastAPI backend on port `8000`
-- `frontend` — React frontend on ports `80` and `443`
+| Service | Port | Notes |
+|---------|------|-------|
+| `postgres` | 5432 | Primary database (SQLite fallback in local dev) |
+| `redis` | 6379 | Cache, Celery broker, event bus, hot memory layer |
+| `qdrant` | 6333 | Vector DB for RAG memory (`/readyz` healthcheck configured) |
+| `minio` | 9000 | S3-compatible storage |
+| `backend` | 8000 | FastAPI backend |
+| `frontend` | 80/443 | React app served by nginx |
 
 ---
 
-## Start services
+## Start / stop
 
 ```bash
 cd infrastructure/docker
-docker compose up -d
+docker compose up -d          # start the stack
+docker compose ps             # check status
+docker compose down           # stop
+docker compose down -v        # stop and remove volumes (resets data)
 ```
 
-Check container status:
+---
 
-```bash
-docker compose ps
-```
+## Monitoring (Prometheus)
 
-Stop services:
+`docker/prometheus/` contains the Prometheus scrape configuration targeting the backend `/metrics` endpoint (prometheus-client). Add a `prometheus` service to compose (or run the binary) pointed at this config to scrape backend metrics; Grafana can be added on top for dashboards.
 
-```bash
-docker compose down
-```
+---
+
+## Windows helpers
+
+Docker Desktop on Windows can be killed by shell job-object cleanup (containers appear to restart in a cycle). Helpers:
+
+- [`ensure-qdrant.ps1`](docker/ensure-qdrant.ps1) — launches/verifies the Qdrant container detached, waits for `/readyz`
+- [`../docs/QDRANT_WINDOWS.md`](../docs/QDRANT_WINDOWS.md) — root cause, WSL2 `.wslconfig` tuning, and a native Windows Qdrant binary alternative
+
+Launch Docker Desktop detached if you see container restart cycles.
+
+---
+
+## Kubernetes
+
+Full manifests live in [`../deployment/kubernetes/`](../deployment/kubernetes/README.md): backend & frontend deployments + services, and an ingress.
 
 ---
 
 ## Recommended local workflow
 
-1. Ensure Docker Desktop is running.
-2. Start the stack with `docker compose up -d`.
-3. Visit `http://localhost` for the frontend.
-4. Visit `http://localhost:8000/docs` for the backend API docs.
-
----
-
-## Notes
-
-- The backend container reads environment variables from the compose file and seeds demo users if enabled.
-- The frontend container serves the built React app from port `80`.
-- If you need to reset persistent data, stop containers and remove volumes:
-
-```bash
-docker compose down -v
-```
-
----
-
-## Windows guidance
-
-If Windows path or Docker networking issues appear, use the built-in PowerShell helper:
-
-```powershell
-.
-```
-
-and ensure `docker compose` is available in PowerShell.
+1. Start Docker Desktop.
+2. `docker compose up -d`.
+3. Frontend: `http://localhost` · API docs: `http://localhost:8000/docs` · Prometheus metrics: `http://localhost:8000/api/v1/metrics`.

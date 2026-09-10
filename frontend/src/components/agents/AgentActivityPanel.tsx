@@ -14,6 +14,7 @@ import useAgentWebSocket, {
   type AgentStep,
   type ConnectorHealthEvent,
 } from '../../hooks/useAgentWebSocket';
+import PlanGraphView from './PlanGraphView';
 
 // ── Status dot ────────────────────────────────────────────────────────
 
@@ -125,6 +126,11 @@ const RunCard: React.FC<{
                     </span>
                   ))}
                 </div>
+              )}
+
+              {/* Execution DAG */}
+              {run.graph && run.graph.nodes.length > 0 && (
+                <PlanGraphView graph={run.graph} />
               )}
 
               {/* Agent steps timeline */}

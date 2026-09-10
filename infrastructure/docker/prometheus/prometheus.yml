@@ -1,0 +1,17 @@
+# AIDEN Prometheus scrape config (Stage 3.3)
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # AIDEN backend — in-memory fallback metrics until prometheus_client is
+  # installed in the backend image (pip install -r requirements.txt).
+  - job_name: "aiden-backend"
+    metrics_path: /api/v1/observability/metrics
+    static_configs:
+      - targets: ["backend:8000"]
+
+  # Prometheus itself
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

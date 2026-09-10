@@ -24,6 +24,34 @@ export interface AgentStep {
   timestamp: string;
 }
 
+/** A node in the orchestrator's execution DAG (one agent step). */
+export interface PlanGraphNode {
+  step_id: string;
+  agent: string;
+  objective?: string;
+  status: 'pending' | 'running' | 'success' | 'failed';
+  detail?: string;
+  confidence?: number;
+  execution_time_ms?: number;
+  depends_on: string[];
+}
+
+/** Edge between two DAG nodes (source must complete before target). */
+export interface PlanGraphEdge {
+  source: string;
+  target: string;
+}
+
+/** The execution DAG of a run, built from plan_graph WebSocket events. */
+export interface PlanGraph {
+  plan_id: string;
+  intent?: string;
+  status: 'running' | 'success' | 'partial' | 'failure';
+  nodes: PlanGraphNode[];
+  edges: PlanGraphEdge[];
+  summary?: string;
+}
+
 export interface AgentRun {
   run_id: string;
   objective: string;
@@ -36,6 +64,8 @@ export interface AgentRun {
   agents_used: string[];
   tools_used: string[];
   steps: AgentStep[];
+  /** Execution DAG for this run (from plan_graph events). */
+  graph?: PlanGraph;
   confidence?: number;
   execution_time_ms?: number;
   created_at: string;
@@ -50,7 +80,7 @@ export interface ConnectorHealthEvent {
 }
 
 export interface WebSocketMessage {
-  type: 'agent_step' | 'execution_update' | 'pipeline_status' | 'connector_health' | 'notification' | 'pong' | 'connection';
+  type: 'agent_step' | 'execution_update' | 'pipeline_status' | 'connector_health' | 'notification' | 'plan_graph' | 'pong' | 'connection';
   data?: any;
   run_id?: string;
   timestamp?: string;
@@ -202,6 +232,109 @@ export function useAgentWebSocket(
           };
           setLatestRun(newRun);
           return [newRun, ...prev].slice(0, maxRuns);
+        });
+        break;
+      }
+
+      case 'plan_graph': {
+        const runId = msg.run_id || msg.data?.run_id || msg.data?.plan_id;
+        if (!runId) break;
+        const phase = msg.data?.phase;
+
+        setRuns((prev) => {
+          const idx = prev.findIndex((r) => r.run_id === runId);
+          // Ensure a run exists for this graph
+          let base: AgentRun[] = prev;
+          if (idx < 0) {
+            const newRun: AgentRun = {
+              run_id: runId,
+              objective: msg.data?.objective || '',
+              status: 'running',
+              agents_used: [],
+              tools_used: [],
+              steps: [],
+              created_at: now,
+              updated_at: now,
+            };
+            base = [newRun, ...prev].slice(0, maxRuns);
+          }
+          const targetIdx = base.findIndex((r) => r.run_id === runId);
+          const existing = base[targetIdx];
+
+          let graph: PlanGraph = existing.graph || {
+            plan_id: msg.data?.plan_id || runId,
+            status: 'running',
+            nodes: [],
+            edges: [],
+          };
+
+          if (phase === 'started') {
+            graph = {
+              plan_id: msg.data?.plan_id || runId,
+              intent: msg.data?.intent,
+              status: 'running',
+              nodes: (msg.data?.nodes || []).map((n: any) => ({ ...n, status: n.status || 'pending' })),
+              edges: (msg.data?.nodes || []).flatMap((n: any) =>
+                (n.depends_on || []).map((d: string) => ({ source: d, target: n.step_id }))
+              ),
+            };
+          } else if (phase === 'step') {
+            graph = {
+              ...graph,
+              nodes: graph.nodes.map((n) =>
+                n.step_id === msg.data?.step_id
+                  ? {
+                      ...n,
+                      status: msg.data?.status || n.status,
+                      detail: msg.data?.detail || n.detail,
+                      execution_time_ms: msg.data?.execution_time_ms ?? n.execution_time_ms,
+                    }
+                  : n
+              ),
+              // Insert unknown step nodes on the fly (defensive)
+              ...(graph.nodes.some((n) => n.step_id === msg.data?.step_id)
+                ? {}
+                : {
+                    nodes: [
+                      ...graph.nodes,
+                      {
+                        step_id: msg.data?.step_id,
+                        agent: msg.data?.agent || 'unknown',
+                        status: msg.data?.status || 'running',
+                        detail: msg.data?.detail,
+                        execution_time_ms: msg.data?.execution_time_ms,
+                        depends_on: msg.data?.depends_on || [],
+                      },
+                    ],
+                  }),
+              edges: graph.edges.some(
+                (e) => e.target === msg.data?.step_id && (msg.data?.depends_on || []).includes(e.source)
+              )
+                ? graph.edges
+                : [
+                    ...graph.edges,
+                    ...(msg.data?.depends_on || []).map((d: string) => ({
+                      source: d,
+                      target: msg.data?.step_id,
+                    })),
+                  ],
+            };
+          } else if (phase === 'completed') {
+            graph = {
+              ...graph,
+              status: msg.data?.status || graph.status,
+              summary: msg.data?.summary || graph.summary,
+            };
+          }
+
+          const updated: AgentRun = {
+            ...existing,
+            graph,
+            updated_at: now,
+          };
+          base[targetIdx] = updated;
+          setLatestRun(updated);
+          return base;
         });
         break;
       }
