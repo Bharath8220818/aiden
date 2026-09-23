@@ -1,0 +1,91 @@
+# Render Blueprint — AIDEN backend + Qdrant + Ollama (embeddings)
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Apply via: Render Dashboard → New → Blueprint → this repo.
+# Secrets (SECRET_KEY, JWT_SECRET, FRONTEND_URL, CORS_ORIGINS, SMTP_*, JIRA_*)
+# are deliberately NOT here — set them in the dashboard (see DEPLOYMENT_PLAN.md §A.2).
+#
+# Qdrant and Ollama are private services (no public URLs; only the backend
+# reaches them over Render's internal network).
+
+services:
+  # ------------------------------------------------------------------ #
+  # FastAPI backend                                                    #
+  # ------------------------------------------------------------------ #
+  - type: web
+    name: aiden-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: starter          # free tier sleeps; upgrade for a stable demo
+    healthCheckPath: /api/v1/health/healthz
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL   # Supabase session pooler (port 5432), postgres:// form
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: REDIS_URL
+        sync: false         # optional until Phase D
+      - key: QDRANT_URL
+        fromService:
+          type: pserv
+          name: aiden-qdrant
+      - key: OLLAMA_URL
+        fromService:
+          type: pserv
+          name: aiden-ollama
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: JIRA_URL
+        sync: false
+      - key: JIRA_EMAIL
+        sync: false
+      - key: JIRA_API_TOKEN
+        sync: false
+
+  # ------------------------------------------------------------------ #
+  # Qdrant — vector store for RAG (private, disk-backed)               #
+  # ------------------------------------------------------------------ #
+  - type: pserv
+    name: aiden-qdrant
+    runtime: image
+    image:
+      url: docker.io/qdrant/qdrant:latest
+    plan: starter
+    disk:
+      name: qdrant-storage
+      mountPath: /qdrant/storage
+      sizeGB: 1
+
+  # ------------------------------------------------------------------ #
+  # Ollama — local embeddings (nomic-embed-text is CPU-friendly)       #
+  # ------------------------------------------------------------------ #
+  - type: pserv
+    name: aiden-ollama
+    runtime: image
+    image:
+      url: docker.io/ollama/ollama:latest
+    plan: starter
+    disk:
+      name: ollama-models
+      mountPath: /root/.ollama
+      sizeGB: 2
+    # Pull the embedding model on boot, then serve.
+    dockerCommand: bash -c "ollama pull nomic-embed-text && ollama serve"

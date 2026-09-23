@@ -1,0 +1,29 @@
+# AIDEN Backend — locked dependency versions
+# Regenerate with: pip freeze | sort > requirements.lock.txt (inside a clean venv)
+# Install exact versions with: pip install -r requirements.lock.txt
+# The loose ranges in requirements.txt remain the source of truth for upgrades;
+# this lock pins a known-green combination (98 pytest green on Python 3.13).
+
+aiosqlite==0.22.1
+alembic==1.20.0
+annotated-types==0.8.0
+anyio==4.15.1
+asyncpg==0.31.0
+bcrypt==5.0.0
+certifi==2026.7.22
+fastapi==0.141.1
+httpcore==1.0.9
+httpx==0.28.1
+idna==3.19
+iniconfig==2.3.0
+packaging==26.3
+pluggy==1.6.0
+pydantic==2.13.5
+pydantic-settings==2.15.0
+pydantic_core==2.46.5
+PyJWT==2.14.0
+pytest==9.1.1
+pytest-asyncio==1.4.0
+SQLAlchemy==2.0.52
+starlette==1.6.0
+uvicorn==0.52.4

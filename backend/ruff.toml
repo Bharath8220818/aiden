@@ -1,0 +1,28 @@
+# AIDEN Backend — ruff lint + format configuration
+# Run: ruff check .   ·   ruff format --check .   ·   ruff check --fix .
+target-version = "py311"
+line-length = 110
+extend-exclude = ["venv", "migrations/versions"]
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes (unused imports/vars, f-string bugs)
+    "I",   # isort import ordering
+    "B",   # bugbear (common footguns)
+    "UP",  # pyupgrade (modern syntax)
+]
+ignore = [
+    "E501",  # line length — enforced by formatter; long strings are acceptable
+    "B008",  # FastAPI pattern: function calls in parameter defaults (Depends(...))
+    "UP042", # str,Enum → StrEnum: changes str(x) semantics across Python versions;
+             # deliberate avoidance while API serialization relies on current behavior
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["B011"] # assert False is fine in tests
+
+[format]
+quote-style = "double"
+indent-style = "space"

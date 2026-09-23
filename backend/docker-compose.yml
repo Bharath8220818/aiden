@@ -1,0 +1,191 @@
+# AIDEN Backend — local development stack
+#
+#   docker compose up --build
+#   Backend:  http://localhost:8000/docs
+#   Gateway:  http://localhost:8080  (nginx → frontend dist + /api + /ws)
+#   Postgres: localhost:5432 (aiden / aiden / aiden)
+#   Redis:    localhost:6379
+#   Qdrant:   http://localhost:6333 (vector store — RAG memory layer)
+services:
+  backend:
+    build: .
+    container_name: aiden-backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://aiden:aiden@db:5432/aiden
+      REDIS_URL: redis://redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
+      AIRFLOW_URL: ${AIRFLOW_URL:-}
+      AIRFLOW_DAGS_FOLDER: /opt/airflow/dags
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ./airflow/dags:/opt/airflow/dags
+
+  db:
+    image: postgres:16-alpine
+    container_name: aiden-postgres
+    environment:
+      POSTGRES_USER: aiden
+      POSTGRES_PASSWORD: aiden
+      POSTGRES_DB: aiden
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiden -d aiden"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: aiden-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: aiden-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':<(/dev/tcp/localhost/6333)' 2>/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Local embeddings for RAG (nomic-embed-text is CPU-friendly). The model is
+  # pulled into the named volume on first start. Enabled via the `rag` profile
+  # so the plain dev stack stays light — same profile pattern as gateway/execution.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: aiden-ollama
+    profiles: ["rag"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_storage:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # API gateway — serves the built frontend, proxies /api + /ws, adds security
+  # headers and per-route-class rate limiting (login is stricter). Enabled via
+  # profiles so the plain backend dev stack starts without it:
+  #   docker compose --profile gateway up
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: aiden-gateway
+    profiles: ["gateway"]
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../frontend/dist:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+
+  # ------------------------------------------------------------------ #
+  # Real execution — Airflow (Sprint 4). Enabled via profiles so the
+  # lightweight dev stack stays lean:
+  #   docker compose --profile execution up
+  # The backend and the scheduler share ./airflow/dags — AIDEN writes
+  # generated DAG files there and the scheduler parses them.
+  # ------------------------------------------------------------------ #
+  airflow-init:
+    image: apache/airflow:2.9.3
+    container_name: aiden-airflow-init
+    profiles: ["execution"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment: &airflow_env
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://aiden:aiden@db:5432/aiden
+      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/1
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      _AIRFLOW_WWW_USER_USERNAME: aiden
+      _AIRFLOW_WWW_USER_PASSWORD: aiden
+    user: "50000:0"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    command: >
+      bash -c "airflow db migrate && airflow users create --username $$AIRFLOW_WWW_USER_USERNAME --password $$AIRFLOW_WWW_USER_PASSWORD --firstname AIDEN --lastname Platform --role Admin --email aiden@acme.io || true"
+
+  airflow-webserver:
+    image: apache/airflow:2.9.3
+    container_name: aiden-airflow-web
+    profiles: ["execution"]
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    environment: *airflow_env
+    user: "50000:0"
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    command: webserver
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  airflow-scheduler:
+    image: apache/airflow:2.9.3
+    container_name: aiden-airflow-scheduler
+    profiles: ["execution"]
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    environment: *airflow_env
+    user: "50000:0"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    command: scheduler
+
+  airflow-worker:
+    image: apache/airflow:2.9.3
+    container_name: aiden-airflow-worker
+    profiles: ["execution"]
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    environment: *airflow_env
+    user: "50000:0"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    command: celery worker
+
+volumes:
+  pgdata:
+  qdrant_storage:
+  ollama_storage:

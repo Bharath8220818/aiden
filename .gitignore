@@ -1,24 +1,26 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+# Secrets — never commit
+.env
+.env.*
+!.env.example
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# OS / editor junk
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+Thumbs.db
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+PROJECT_STATUS.md
+DEPLOYMENT_PLAN.md
+FRONTEND_PLAN.md
+DESIGN.md
+
+
+*docs
+
+
+
+
+
