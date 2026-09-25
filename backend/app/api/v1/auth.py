@@ -18,7 +18,22 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/login", response_model=SessionOut)
 async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)) -> SessionOut:
-    return await AuthService(db).login(payload.email, payload.password)
+    session = await AuthService(db).login(payload.email, payload.password)
+    # §8 observability: audit successful logins (service validates credentials)
+    from app.services.audit import audit_row
+
+    user = await UserService(db).get_user_by_email(payload.email)
+    db.add(
+        audit_row(
+            action="auth.login",
+            resource_type="session",
+            resource_id=None,
+            user_id=user.id if user else None,
+            details={"email": payload.email},
+        )
+    )
+    await db.commit()
+    return session
 
 
 @router.post("/logout", response_model=LogoutOut)

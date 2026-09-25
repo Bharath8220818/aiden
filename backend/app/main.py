@@ -63,8 +63,10 @@ app.add_middleware(
 # Per-IP rate limiting (60 req/min default) — registered AFTER CORS so CORS
 # headers still wrap 429 responses.
 from app.core.rate_limit import RateLimitMiddleware  # noqa: E402
+from app.core.security_headers import SecurityHeadersMiddleware  # noqa: E402
 
 app.add_middleware(RateLimitMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 # --------------------------------------------------------------------------- #
