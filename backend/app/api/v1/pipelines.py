@@ -31,6 +31,7 @@ from app.schemas.pipeline import (
     PipelineUpdate,
 )
 from app.schemas.pipeline_run import PipelineRunOut
+from app.services.audit import AuditService
 from app.services.pipeline_fleet_service import PipelineFleetService
 from app.services.pipeline_service import PipelineService
 
@@ -98,18 +99,13 @@ async def create_pipeline(
     await ensure_project_permission(db, ctx.user, payload.project_id, "pipeline.create")
     service = PipelineService(db)
     pipeline = await service.create(payload, created_by=ctx.user.id)
-    # §8 observability: audit in the same transaction as the action
-    from app.services.audit import audit_row
-
-    db.add(
-        audit_row(
-            action="pipeline.create",
-            resource_type="pipeline",
-            resource_id=str(pipeline.id),
-            project_id=payload.project_id,
-            user_id=ctx.user.id,
-            details={"name": payload.name, "pipeline_type": str(payload.pipeline_type)},
-        )
+    AuditService(db).record(
+        action="pipeline.create",
+        resource_type="pipeline",
+        resource_id=str(pipeline.id),
+        project_id=payload.project_id,
+        user_id=ctx.user.id,
+        details={"name": payload.name, "pipeline_type": str(payload.pipeline_type)},
     )
     await db.commit()
     return await service.to_out(pipeline)
@@ -174,18 +170,13 @@ async def run_pipeline(
 ) -> PipelineRunOut:
     pipeline, _ = await ensure_pipeline_permission(db, ctx.user, pipeline_id, "pipeline.execute")
     run = await PipelineRunRepository(db).create(pipeline_id=pipeline.id, trigger_type="manual")
-    # §8 observability: audit in the same transaction as the action
-    from app.services.audit import audit_row
-
-    db.add(
-        audit_row(
-            action="pipeline.run",
-            resource_type="pipeline_run",
-            resource_id=str(run.id),
-            project_id=pipeline.project_id,
-            user_id=ctx.user.id,
-            details={"pipeline": pipeline.name, "trigger": "manual"},
-        )
+    AuditService(db).record(
+        action="pipeline.run",
+        resource_type="pipeline_run",
+        resource_id=str(run.id),
+        project_id=pipeline.project_id,
+        user_id=ctx.user.id,
+        details={"pipeline": pipeline.name, "trigger": "manual"},
     )
     await db.commit()
 

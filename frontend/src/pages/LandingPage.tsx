@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { LineageHero } from '@/features/landing/components/LineageHero';
 import { RunTerminal } from '@/features/landing/components/RunTerminal';
 import { StageRail } from '@/features/landing/components/StageRail';
+import { usePlatformPulse } from '@/features/landing/services/pulse.service';
 
 type Tone = 'info' | 'ok' | 'bad' | 'warn' | 'dim';
 
@@ -22,6 +23,7 @@ export const LandingPage: React.FC = () => {
   const location = useLocation();
   const { isAuthenticated } = useAuth();
   const [termLine, setTermLine] = useState<{ text: string; tone: Tone } | null>(null);
+  const { pulse, offline } = usePlatformPulse();
   const ctaRef = useScrollReveal<HTMLDivElement>();
   const heroSectionRef = useRef<HTMLElement>(null);
 
@@ -104,9 +106,9 @@ export const LandingPage: React.FC = () => {
         >
           <div className="p-4 sm:p-6 rounded-2xl border border-border bg-card shadow-elevated">
             <div className="eyebrow mb-3">lineage · daily_orders</div>
-            <LineageHero onLog={handleLog} />
+            <LineageHero onLog={handleLog} pulse={pulse} />
           </div>
-          <RunTerminal line={termLine} />
+          <RunTerminal line={termLine} pulse={pulse} offline={offline} />
         </motion.div>
       </section>
 

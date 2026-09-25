@@ -18,6 +18,7 @@ from app.core.dependencies import (
 from app.core.exceptions import ForbiddenError
 from app.models.user import User, UserRole
 from app.schemas.project import ProjectCreate, ProjectListOut, ProjectOut, ProjectUpdate
+from app.services.audit import AuditService
 from app.services.project_service import ProjectService
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -34,18 +35,13 @@ async def create_project(
     await ensure_workspace_permission(db, ctx.user, payload.workspace_id, "project.create")
     service = ProjectService(db)
     project = await service.create(payload, created_by=ctx.user.id)
-    # §8 observability: audit in the same transaction as the action
-    from app.services.audit import audit_row
-
-    db.add(
-        audit_row(
-            action="project.create",
-            resource_type="project",
-            resource_id=str(project.id),
-            workspace_id=payload.workspace_id,
-            user_id=ctx.user.id,
-            details={"name": payload.name},
-        )
+    AuditService(db).record(
+        action="project.create",
+        resource_type="project",
+        resource_id=str(project.id),
+        workspace_id=payload.workspace_id,
+        user_id=ctx.user.id,
+        details={"name": payload.name},
     )
     await db.commit()
     return await service.to_out(project)

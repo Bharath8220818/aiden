@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+
+import { formatDuration, formatRows, type PlatformPulse } from '../services/pulse.service';
 
 /**
  * LineageHero — the signature element.
@@ -7,6 +9,8 @@ import React, { useEffect, useMemo, useState } from 'react';
  *   flow → incident at validate → diagnose → heal → flow resumes
  * Every state is real product vocabulary (task ids, severities, actions);
  * the "animation" is the product's story, not decoration.
+ * When the platform pulse is live, the completion line reports the REAL
+ * last-run stats instead of the scripted ones.
  */
 
 type NodeState = 'idle' | 'running' | 'ok' | 'bad' | 'healing';
@@ -94,6 +98,18 @@ const PHASES: Phase[] = [
   },
 ];
 
+/** Override for the final phase when the real pulse has a last completed run. */
+const realDoneLine = (pulse: PlatformPulse | null): string | null => {
+  const last = pulse?.runs.last;
+  if (!last?.status) return null;
+  const bits = [
+    `last run ${last.status}`,
+    last.rowsProcessed != null ? `${formatRows(last.rowsProcessed)} rows` : null,
+    last.durationMs != null ? formatDuration(last.durationMs) : null,
+  ].filter(Boolean);
+  return bits.join(' · ');
+};
+
 /** Edge segments light up when both endpoints are past them. */
 const edgeActive = (from: keyof typeof POS, to: keyof typeof POS, states: Partial<Record<keyof typeof POS, NodeState>>) => {
   const done = (s: NodeState | undefined) => s === 'ok';
@@ -110,7 +126,10 @@ const edgeMid = (a: { x: number; y: number }, b: { x: number; y: number }) => {
   return { x, y };
 };
 
-export const LineageHero: React.FC<{ onLog?: (line: string, tone: Phase['status']['tone']) => void }> = ({ onLog }) => {
+export const LineageHero: React.FC<{
+  onLog?: (line: string, tone: Phase['status']['tone']) => void;
+  pulse?: PlatformPulse | null;
+}> = ({ onLog, pulse }) => {
   const [phaseIdx, setPhaseIdx] = useState(0);
   const phase = PHASES[phaseIdx % PHASES.length];
 
@@ -121,8 +140,20 @@ export const LineageHero: React.FC<{ onLog?: (line: string, tone: Phase['status'
     return acc;
   }, [phaseIdx]);
 
+  // Logging must fire once per phase — pulse updates (30s poll) must NOT
+  // re-emit the current phase line, so it's read through a ref here.
+  const pulseRef = useRef(pulse);
   useEffect(() => {
-    onLog?.(phase.status.text, phase.status.tone);
+    pulseRef.current = pulse;
+  }, [pulse]);
+
+  useEffect(() => {
+    const isDone = phase.name === 'done';
+    const text =
+      isDone && pulseRef.current
+        ? realDoneLine(pulseRef.current) ?? phase.status.text
+        : phase.status.text;
+    onLog?.(text, phase.status.tone);
     const t = setTimeout(() => setPhaseIdx((i) => i + 1), phase.hold);
     return () => clearTimeout(t);
   }, [phaseIdx, phase, onLog]);
@@ -179,7 +210,7 @@ export const LineageHero: React.FC<{ onLog?: (line: string, tone: Phase['status'
 
         {/* Status line under the canvas */}
         <text className="ln-status" x={30} y={232}>
-          {phase.status.text}
+          {phase.name === 'done' && pulse ? realDoneLine(pulse) ?? phase.status.text : phase.status.text}
         </text>
       </svg>
     </div>

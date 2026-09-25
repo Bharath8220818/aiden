@@ -7,9 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
+from app.core.exceptions import InvalidCredentialsError
 from app.models.user import User
 from app.schemas.auth import LoginRequest, LogoutOut, SessionOut
 from app.schemas.user import UserOut
+from app.services.audit import AuditService
 from app.services.auth_service import AuthService
 from app.services.user_service import UserService
 
@@ -18,19 +20,18 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/login", response_model=SessionOut)
 async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)) -> SessionOut:
-    session = await AuthService(db).login(payload.email, payload.password)
-    # §8 observability: audit successful logins (service validates credentials)
-    from app.services.audit import audit_row
-
-    user = await UserService(db).get_user_by_email(payload.email)
-    db.add(
-        audit_row(
-            action="auth.login",
-            resource_type="session",
-            resource_id=None,
-            user_id=user.id if user else None,
-            details={"email": payload.email},
-        )
+    service = AuthService(db)
+    # authenticate() first so failed logins audit nothing; then one transaction
+    # issues the session and records the login (§8: LOGIN is an audited action).
+    user = await service.authenticate(payload.email, payload.password)
+    if user is None:
+        raise InvalidCredentialsError()
+    session = await service.session_for(user)
+    AuditService(db).record(
+        action="auth.login",
+        resource_type="session",
+        user_id=user.id,
+        details={"email": payload.email},
     )
     await db.commit()
     return session

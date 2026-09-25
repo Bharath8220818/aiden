@@ -19,6 +19,7 @@ from app.api.v1 import (
     notifications,
     overview,
     pipelines,
+    platform,
     project_import,
     projects,
     requirements,
@@ -39,6 +40,7 @@ api_router.include_router(projects.router)
 api_router.include_router(project_import.router)
 api_router.include_router(requirements.router)
 api_router.include_router(pipelines.router)
+api_router.include_router(platform.router)
 api_router.include_router(connections.router)
 api_router.include_router(agents.router)
 api_router.include_router(knowledge.router)

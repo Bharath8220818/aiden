@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 
+import { formatDuration, formatRows, type PlatformPulse } from '../services/pulse.service';
+
 type Tone = 'info' | 'ok' | 'bad' | 'warn' | 'dim';
 
 interface LogLine {
@@ -19,22 +21,64 @@ const TONE_CLASS: Record<Tone, string> = {
 
 const MAX_LINES = 9;
 
-const stamp = () => {
-  const d = new Date();
-  return d.toTimeString().slice(0, 8);
-};
+const stamp = () => new Date().toTimeString().slice(0, 8);
 
 /**
- * RunTerminal — the landing's run log. Receives the lineage demo's phases
- * and renders them as an operator's console: real vocabulary, timestamps,
- * the product's actual statuses. Keeps the last N lines; autoscrolls.
+ * RunTerminal — the landing's run log. The lineage demo reports its phases;
+ * the boot lines and header come from the REAL platform pulse
+ * (GET /platform/pulse — actual run/incident/agent aggregates).
  */
-export const RunTerminal: React.FC<{ line: { text: string; tone: Tone } | null }> = ({ line }) => {
-  const [lines, setLines] = useState<LogLine[]>([
-    { id: 0, time: stamp(), text: 'aiden orchestrator online · 11 agents registered', tone: 'dim' },
-  ]);
+export const RunTerminal: React.FC<{
+  line: { text: string; tone: Tone } | null;
+  pulse: PlatformPulse | null;
+  offline: boolean;
+}> = ({ line, pulse, offline }) => {
+  const bootedRef = useRef(false);
+  const [lines, setLines] = useState<LogLine[]>([]);
   const bodyRef = useRef<HTMLDivElement>(null);
   const idRef = useRef(1);
+
+  // Boot lines — from the real pulse, or an honest offline note.
+  useEffect(() => {
+    if (bootedRef.current) return;
+    if (pulse) {
+      bootedRef.current = true;
+      const a = pulse.agents;
+      const r = pulse.runs;
+      setLines([
+        {
+          id: idRef.current++,
+          time: stamp(),
+          text: `aiden orchestrator online · ${a.registered} agents registered`,
+          tone: 'dim',
+        },
+        {
+          id: idRef.current++,
+          time: stamp(),
+          text: `last completed run · ${r.last?.status ?? 'none yet'}${
+            r.last?.rowsProcessed ? ` · ${formatRows(r.last.rowsProcessed)} rows` : ''
+          }${r.last?.durationMs ? ` · ${formatDuration(r.last.durationMs)}` : ''}`,
+          tone: r.last?.status === 'failed' ? 'warn' : 'ok',
+        },
+        {
+          id: idRef.current++,
+          time: stamp(),
+          text: `${r.total24h} runs in ${pulse.windowHours}h · ${r.success24h} ok${
+            r.failed24h ? ` · ${r.failed24h} failed` : ''
+          }${
+            pulse.incidents.open ? ` · ${pulse.incidents.open} open incidents` : ''
+          } · ${a.agentRuns24h} agent runs`,
+          tone: r.failed24h || pulse.incidents.open ? 'warn' : 'ok',
+        },
+      ]);
+    } else if (offline) {
+      bootedRef.current = true;
+      setLines([
+        { id: idRef.current++, time: stamp(), text: 'platform pulse unavailable — showing scripted demo', tone: 'warn' },
+        { id: idRef.current++, time: stamp(), text: 'aiden orchestrator online · demo mode', tone: 'dim' },
+      ]);
+    }
+  }, [pulse, offline]);
 
   useEffect(() => {
     if (!line) return;
@@ -52,8 +96,16 @@ export const RunTerminal: React.FC<{ line: { text: string; tone: Tone } | null }
   return (
     <div className="rterm" aria-live="polite" aria-label="Live run log from the demo above">
       <div className="rterm-head">
-        <span style={{ width: 8, height: 8, borderRadius: 99, background: '#3FB950', display: 'inline-block' }} />
-        <span>run_1042 · aiden.log</span>
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 99,
+            background: offline ? '#FBBF24' : '#3FB950',
+            display: 'inline-block',
+          }}
+        />
+        <span>{pulse ? `pulse · aiden.log` : 'demo · aiden.log'}</span>
       </div>
       <div className="rterm-body" ref={bodyRef}>
         {lines.map((l) => (
