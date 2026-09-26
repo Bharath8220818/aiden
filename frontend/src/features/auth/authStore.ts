@@ -117,7 +117,7 @@ export const useAuthStore = create<AuthState>()(
         if (!account || account.password !== password) {
           set({
             isAuthenticating: false,
-            error: 'Invalid credentials. Try one of the demo accounts below.',
+            error: 'Invalid email or password.',
           });
           throw new Error('invalid_credentials');
         }

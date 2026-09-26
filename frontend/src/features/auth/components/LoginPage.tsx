@@ -2,15 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
-import { DEMO_ACCOUNTS } from '../authStore';
-import { ROLE_LABELS } from '../types';
 import { Button } from '@/components/ui/Button';
 import { ThemeToggleInline } from '@/components/ui/ThemeToggle';
 import { cn } from '@/lib/utils';
 import { Sparkles, Lock, Mail, ArrowRight, AlertCircle, Bot, Network, HeartPulse, X, UserPlus, LogIn, ShieldCheck } from 'lucide-react';
-
-/** Demo roles surfaced on the auth card (from the seeded directory). */
-const QUICK_ROLES = ['bharath@acmedata.io', 'admin@acmedata.io', 'engineer@acmedata.io', 'analyst@acmedata.io'];
 
 /**
  * Auth popup: a glassmorphic modal floating over the (blurred) landing page.
@@ -24,8 +19,8 @@ export const LoginPage: React.FC = () => {
   const emailRef = useRef<HTMLInputElement>(null);
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
-  const [email, setEmail] = React.useState('bharath@acmedata.io');
-  const [password, setPassword] = React.useState('lead123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [password2, setPassword2] = useState('');
   const [signupNote, setSignupNote] = useState<string | null>(null);
@@ -57,15 +52,6 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const quickFill = (demoEmail: string) => {
-    clearError();
-    setMode('signin');
-    setSignupNote(null);
-    setEmail(demoEmail);
-    setPassword(DEMO_ACCOUNTS[demoEmail].password);
-    setPassword2('');
-  };
-
   const backToLanding = () => navigate('/', { replace: true });
 
   return (
@@ -87,7 +73,7 @@ export const LoginPage: React.FC = () => {
           initial={{ opacity: 0, y: 24, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          className="auth-pop w-full max-w-md glass-strong rounded-2xl p-6 sm:p-8 space-y-5"
+          className="auth-pop w-full max-w-md glass-strong rounded-2xl p-6 sm:p-8 space-y-5 max-h-[92vh] overflow-y-auto"
           role="dialog"
           aria-modal="true"
           aria-label={mode === 'signin' ? 'Sign in to AIDEN' : 'Create your AIDEN account'}
@@ -230,31 +216,6 @@ export const LoginPage: React.FC = () => {
               {mode === 'signin' ? 'Sign in to AIDEN' : 'Create account'}
             </Button>
           </form>
-
-          {/* Demo roles */}
-          <div className="space-y-2">
-            <p className="text-[10px] uppercase font-semibold text-text-muted tracking-wide">
-              {mode === 'signin' ? 'One-tap demo roles' : 'Explore with a demo role instead'}
-            </p>
-            <div className="grid grid-cols-2 gap-1.5">
-              {QUICK_ROLES.map((demoEmail) => (
-                <button
-                  key={demoEmail}
-                  type="button"
-                  onClick={() => quickFill(demoEmail)}
-                  className="group text-left px-2.5 py-2 rounded-lg bg-card/70 border border-border hover:border-indigo-400/50 hover:bg-card-hover hover:-translate-y-0.5 transition-all duration-200"
-                >
-                  <div className="text-[11px] font-semibold text-text-primary truncate">{DEMO_ACCOUNTS[demoEmail].user.name}</div>
-                  <div className="text-[9px] text-text-muted truncate">{ROLE_LABELS[DEMO_ACCOUNTS[demoEmail].user.systemRole]}</div>
-                </button>
-              ))}
-            </div>
-            {mode === 'signup' && (
-              <p className="text-[10px] text-text-muted">
-                New accounts start as Engineer in the Acme Data Platform demo workspace.
-              </p>
-            )}
-          </div>
 
           {/* Footer */}
           <div className="flex items-center justify-between pt-1 border-t border-border-subtle">

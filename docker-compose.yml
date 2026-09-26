@@ -1,0 +1,164 @@
+# AIDEN — Phase B local stack
+#
+# Brings up the full platform so GET /api/v1/health/full reports `ok` for
+# database, redis, qdrant and ollama (the four `not_configured` Phase B flags).
+#
+#   docker compose up -d --build
+#   docker compose ps          # every service healthy
+#   curl http://localhost:8001/api/v1/health/full
+#   # -> {"status":"healthy","checks":{"database":"ok","redis":"ok",
+#   #     "qdrant":"ok","ollama":"ok"}}
+#
+# Host ports (dev servers own 8000/5173 on this machine):
+#   frontend  http://localhost:5174   (nginx proxies /api -> backend:8000)
+#   backend   http://localhost:8001
+#   postgres  localhost:5433          (mapped for psql/DBeaver; not used by app)
+#
+# Network isolation: postgres/redis/qdrant/ollama sit on the `internal`
+# network with NO published ports — only the backend can reach them.
+
+name: aiden
+
+services:
+  # ------------------------------------------------------------------ #
+  # PostgreSQL — primary datastore                                      #
+  # ------------------------------------------------------------------ #
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: aiden
+      POSTGRES_PASSWORD: aiden_local
+      POSTGRES_DB: aiden
+    volumes:
+      - aiden-pgdata:/var/lib/postgresql/data
+    networks: [internal]
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiden -d aiden"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # ------------------------------------------------------------------ #
+  # Redis — cache / events                                              #
+  # ------------------------------------------------------------------ #
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # ------------------------------------------------------------------ #
+  # Qdrant — vector store for RAG                                       #
+  # ------------------------------------------------------------------ #
+  qdrant:
+    image: qdrant/qdrant:latest
+    volumes:
+      - aiden-qdrant:/qdrant/storage
+    networks: [internal]
+    healthcheck:
+      # qdrant image ships no wget/curl — bash /dev/tcp probe (sh lacks /dev/tcp)
+      test: ["CMD", "/usr/bin/bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/6333"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # ------------------------------------------------------------------ #
+  # Ollama — local embeddings (nomic-embed-text)                        #
+  # ------------------------------------------------------------------ #
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - aiden-ollama:/root/.ollama
+    # `edge` gives outbound access for the one-time model pull (the fully
+    # `internal` network has no DNS/egress); still no published ports.
+    networks: [internal, edge]
+    # Pull the embedding model once the server is up (idempotent: the pull
+    # is a no-op when the model is already on disk).
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "ollama serve & sleep 4 && for i in 1 2 3; do ollama pull nomic-embed-text && break; sleep 5; done; wait"
+    # ollama image ships no wget/curl and dash lacks /dev/tcp — use the
+    # ollama CLI itself (exits 0 only when the local server answers)
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  # ------------------------------------------------------------------ #
+  # Backend — FastAPI (migrations run before serving)                   #
+  # ------------------------------------------------------------------ #
+  backend:
+    build: ./backend
+    image: aiden-backend:compose
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    environment:
+      ENVIRONMENT: development
+      DEBUG: "false"
+      DATABASE_URL: postgresql+asyncpg://aiden:aiden_local@postgres:5432/aiden
+      REDIS_URL: redis://redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      OLLAMA_URL: http://ollama:11434
+      AI_EMBEDDING_MODEL: nomic-embed-text
+      FRONTEND_URL: http://localhost:5174
+      CORS_ORIGINS: http://localhost:5174,http://localhost:5173
+      RATE_LIMIT_PER_MINUTE: "60"
+      # Dev-safe defaults — the compose stack is a development environment.
+      # Do not point this file at production data.
+      SECRET_KEY: aiden-insecure-dev-secret-change-me
+      JWT_SECRET: aiden-insecure-dev-jwt-change-me
+    networks: [internal, edge]
+    ports:
+      - "8001:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8000/api/v1/health/healthz', timeout=3)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  # ------------------------------------------------------------------ #
+  # Frontend — nginx serving the SPA + API gateway                      #
+  # ------------------------------------------------------------------ #
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Must match the nginx proxy path (frontend/nginx.conf -> /api/).
+        VITE_API_URL: /api/v1
+        VITE_WS_URL: ws://localhost:5174/api/v1/ws
+    image: aiden-frontend:compose
+    depends_on:
+      backend:
+        condition: service_started
+    networks: [edge]
+    ports:
+      - "5174:80"
+
+networks:
+  edge: {}
+  internal:
+    internal: true
+
+volumes:
+  aiden-pgdata:
+  aiden-qdrant:
+  aiden-ollama:

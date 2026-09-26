@@ -23,16 +23,16 @@ export const Badge: React.FC<BadgeProps> = ({
     error: 'bg-red-500/10 text-red-600 border-red-500/20',
     info: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
     neutral: 'bg-background text-text-secondary border-border-highlight',
-    ai: 'bg-indigo-500/15 text-indigo-600 border-indigo-500/30',
+    ai: 'bg-aiden-accent/10 text-aiden-accent border-aiden-accent/30',
   };
 
   const dotColors = {
-    success: 'bg-emerald-400',
-    warning: 'bg-amber-400',
-    error: 'bg-red-400',
-    info: 'bg-blue-400',
+    success: 'bg-success',
+    warning: 'bg-warning',
+    error: 'bg-error',
+    info: 'bg-info',
     neutral: 'bg-gray-400',
-    ai: 'bg-cyan-400',
+    ai: 'bg-aiden-accent',
   };
 
   const sizes = {

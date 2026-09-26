@@ -34,7 +34,7 @@ describe('auth store', () => {
     await expect(useAuthStore.getState().login('bharath@acmedata.io', 'nope')).rejects.toThrow();
     const state = useAuthStore.getState();
     expect(state.user).toBeNull();
-    expect(state.error).toContain('Invalid credentials');
+    expect(state.error).toContain('Invalid email or password');
     expect(state.isAuthenticating).toBe(false);
   });
 

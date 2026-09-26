@@ -19,47 +19,41 @@ describe('LoginPage', () => {
     useAuthStore.getState().logout();
   });
 
-  it('renders email and password fields with demo accounts', () => {
+  it('renders email and password fields with no demo-role shortcuts', () => {
     renderLogin();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
-    expect(screen.getByText('Bharath')).toBeInTheDocument();
-    expect(screen.getByText('Ava Chen')).toBeInTheDocument();
+    // The one-tap demo roles are gone — the card only offers real credentials.
+    expect(screen.queryByText('Bharath')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ava Chen')).not.toBeInTheDocument();
+    expect(screen.queryByText(/one-tap demo roles/i)).not.toBeInTheDocument();
+    // No credentials are prefilled.
+    expect(screen.getByLabelText(/email/i)).toHaveValue('');
+    expect(screen.getByLabelText(/password/i)).toHaveValue('');
   });
 
-  it('signs in with prefilled demo credentials', async () => {
-    const user = userEvent.setup();
-
-    renderLogin();
-    await user.click(screen.getByRole('button', { name: /^sign in to aiden$/i }));
-
-    await waitFor(() => {
-      expect(useAuthStore.getState().user?.systemRole).toBe('lead');
-    });
-  });
-
-  it('quick-fills credentials when a demo account is clicked', async () => {
+  it('keeps the session empty when the form is submitted empty', async () => {
     const user = userEvent.setup();
     renderLogin();
 
-    await user.click(screen.getByText('Sam Okafor'));
+    await user.click(screen.getByRole('button', { name: /sign in to aiden/i }));
 
-    expect(screen.getByLabelText(/email/i)).toHaveValue('analyst@acmedata.io');
-    expect(screen.getByLabelText(/password/i)).toHaveValue('view123');
+    // HTML5 validation blocks the submit — no session, no alert.
+    expect(useAuthStore.getState().user).toBeNull();
+    expect(screen.getByLabelText(/email/i)).toBeRequired();
+    expect(screen.getByLabelText(/password/i)).toBeRequired();
   });
 
   it('shows an error for invalid credentials and keeps the session empty', async () => {
     const user = userEvent.setup();
     renderLogin();
 
-    await user.clear(screen.getByLabelText(/email/i));
     await user.type(screen.getByLabelText(/email/i), 'bharath@acmedata.io');
-    await user.clear(screen.getByLabelText(/password/i));
     await user.type(screen.getByLabelText(/password/i), 'wrong-password');
-    await user.click(screen.getByRole('button', { name: /^sign in to aiden$/i }));
+    await user.click(screen.getByRole('button', { name: /sign in to aiden/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent(/invalid credentials/i);
+      expect(screen.getByRole('alert')).toHaveTextContent(/invalid email or password/i);
     });
     expect(useAuthStore.getState().user).toBeNull();
   });

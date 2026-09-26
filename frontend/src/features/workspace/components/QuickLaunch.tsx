@@ -19,6 +19,7 @@ import {
   Cpu,
   ChevronDown,
   LayoutDashboard,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import type { Permission } from '@/features/auth/permissions';
@@ -39,6 +40,7 @@ interface LaunchTarget {
 }
 
 const TARGETS: LaunchTarget[] = [
+  { path: '/workspace', label: 'Command Workspace', description: 'Ask AIDEN in plain language', icon: <Sparkles className="w-4 h-4" /> },
   { path: '/dashboard', label: 'Dashboard', description: 'Platform overview & KPIs', icon: <LayoutDashboard className="w-4 h-4" /> },
   { path: '/projects', label: 'Projects', description: 'Create, import, and browse projects', icon: <FolderOpen className="w-4 h-4" /> },
   { path: '/architecture', label: 'Architecture', description: 'Design and validate blueprints', icon: <Network className="w-4 h-4" /> },
