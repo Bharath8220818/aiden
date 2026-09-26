@@ -10,12 +10,15 @@ Covers:
 
 from __future__ import annotations
 
+import uuid
+
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token
-from app.models import User, UserRole
-from tests.helpers import seed_user
+from app.models import AgentRun, Approval, ApprovalStatus, Architecture, Pipeline, PipelineRun, User, UserRole
+from app.services.orchestrator_service import OrchestratorService
+from tests.helpers import seed_user, seed_workspace_with_member
 
 
 def _auth(user: User) -> dict[str, str]:
@@ -159,6 +162,107 @@ async def test_full_loop_run_persists_stages_and_outputs(
         history = await client.get("/api/v1/agents/runs", headers=_auth(user))
         assert history.status_code == 200
         assert any(r["id"] == run["id"] for r in history.json())
+
+
+async def test_full_loop_persists_real_artifacts_and_approval(
+    client: httpx.AsyncClient, db_session: AsyncSession
+) -> None:
+    """Phase C: design/code stages persist real Architecture+Pipeline rows and
+    deployment goes through the governed tool path (real Approval row)."""
+
+
+    user = await seed_user(db_session, role=UserRole.admin)
+    _, project = await seed_workspace_with_member(db_session, user, with_project=True)
+
+    resp = await client.post(
+        "/api/v1/agents/orchestrate/full_loop",
+        json={"prompt": "Create a daily sales pipeline from PostgreSQL to Snowflake", "projectId": str(project.id)},
+        headers=_auth(user),
+    )
+    assert resp.status_code == 200
+    run = resp.json()
+    assert run["status"] == "success"
+    outputs = run["outputs"]
+
+    # Stage 4 persisted a real Architecture row for the project
+    arch_id = outputs["pipeline_design"]["architectureId"]
+    assert arch_id
+    arch = await db_session.get(Architecture, uuid.UUID(arch_id))
+    assert arch is not None and str(arch.project_id) == str(project.id)
+    assert arch.blueprint and len(arch.blueprint["nodes"]) == 5
+
+    # Stage 5 persisted a real Pipeline row wired to the architecture
+    pipeline_id = outputs["code_generation"]["pipelineId"]
+    assert pipeline_id
+    pipeline = await db_session.get(Pipeline, uuid.UUID(pipeline_id))
+    assert pipeline is not None and str(pipeline.project_id) == str(project.id)
+    assert pipeline.config["architectureId"] == arch_id
+
+    # Stage 8 went through the governed tool path: a real pending Approval row
+    approval_id = outputs["deployment"]["approvalId"]
+    assert outputs["deployment"]["approvalRequired"] is True
+    assert approval_id
+
+    approval = await db_session.get(Approval, uuid.UUID(approval_id))
+    assert approval is not None and approval.status == ApprovalStatus.pending
+    assert approval.payload["tool"] == "pipeline.trigger"
+    assert approval.payload["params"]["pipeline_id"] == pipeline_id
+
+
+async def test_approval_resumes_agent_pipeline_trigger(
+    client: httpx.AsyncClient, db_session: AsyncSession
+) -> None:
+    """§15 close-up: approving the agent's queued call executes it — a real
+    pipeline_runs row appears and the approval is marked approved."""
+    from sqlalchemy import func, select
+
+    from app.models import Approval, ApprovalStatus
+
+    lead = await seed_user(db_session, role=UserRole.lead)
+    _, project = await seed_workspace_with_member(db_session, lead, with_project=True)
+
+    resp = await client.post(
+        "/api/v1/agents/orchestrate/requirement_to_code",
+        json={"prompt": "Create a nightly inventory pipeline", "projectId": str(project.id)},
+        headers=_auth(lead),
+    )
+    assert resp.status_code == 200
+    run = resp.json()
+    pipeline_id = run["outputs"]["code_generation"]["pipelineId"]
+
+    # requirement_to_code has no deployment stage — queue the governed call
+    # exactly as stage 8 would, through the orchestrator's own helper.
+    agent_run = await db_session.get(AgentRun, uuid.UUID(run["id"]))
+    agent_run.project_id = project.id
+    result = await OrchestratorService(db_session)._governed(
+        agent_run, "pipeline.trigger", {"pipeline_id": pipeline_id}
+    )
+    assert result["status"] == "approval-required"
+    approval = await db_session.get(Approval, uuid.UUID(result["approvalId"]))
+    assert approval is not None and approval.status == ApprovalStatus.pending
+
+    before = (
+        await db_session.execute(
+            select(func.count()).select_from(PipelineRun).where(PipelineRun.pipeline_id == uuid.UUID(pipeline_id))
+        )
+    ).scalar()
+
+    # Lead approves → ToolRegistry.resume executes the stored call
+    ok = await client.post(
+        f"/api/v1/approvals/{result['approvalId']}/approve", json={"note": "lgtm"}, headers=_auth(lead)
+    )
+    assert ok.status_code == 200
+    body = ok.json()
+    assert body["toolResult"]["status"] == "ok"
+
+    after = (
+        await db_session.execute(
+            select(func.count()).select_from(PipelineRun).where(PipelineRun.pipeline_id == uuid.UUID(pipeline_id))
+        )
+    ).scalar()
+    assert after == before + 1
+    await db_session.refresh(approval)
+    assert approval.status == ApprovalStatus.approved
 
 
 async def test_agent_runs_requires_auth(client: httpx.AsyncClient) -> None:

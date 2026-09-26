@@ -21,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
-from app.models import AgentRun, AgentRunStatus, AgentStageRun, StageStatus
+from app.models import AgentRun, AgentRunStatus, AgentStageRun, StageStatus, User
 from app.services import ai_client
 from app.services.event_bus import broadcast_platform_event
 from app.services.registry_service import RegistryService
@@ -83,6 +83,35 @@ class OrchestratorService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
         self.registry = RegistryService(db)
+        self._actor: User | None = None  # loaded per-run for governed tool calls
+
+    async def _load_actor(self, run: AgentRun) -> User | None:
+        """The user whose identity + permissions govern this run's tool calls."""
+        if self._actor is None and run.created_by:
+            self._actor = await self.db.get(User, run.created_by)
+        return self._actor
+
+    async def _governed(self, run: AgentRun, tool: str, params: dict) -> dict[str, Any]:
+        """Execute a platform action through the §15 path — ToolRegistry is the
+        ONLY way agents act on the outside world (permission + risk + audit)."""
+        from app.core.permissions import permissions_for_system_role
+        from app.services.tool_registry import ToolError
+        from app.services.tool_registry import registry as tools
+
+        actor = await self._load_actor(run)
+        if actor is None:
+            return {"status": "unavailable", "detail": "run has no acting user"}
+        try:
+            return await tools.execute(
+                tool,
+                db=self.db,
+                user_id=actor.id,
+                permissions=permissions_for_system_role(actor.role),
+                params=params,
+                project_id=run.project_id,
+            )
+        except ToolError as exc:
+            return {"status": "denied", "code": exc.code, "detail": str(exc)}
 
     async def start(
         self,
@@ -267,17 +296,64 @@ class OrchestratorService:
         }
 
     async def _stage_pipeline_design(self, run: AgentRun) -> dict[str, Any]:
+        """PERSIST a real Architecture row — the design stage's product (§18).
+
+        Falls back to the layered-ETL default when no template matches; the row
+        is what the Architecture canvas renders afterwards.
+        """
+        outputs = run.outputs or {}
+        topic = outputs.get("requirement_analysis", {}).get("topic", "orders")
         templates = await self.registry.architecture_templates()
         chosen = templates[0] if templates else None
+        nodes = [
+            {"id": "source", "label": "source", "kind": "source"},
+            {"id": "ingest", "label": "ingest", "kind": "ingest"},
+            {"id": "transform", "label": "transform", "kind": "transform"},
+            {"id": "quality", "label": "quality", "kind": "quality"},
+            {"id": "sink", "label": "sink", "kind": "sink"},
+        ]
+        edges = [
+            {"from": "source", "to": "ingest"},
+            {"from": "ingest", "to": "transform"},
+            {"from": "transform", "to": "quality"},
+            {"from": "quality", "to": "sink"},
+        ]
+        pattern = chosen["name"] if chosen else "layered_etl"
+        architecture = None
+        if run.project_id:
+            from app.models import Architecture, ArchitectureStatus
+
+            architecture = Architecture(
+                project_id=run.project_id,
+                name=f"{topic} pipeline blueprint (agent)",
+                description=f"Designed by {run.workflow} orchestration",
+                blueprint={"nodes": nodes, "edges": edges, "pattern": pattern},
+                status=ArchitectureStatus.validated,
+                created_by=run.created_by,
+            )
+            self.db.add(architecture)
+            await self.db.commit()
+            await self.db.refresh(architecture)
         return {
-            "summary": f"Blueprint pattern selected: {chosen['name']}" if chosen else "Default layered ETL",
-            "pattern": chosen["name"] if chosen else "layered_etl",
-            "hops": ["source", "ingest", "transform", "quality", "sink"],
+            "summary": (
+                f"Blueprint persisted: {pattern} pattern ({len(nodes)} nodes)"
+                if architecture
+                else f"Blueprint pattern selected: {pattern} (no project context)"
+            ),
+            "pattern": pattern,
+            "hops": [n["id"] for n in nodes],
+            "architectureId": str(architecture.id) if architecture else None,
         }
 
     async def _stage_code_generation(self, run: AgentRun) -> dict[str, Any]:
+        """PERSIST a real Pipeline row — the generated artifact (§18).
+
+        The pipeline is created through PipelineService so ownership, status
+        and config follow the same contract as API-created pipelines.
+        """
         outputs = run.outputs or {}
         topic = outputs.get("requirement_analysis", {}).get("topic", "orders")
+        architecture_id = outputs.get("pipeline_design", {}).get("architectureId")
         artifacts = [
             {"target": "pyspark", "file": f"dags/{topic}_transform.py"},
             {"target": "sql", "file": f"sql/{topic}_merge.sql"},
@@ -285,9 +361,34 @@ class OrchestratorService:
             {"target": "kafka_config", "file": f"config/{topic}_topics.yaml"},
             {"target": "tests", "file": f"tests/test_{topic}_pipeline.py"},
         ]
+        pipeline = None
+        if run.project_id:
+            from app.schemas.pipeline import PipelineCreate
+            from app.services.pipeline_service import PipelineService
+
+            pipeline = await PipelineService(self.db).create(
+                PipelineCreate(
+                    project_id=run.project_id,
+                    name=f"{topic}_daily_v1 (agent)",
+                    description=f"Generated by {run.workflow} orchestration",
+                    pipeline_type="batch",
+                    config={
+                        "source": f"pg.raw_{topic}",
+                        "target": f"snow.marts_{topic}",
+                        "architectureId": architecture_id,
+                        "artifacts": artifacts,
+                    },
+                ),
+                created_by=run.created_by,
+            )
         return {
-            "summary": f"Generated {len(artifacts)} artifacts for {topic}",
+            "summary": (
+                f"Pipeline persisted: {pipeline.name} with {len(artifacts)} artifacts"
+                if pipeline
+                else f"Generated {len(artifacts)} artifacts (no project context)"
+            ),
             "artifacts": artifacts,
+            "pipelineId": str(pipeline.id) if pipeline else None,
         }
 
     async def _stage_data_quality(self, run: AgentRun) -> dict[str, Any]:
@@ -307,12 +408,38 @@ class OrchestratorService:
         }
 
     async def _stage_deployment(self, run: AgentRun) -> dict[str, Any]:
-        # Governance contract: the orchestrator NEVER deploys unilaterally —
-        # it queues for human approval (spec §15).
+        """Governance contract (§15): deployment is a HIGH-risk production
+        action — the orchestrator NEVER deploys unilaterally. The governed
+        pipeline.trigger tool queues a real Approval row (lead+) with the
+        generated pipeline id; approval resumes the call (audit trail via
+        ToolRegistry). Falls back to a plain queue summary without project
+        context (nothing to deploy).
+        """
+        outputs = run.outputs or {}
+        pipeline_id = outputs.get("code_generation", {}).get("pipelineId")
+        if not pipeline_id:
+            return {
+                "summary": "Deployment package queued for approval",
+                "approvalRequired": True,
+                "link": "/approvals",
+            }
+        result = await self._governed(
+            run,
+            "pipeline.trigger",
+            {"pipeline_id": pipeline_id, "summary": "Agent-generated pipeline deployment"},
+        )
+        approval_required = result.get("status") == "approval-required"
         return {
-            "summary": "Deployment package queued for approval",
-            "approvalRequired": True,
+            "summary": (
+                "Deployment queued for lead approval (Governance → Approvals)"
+                if approval_required
+                else result.get("message") or result.get("detail") or "Deployment action recorded"
+            ),
+            "approvalRequired": approval_required,
             "link": "/approvals",
+            "approvalId": result.get("approvalId"),
+            "pipelineId": pipeline_id,
+            "governance": result.get("status"),
         }
 
     async def _stage_monitoring_observability(self, run: AgentRun) -> dict[str, Any]:
