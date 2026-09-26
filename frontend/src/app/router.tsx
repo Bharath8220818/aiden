@@ -30,6 +30,7 @@ const GovernancePage = lazy(() => import('@/pages/GovernancePage'));
 const TeamPage = lazy(() => import('@/pages/TeamPage'));
 const WorkspacePage = lazy(() => import('@/pages/WorkspacePage'));
 const LandingPage = lazy(() => import('@/pages/LandingPage'));
+const StatusPage = lazy(() => import('@/pages/StatusPage'));
 
 /**
  * `/` is dual-faced: the public landing page for signed-out visitors and the
@@ -106,6 +107,17 @@ function guardedDetail(section: string, path: string, element: ReactNode) {
 }
 
 export const router = createBrowserRouter([
+  {
+    // Public deployment-status page — deliberately outside the auth guard:
+    // when the backend is unreachable nobody can sign in to debug it, so the
+    // wiring report must be reachable signed-out.
+    path: '/status',
+    element: (
+      <Suspense fallback={<RouteFallback />}>
+        <StatusPage />
+      </Suspense>
+    ),
+  },
   {
     path: '/login',
     element: <LoginPage />,

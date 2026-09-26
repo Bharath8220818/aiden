@@ -37,5 +37,14 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    // Mirror nginx.conf: API + WebSocket go to the FastAPI backend so the
+    // same-origin defaults in services/api.ts + services/websocket.ts work.
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        ws: true,
+      },
+    },
   },
 });

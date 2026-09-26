@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '@/components/ui/Button';
@@ -15,7 +15,6 @@ import { Sparkles, Lock, Mail, ArrowRight, AlertCircle, Bot, Network, HeartPulse
 export const LoginPage: React.FC = () => {
   const { login, register, isAuthenticated, isAuthenticating, error, clearError } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const emailRef = useRef<HTMLInputElement>(null);
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -221,7 +220,10 @@ export const LoginPage: React.FC = () => {
           <div className="flex items-center justify-between pt-1 border-t border-border-subtle">
             <div className="flex items-center gap-2 text-[10px] font-mono text-text-muted">
               <Bot className="w-3.5 h-3.5" />
-              SOC 2 · SSO/SAML ready
+              <Link to="/status" className="hover:text-text-secondary transition-colors">
+                System status
+              </Link>
+              · SOC 2 · SSO/SAML ready
             </div>
             <ThemeToggleInline />
           </div>

@@ -37,22 +37,7 @@ import type {
 
 /* ------------------------------------------------------------------ */
 /* Sidebar mini-nav (section 3)                                        */
-/* ------------------------------------------------------------------ */
-const ActivityIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M22 12h-4l-3 9L9 3l-3 9H2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const TOOL_LINKS = [
-  { label: 'Architecture', path: '/architecture', icon: Network },
-  { label: 'Pipeline', path: '/pipelines', icon: GitBranch },
-  { label: 'SQL', path: '/sql', icon: Terminal },
-  { label: 'Monitor', path: '/monitoring', icon: ActivityIcon },
-  { label: 'Fix', path: '/self-healing', icon: TriangleAlert },
-];
-
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ *//* ------------------------------------------------------------------ */
 /* Artifact cards (section 7)                                          */
 /* ------------------------------------------------------------------ */
 const FlowDiagram: React.FC<{ nodes: string[]; edges?: Array<[string, string]> }> = ({ nodes, edges }) => (
@@ -285,6 +270,7 @@ const UniversalInput: React.FC<{
   // (still-being-said) text is shown live in the placeholder strip below.
   useEffect(() => {
     if (!transcript) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs an external system (speech recognition) into form state
     setValue((prev) => {
       const base = prev.replace(SPEECH_TAIL_RE, '');
       return base ? `${base} ${transcript}` : transcript;
@@ -475,6 +461,7 @@ export const WorkspacePage: React.FC = () => {
       });
     }
     if (focusId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time deep-link hydration on mount
       setFocusNote(`Continuing from ${focusId} — ask me anything about it.`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -557,38 +544,6 @@ export const WorkspacePage: React.FC = () => {
       }
     },
     [messages, projectId]
-  );
-
-  // Quick Launch suggestions: pre-seed the input intent per target page so
-  // "Work here" starts the conversation already pointed at the domain.
-  const workHere = useCallback(
-    (path: string) => {
-      const seed: Record<string, string> = {
-        '/architecture': 'Draft an architecture for ',
-        '/pipelines': 'Create a pipeline that ',
-        '/pipelines/manage': 'What is the status of my pipelines?',
-        '/sql': 'Write a SQL query that ',
-        '/connections': 'Show me the tables in my connected warehouse',
-        '/monitoring': 'Check platform health',
-        '/incidents': 'Show me why the latest incident happened',
-        '/self-healing': 'Walk me through the healing plan for the latest incident',
-        '/agents': 'What can each of my agents do?',
-        '/knowledge': 'What do you know about ',
-        '/integrations': 'Which tools and integrations are available?',
-        '/approvals': 'Which approvals are waiting and why?',
-        '/governance': 'Show recent audit activity',
-        '/team': 'Who is on my team and what can they do?',
-        '/projects': 'Help me start a new project ',
-        '/dashboard': 'Give me a status summary of everything',
-      };
-      const note = seed[path];
-      if (note) {
-        void handleSend(note.endsWith(' ') ? `${note}…` : note);
-      } else {
-        navigate(path);
-      }
-    },
-    [handleSend, navigate]
   );
 
   const effectiveProjectId = projectIdFromDeepLink ?? projectId;

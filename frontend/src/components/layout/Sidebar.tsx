@@ -129,6 +129,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, isMobileDrawer = fa
             collapsed={collapsed}
             onClick={isMobileDrawer ? closeMobileNav : undefined}
           />
+          <NavItem
+            label="System status"
+            path="/status"
+            iconName="HeartPulse"
+            collapsed={collapsed}
+            onClick={isMobileDrawer ? closeMobileNav : undefined}
+          />
         </div>
 
         {/* Expand button when collapsed */}

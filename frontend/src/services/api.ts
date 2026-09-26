@@ -1,6 +1,22 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+/**
+ * Resolves the API base URL:
+ * 1. VITE_API_URL when set at build time (correct for Vercel/Render deploys),
+ * 2. same-origin fallback when the site is served over https (production host
+ *    proxying /api),
+ * 3. localhost:8000 for local development only.
+ */
+const resolveBaseURL = (): string => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl) return envUrl;
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    return `${window.location.origin}/api/v1`;
+  }
+  return 'http://localhost:8000/api/v1';
+};
+
+const baseURL = resolveBaseURL();
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL,

@@ -36,6 +36,12 @@ export function RouteErrorElement() {
         >
           Go to Dashboard
         </Link>
+        <Link
+          to="/status"
+          className="px-4 py-2 rounded-lg text-sm font-medium bg-card border border-border text-text-secondary hover:text-text-primary hover:bg-card-hover transition-colors"
+        >
+          System status
+        </Link>
       </div>
     </div>
   );

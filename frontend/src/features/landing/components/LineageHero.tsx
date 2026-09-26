@@ -117,15 +117,6 @@ const edgeActive = (from: keyof typeof POS, to: keyof typeof POS, states: Partia
   return done(states[from]) && (active(states[to]) || done(states[to]));
 };
 
-const edgeMid = (a: { x: number; y: number }, b: { x: number; y: number }) => {
-  // Match the cubic bezier's visual midpoint (control points at vertical centers).
-  const t = 0.5;
-  const c1y = a.y, c2y = b.y;
-  const x = (1 - t) ** 3 * a.x + 3 * (1 - t) ** 2 * t * a.x + 3 * (1 - t) * t ** 2 * b.x + t ** 3 * b.x;
-  const y = (1 - t) ** 3 * a.y + 3 * (1 - t) ** 2 * t * c1y + 3 * (1 - t) * t ** 2 * c2y + t ** 3 * b.y;
-  return { x, y };
-};
-
 export const LineageHero: React.FC<{
   onLog?: (line: string, tone: Phase['status']['tone']) => void;
   pulse?: PlatformPulse | null;

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { api } from '@/services/api';
-import { AuthUser, AuthSession, SystemRole } from './types';
+import { AuthUser, AuthSession, SystemRole, ROLE_LABELS } from './types';
 
 interface AuthState {
   user: AuthUser | null;
@@ -12,7 +12,7 @@ interface AuthState {
   error: string | null;
 
   login: (email: string, password: string) => Promise<AuthUser>;
-  /** Open self-registration → auto-login on success. Mock mode explains the limit. */
+  /** Create an account (real backend or local demo identity) → auto-login on success. */
   register: (name: string, email: string, password: string) => Promise<AuthUser>;
   logout: () => void;
   clearError: () => void;
@@ -168,13 +168,48 @@ export const useAuthStore = create<AuthState>()(
           }
         }
 
-        // Demo path: registration is not simulated — say so honestly.
+        // Demo path: create a local account backed by the shared mock identity
+        // (same shape as the seeded accounts) so the rest of the app — RBAC,
+        // workspace name, session TTL — behaves exactly like a real session.
         await new Promise((r) => setTimeout(r, 400));
+
+        const normalized = email.trim().toLowerCase();
+        if (DEMO_ACCOUNTS[normalized]) {
+          set({
+            isAuthenticating: false,
+            error: 'That email belongs to a demo role — sign in with it on the Sign in tab instead.',
+          });
+          throw new Error('email_already_registered');
+        }
+
+        const role: SystemRole = 'engineer';
+        const user: AuthUser = {
+          id: `usr-local-${normalized.replace(/[^a-z0-9]/g, '-')}`,
+          name: name.trim(),
+          email: normalized,
+          systemRole: role,
+          roleTitle: ROLE_LABELS[role],
+          status: 'online',
+          workspaceName: `${name.trim().split(' ')[0] || 'My'} Workspace`,
+        };
+        DEMO_ACCOUNTS[normalized] = {
+          password,
+          user,
+        };
+
+        const session: AuthSession = {
+          user,
+          token: `aiden.${btoa(user.id)}.${Date.now().toString(36)}`,
+          expiresAt: new Date(Date.now() + SESSION_TTL_MS).toISOString(),
+        };
         set({
+          user: session.user,
+          token: session.token,
+          expiresAt: session.expiresAt,
           isAuthenticating: false,
-          error: 'Account creation is disabled in the demo. Use one of the demo roles on the Sign in tab.',
+          error: null,
         });
-        throw new Error('registration_disabled_in_demo');
+        return session.user;
       },
 
       logout: () => set({ user: null, token: null, expiresAt: null, error: null }),
