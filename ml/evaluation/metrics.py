@@ -107,6 +107,18 @@ def score_requirement(
     gold = sample.get("expected_output", {})
     if pred is None:
         return {"json_validity": 0.0, "field_accuracy": 0.0}
+    # Status-bearing golds (ambiguity / contradiction / invalid training set):
+    # the model must detect the situation, not invent a pipeline spec.
+    if "status" in gold:
+        status_fields = [
+            f
+            for f in ("status", "missing_information", "conflicts", "reason")
+            if f in gold
+        ]
+        return {
+            "json_validity": 1.0,
+            "field_accuracy": field_accuracy(pred, gold, status_fields),
+        }
     return {
         "json_validity": 1.0,
         "field_accuracy": field_accuracy(

@@ -1,0 +1,56 @@
+{
+  "dataset": "AIDEN Requirement Analysis Dataset",
+  "version": "0.2",
+  "generated_at": "2026-09-27T20:04:30.732272+00:00",
+  "splits": {
+    "train": "train.jsonl",
+    "validation": "validation.jsonl",
+    "test": "test.jsonl"
+  },
+  "total_raw": 1089,
+  "total_cleaned": 1089,
+  "train": 828,
+  "validation": 103,
+  "test": 158,
+  "rejected": 0,
+  "rejected_reasons": {},
+  "categories": {
+    "airflow": 46,
+    "ambiguity": 48,
+    "api_to_postgresql": 50,
+    "batch_elt": 50,
+    "batch_etl": 55,
+    "cdc": 50,
+    "contradiction": 29,
+    "csv_to_warehouse": 50,
+    "data_quality": 50,
+    "dbt": 46,
+    "incremental_loads": 50,
+    "invalid": 25,
+    "json_to_warehouse": 46,
+    "kafka_to_snowflake": 54,
+    "monitoring_failure_handling": 46,
+    "mysql_to_bigquery": 50,
+    "pii": 50,
+    "postgresql_to_s3": 46,
+    "postgresql_to_snowflake": 55,
+    "scheduling": 46,
+    "schema_drift": 46,
+    "spark": 46,
+    "streaming": 55
+  },
+  "difficulty": {
+    "easy": 252,
+    "hard": 290,
+    "medium": 547
+  },
+  "statuses": {
+    "invalid": 25,
+    "needs_clarification": 77,
+    "normal": 987
+  },
+  "held_out_categories": [
+    "contradiction",
+    "invalid"
+  ]
+}

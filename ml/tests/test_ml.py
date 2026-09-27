@@ -21,6 +21,8 @@ from ml.preprocessing.pipeline import (
     clean_and_split,
     prepare_agent_dir,
     sample_key,
+    split,
+    validate_record,
 )
 from ml.preprocessing.records import to_backend_record, to_ml_record
 
@@ -139,11 +141,80 @@ def test_prepare_agent_dir_writes_splits(tmp_path: Path) -> None:
     )
     assert stats["train"] + stats["val"] + stats["test"] == 12
     assert (agent_dir / "train.jsonl").exists()
-    assert (agent_dir / "val.jsonl").exists()
+    assert (agent_dir / "validation.jsonl").exists()  # HF-conventional name (v0.2)
     assert (agent_dir / "test.jsonl").exists()
+    assert (agent_dir / "cleaned.jsonl").exists()
+    assert (agent_dir / "rejected.jsonl").exists()
+    report = json.loads((agent_dir / "dataset_report.json").read_text(encoding="utf-8"))
+    assert report["train"] == stats["train"]
+    assert report["validation"] == stats["val"]
+    assert report["test"] == stats["test"]
     assert (
         json.loads((agent_dir / "stats.json").read_text(encoding="utf-8"))["input"]
         == 12
+    )
+
+
+def _status_record(status: str, **extra: object) -> dict:
+    return {
+        "agent": "requirement_analysis",
+        "instruction": "Analyze the user requirement",
+        "input": "Set up something for our orders data.",
+        "expected_output": {"status": status, **extra},
+    }
+
+
+def test_validate_record_accepts_status_golds() -> None:
+    assert (
+        validate_record(
+            _status_record(
+                "needs_clarification", missing_information=["source_system"]
+            ),
+            schema={"required": ["source", "destination", "schedule"]},
+        )
+        == []
+    )
+    assert (
+        validate_record(
+            _status_record("invalid", reason="no pipeline possible"), schema=None
+        )
+        == []
+    )
+
+
+def test_validate_record_rejects_bad_status_golds() -> None:
+    # needs_clarification without any missing/conflict payload
+    assert validate_record(_status_record("needs_clarification"), schema=None)
+    # invalid without a reason
+    assert validate_record(_status_record("invalid"), schema=None)
+    # unknown status
+    assert validate_record(_status_record("maybe_ok"), schema=None)
+
+
+def test_split_holdout_keeps_categories_out_of_train() -> None:
+    records: list[dict] = []
+    for i in range(30):
+        cat = "schema_drift" if i % 3 == 0 else "batch_etl"
+        records.append(
+            {
+                "agent": "requirement_analysis",
+                "instruction": "Convert the user requirement into a pipeline specification",
+                "input": f"unique requirement {i} for {cat}",
+                "expected_output": {
+                    "source": "s",
+                    "destination": "d",
+                    "schedule": "daily",
+                },
+                "metadata": {"category": cat},
+            }
+        )
+    train, val, test = split(records, seed=1, holdout_categories={"schema_drift"})
+    train_cats = {(r.get("metadata") or {}).get("category") for r in train}
+    test_cats = {(r.get("metadata") or {}).get("category") for r in test}
+    assert "schema_drift" not in train_cats
+    assert "schema_drift" in test_cats
+    assert train + val + test == records or (
+        len(train) + len(val) + len(test) == len(records)
     )
 
 

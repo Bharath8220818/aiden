@@ -63,6 +63,8 @@ def render_sample(record: dict[str, Any]) -> dict[str, str]:
 def build_dataset(agent_id: str, split: str = "train") -> list[dict[str, str]]:
     agent_dir = ML_DIR / "datasets" / AGENT_DIRS[agent_id]
     path = agent_dir / f"{split}.jsonl"
+    if not path.exists() and split == "val":
+        path = agent_dir / "validation.jsonl"  # HF-conventional name (dataset v0.2)
     if not path.exists():
         raise FileNotFoundError(
             f"{path} missing — run ml/scripts/prepare_datasets.py first"

@@ -37,57 +37,113 @@ INSTRUCTION = "Convert the user requirement into a pipeline specification"
 # ---------------------------------------------------------------------------
 
 SOURCES = [
-    "postgresql", "mysql", "mongodb", "kafka", "s3", "api", "csv", "json",
-    "oracle", "sql_server", "dynamodb", "redis", "salesforce", "hubspot",
-    "snowflake", "bigquery", "redshift", "elasticsearch", "clickhouse", "sqlite",
+    "postgresql",
+    "mysql",
+    "mongodb",
+    "kafka",
+    "s3",
+    "api",
+    "csv",
+    "json",
+    "oracle",
+    "sql_server",
+    "dynamodb",
+    "redis",
+    "salesforce",
+    "hubspot",
+    "snowflake",
+    "bigquery",
+    "redshift",
+    "elasticsearch",
+    "clickhouse",
+    "sqlite",
 ]
 
 DESTINATIONS = [
-    "snowflake", "bigquery", "redshift", "s3", "postgresql", "mysql",
-    "databricks", "azure_synapse", "clickhouse", "elasticsearch",
-    "data_lake", "delta_lake", "hive", "cassandra", "mongodb",
+    "snowflake",
+    "bigquery",
+    "redshift",
+    "s3",
+    "postgresql",
+    "mysql",
+    "databricks",
+    "azure_synapse",
+    "clickhouse",
+    "elasticsearch",
+    "data_lake",
+    "delta_lake",
+    "hive",
+    "cassandra",
+    "mongodb",
 ]
 
 ENTITIES = [
-    "orders", "customers", "transactions", "events", "sessions", "inventory",
-    "products", "payments", "clickstream", "logs", "metrics", "invoices",
-    "shipments", "returns", "subscriptions", "users", "pageviews", "leads",
-    "contracts", "timesheets", "tickets", "sensor_data", "audit_trail",
-    "financial_records", "hr_data", "device_telemetry",
+    "orders",
+    "customers",
+    "transactions",
+    "events",
+    "sessions",
+    "inventory",
+    "products",
+    "payments",
+    "clickstream",
+    "logs",
+    "metrics",
+    "invoices",
+    "shipments",
+    "returns",
+    "subscriptions",
+    "users",
+    "pageviews",
+    "leads",
+    "contracts",
+    "timesheets",
+    "tickets",
+    "sensor_data",
+    "audit_trail",
+    "financial_records",
+    "hr_data",
+    "device_telemetry",
 ]
 
 SCHEDULES = {
-    "real-time": ["real-time", "streaming", "continuously", "as soon as it arrives", "live"],
-    "hourly":    ["hourly", "every hour", "each hour", "every 60 minutes"],
-    "daily":     ["daily", "every day", "once a day", "each morning", "overnight"],
-    "weekly":    ["weekly", "every week", "once a week", "every Monday"],
-    "monthly":   ["monthly", "once a month", "at the start of each month"],
+    "real-time": [
+        "real-time",
+        "streaming",
+        "continuously",
+        "as soon as it arrives",
+        "live",
+    ],
+    "hourly": ["hourly", "every hour", "each hour", "every 60 minutes"],
+    "daily": ["daily", "every day", "once a day", "each morning", "overnight"],
+    "weekly": ["weekly", "every week", "once a week", "every Monday"],
+    "monthly": ["monthly", "once a month", "at the start of each month"],
 }
 
 SCHEDULE_KEYS = list(SCHEDULES.keys())
 
 # Transformation building blocks
 TRANSFORMS_POOL: list[tuple[str, str]] = [
-    ("mask_pii",            "mask PII"),
-    ("filter_nulls",        "filter out null values"),
-    ("remove_duplicates",   "remove duplicates"),
+    ("mask_pii", "mask PII"),
+    ("filter_nulls", "filter out null values"),
+    ("remove_duplicates", "remove duplicates"),
     ("enrich_with_reference", "enrich with reference data"),
-    ("deduplicate_keys",    "deduplicate by primary key"),
-    ("flatten_json",        "flatten nested JSON"),
-    ("type_cast",           "cast column types"),
+    ("deduplicate_keys", "deduplicate by primary key"),
+    ("flatten_json", "flatten nested JSON"),
+    ("type_cast", "cast column types"),
     ("normalize_timestamps", "normalize timestamps to UTC"),
     ("hash_sensitive_columns", "hash sensitive columns"),
     ("apply_business_rules", "apply business validation rules"),
-    ("aggregate_by_day",    "aggregate by day"),
-    ("calculate_metrics",   "calculate derived metrics"),
+    ("aggregate_by_day", "aggregate by day"),
+    ("calculate_metrics", "calculate derived metrics"),
     ("add_ingestion_timestamp", "add ingestion timestamp"),
-    ("schema_validation",   "validate against schema"),
+    ("schema_validation", "validate against schema"),
     ("data_quality_checks", "run data quality checks"),
     ("incremental_watermark", "apply incremental watermark"),
-    ("partition_by_date",   "partition output by date"),
-    ("sort_by_timestamp",   "sort records by timestamp"),
+    ("partition_by_date", "partition output by date"),
+    ("sort_by_timestamp", "sort records by timestamp"),
     ("join_dimension_table", "join with dimension table"),
-    ("scd_type2",           "apply SCD Type 2 slowly changing dimensions"),
+    ("scd_type2", "apply SCD Type 2 slowly changing dimensions"),
 ]
 
 
@@ -327,7 +383,11 @@ CATEGORIES: list[Category] = [
         "src_filter": None,
         "dst_filter": None,
         "schedules": ["real-time", "hourly", "daily"],
-        "transforms": ["schema_validation", "data_quality_checks", "add_ingestion_timestamp"],
+        "transforms": [
+            "schema_validation",
+            "data_quality_checks",
+            "add_ingestion_timestamp",
+        ],
         "templates": [
             "Create a {schedule_adj} pipeline for {entity} from {source} to {destination} with schema drift detection",
             "Build a {schedule_adj} {entity} pipeline from {source} to {destination} that handles schema changes",
@@ -425,15 +485,27 @@ def _random_transforms(
     rng: random.Random,
     n_min: int = 1,
     n_max: int = 4,
+    *,
+    count_bag: list[int] | None = None,
 ) -> tuple[list[str], list[str]]:
     """Return (transform_keys, transform_phrases)."""
     if forced_keys:
         pool = [(k, p) for k, p in TRANSFORMS_POOL if k in forced_keys]
         if not pool:
             pool = TRANSFORMS_POOL
-        chosen = pool
+        # Forced categories still spread across difficulty via the bag;
+        # hard draws top up from the global pool when the forced set is small.
+        if count_bag:
+            k = max(1, rng.choice(count_bag))
+            if k <= len(pool):
+                chosen = pool if k == len(pool) else rng.sample(pool, k)
+            else:
+                extra = [t for t in TRANSFORMS_POOL if t not in pool]
+                chosen = pool + rng.sample(extra, min(k - len(pool), len(extra)))
+        else:
+            chosen = pool
     else:
-        n = rng.randint(n_min, n_max)
+        n = rng.choice(count_bag) if count_bag else rng.randint(n_min, n_max)
         chosen = rng.sample(TRANSFORMS_POOL, min(n, len(TRANSFORMS_POOL)))
     keys = [k for k, _ in chosen]
     phrases = [p for _, p in chosen]
@@ -445,17 +517,181 @@ def _monitoring_from_template(template: str, forced: bool) -> tuple[bool, bool]:
     if forced:
         return True, True
     t = template.lower()
-    monitoring = any(w in t for w in ["monitor", "alert", "notify", "notification", "sla", "failure"])
-    failure_notification = any(w in t for w in ["notify", "notification", "alert", "failure"])
+    monitoring = any(
+        w in t for w in ["monitor", "alert", "notify", "notification", "sla", "failure"]
+    )
+    failure_notification = any(
+        w in t for w in ["notify", "notification", "alert", "failure"]
+    )
     return monitoring, failure_notification
 
 
 def _difficulty(n_transforms: int) -> str:
+    # Rebalanced to the 25/45/30 Phase-4 target: transform counts are drawn
+    # from TRANSFORM_COUNT_BAG so easy/medium/hard land in the right ratio.
     if n_transforms <= 1:
         return "easy"
     if n_transforms <= 3:
         return "medium"
     return "hard"
+
+
+# Draw bag for transform counts: P(1)=.2 easy, P(2..3)=.5 medium, P(4..5)=.3 hard
+TRANSFORM_COUNT_BAG = [1, 1, 2, 2, 2, 3, 3, 4, 4, 5]
+
+
+# ---------------------------------------------------------------------------
+# Special families: ambiguity (4.8), invalid (4.9), contradiction (4.10)
+# ---------------------------------------------------------------------------
+SPECIAL_INSTRUCTION = (
+    "Analyze the user requirement. If required information is missing or "
+    "contradictory, return a needs_clarification status instead of guessing; "
+    "if no data pipeline can be defined at all, return status invalid with a reason."
+)
+
+AMBIGUOUS_TEMPLATES = [
+    "Create a pipeline to move {entity} data to the warehouse.",
+    "We need to ingest {entity} data.",
+    "Set up something for our {entity} data.",
+    "Automate our {entity} reporting.",
+    "Can you handle the {entity} data for the analytics team?",
+    "Move {entity} data to the cloud.",
+    "I need the {entity} data somewhere the BI team can query it.",
+]
+
+AMBIGUOUS_MISSING_POOL = [
+    "source_system",
+    "destination_warehouse",
+    "destination_cloud_service",
+    "schedule",
+    "transformation_requirements",
+    "entity_detail",
+    "volume_expectations",
+]
+
+AMBIGUOUS_SUFFIXES = [
+    "",
+    " for the analytics team.",
+    " before the next fiscal close.",
+    " as part of the Q3 migration.",
+    " for the new data platform.",
+    " like we discussed last week.",
+    " when you get a chance.",
+    " for the finance rollout.",
+    " into whatever we use now.",
+]
+
+CONTRADICTION_TEMPLATES = [
+    (
+        "Run the {entity} pipeline every day at 2 AM. It should only run once per month.",
+        ["schedule_frequency"],
+    ),
+    (
+        "Stream {entity} from {source} in real time, but only load everything in a monthly batch.",
+        ["schedule_frequency", "processing_mode"],
+    ),
+    (
+        "The {entity} pipeline must be fully automated and also require manual approval before every run.",
+        ["automation_vs_manual_gate"],
+    ),
+    (
+        "Load the full {entity} history from {source} on every run, but only process incremental changes since yesterday.",
+        ["load_strategy"],
+    ),
+    (
+        "Keep the PII fields in {entity} exactly as they are and also mask all PII fields before loading.",
+        ["pii_policy"],
+    ),
+]
+
+INVALID_TEMPLATES = [
+    "Make a pipeline somehow for the {entity} team.",
+    "Do the data thing with the {source} stuff.",
+    "Create a pipeline from {source} to {source} that does absolutely nothing with the {entity}.",
+    "Move the {entity} data from {source} to the same {source} database it is already in.",
+    "Build me a {entity} pipeline. You decide everything. Surprise me.",
+]
+
+INVALID_REASONS = {
+    0: "Insufficient information to define a data pipeline.",
+    1: "No actionable data-engineering requirement in the input.",
+    2: "Source and destination are identical and no operation is specified.",
+    3: "Self-loop copy with no transformation has no defined purpose.",
+    4: "All parameters delegated; a pipeline cannot be defined without constraints.",
+}
+
+
+def _special_examples(count: int, rng: random.Random) -> list[dict[str, Any]]:
+    """needs_clarification / invalid examples (45% / 25% / 30% mix)."""
+    n_amb = round(count * 0.45)
+    n_inv = round(count * 0.25)
+    n_con = count - n_amb - n_inv
+    examples: list[dict[str, Any]] = []
+
+    for _ in range(n_amb):
+        entity = _pick(ENTITIES, rng)
+        text = _pick(AMBIGUOUS_TEMPLATES, rng).format(entity=entity).rstrip(".")
+        text += _pick(AMBIGUOUS_SUFFIXES, rng)
+        if not text.endswith("."):
+            text += "."
+        missing = rng.sample(AMBIGUOUS_MISSING_POOL, k=rng.randint(2, 4))
+        examples.append(
+            {
+                "agent": "requirement_analysis",
+                "instruction": SPECIAL_INSTRUCTION,
+                "input": text,
+                "expected_output": {
+                    "status": "needs_clarification",
+                    "missing_information": missing,
+                },
+                "metadata": {
+                    "category": "ambiguity",
+                    "difficulty": "medium",
+                    "source": "synthetic",
+                },
+            }
+        )
+
+    for _ in range(n_con):
+        template, conflicts = _pick(CONTRADICTION_TEMPLATES, rng)
+        text = template.format(entity=_pick(ENTITIES, rng), source=_pick(SOURCES, rng))
+        examples.append(
+            {
+                "agent": "requirement_analysis",
+                "instruction": SPECIAL_INSTRUCTION,
+                "input": text,
+                "expected_output": {
+                    "status": "needs_clarification",
+                    "conflicts": conflicts,
+                },
+                "metadata": {
+                    "category": "contradiction",
+                    "difficulty": "hard",
+                    "source": "synthetic",
+                },
+            }
+        )
+
+    for i in range(n_inv):
+        template = INVALID_TEMPLATES[i % len(INVALID_TEMPLATES)]
+        text = template.format(source=_pick(SOURCES, rng), entity=_pick(ENTITIES, rng))
+        reason = INVALID_REASONS[i % len(INVALID_TEMPLATES)]
+        examples.append(
+            {
+                "agent": "requirement_analysis",
+                "instruction": SPECIAL_INSTRUCTION,
+                "input": text,
+                "expected_output": {"status": "invalid", "reason": reason},
+                "metadata": {
+                    "category": "invalid",
+                    "difficulty": "easy",
+                    "source": "synthetic",
+                },
+            }
+        )
+
+    rng.shuffle(examples)
+    return examples
 
 
 def _schedule_adj(schedule_key: str, rng: random.Random) -> str:
@@ -497,11 +733,15 @@ def generate_example(
     forced_monitoring = cat.get("monitoring_forced", False)
 
     transforms_forced = cat.get("transforms")
-    transform_keys, transform_phrases = _random_transforms(transforms_forced, rng)
+    transform_keys, transform_phrases = _random_transforms(
+        transforms_forced, rng, count_bag=TRANSFORM_COUNT_BAG
+    )
 
     # decide whether to mention transforms in the input text
     mention_transforms = rng.random() > 0.3
-    monitoring, failure_notification = _monitoring_from_template(template, forced_monitoring)
+    monitoring, failure_notification = _monitoring_from_template(
+        template, forced_monitoring
+    )
 
     # random chance to add notification clause even if not in template
     if not failure_notification and rng.random() > 0.6:
@@ -517,9 +757,15 @@ def generate_example(
     )
     if mention_transforms and transform_phrases:
         connector = rng.choice([", ", " and ", "; "])
-        suffix_parts = rng.sample(transform_phrases, min(len(transform_phrases), rng.randint(1, 3)))
+        suffix_parts = rng.sample(
+            transform_phrases, min(len(transform_phrases), rng.randint(1, 3))
+        )
         input_text = input_text.rstrip(".") + connector + ", ".join(suffix_parts)
-    if failure_notification and "notify" not in input_text.lower() and "alert" not in input_text.lower():
+    if (
+        failure_notification
+        and "notify" not in input_text.lower()
+        and "alert" not in input_text.lower()
+    ):
         input_text = input_text.rstrip(".") + " and notify me if it fails"
 
     return {
@@ -542,14 +788,17 @@ def generate_example(
     }
 
 
-def generate(total: int = 1050, seed: int = 42) -> list[dict[str, Any]]:
-    """Generate `total` examples proportionally across categories."""
+def generate(total: int = 1100, seed: int = 42) -> list[dict[str, Any]]:
+    """Generate `total` examples: ~90% across categories + ~10% special
+    families (ambiguity / invalid / contradiction, spec 4.8-4.10)."""
     rng = random.Random(seed)
     total_weight = sum(c["weight"] for c in CATEGORIES)
 
-    examples: list[dict[str, Any]] = []
+    n_special = round(total * 0.10)
+    examples: list[dict[str, Any]] = _special_examples(n_special, rng)
+
     for cat in CATEGORIES:
-        count = round(total * cat["weight"] / total_weight)
+        count = round((total - n_special) * cat["weight"] / total_weight)
         for _ in range(count):
             examples.append(generate_example(cat, rng))
 
@@ -562,7 +811,11 @@ def generate(total: int = 1050, seed: int = 42) -> list[dict[str, Any]]:
 
 def _content_key(rec: dict[str, Any]) -> str:
     basis = json.dumps(
-        {k: rec.get(k) for k in ("agent", "instruction", "input") if rec.get(k) is not None},
+        {
+            k: rec.get(k)
+            for k in ("agent", "instruction", "input")
+            if rec.get(k) is not None
+        },
         sort_keys=True,
         ensure_ascii=False,
     )
@@ -608,19 +861,26 @@ def main(argv: list[str] | None = None) -> int:
         description="Generate synthetic A1 Requirement Agent training examples",
     )
     parser.add_argument(
-        "--count", type=int, default=1050,
-        help="Total number of examples to generate (default: 1050)",
+        "--count",
+        type=int,
+        default=1100,
+        help="Total number of examples to generate (default: 1100)",
     )
     parser.add_argument(
-        "--seed", type=int, default=42,
+        "--seed",
+        type=int,
+        default=42,
         help="Random seed for reproducibility (default: 42)",
     )
     parser.add_argument(
-        "--output", type=Path, default=RAW_JSONL,
+        "--output",
+        type=Path,
+        default=RAW_JSONL,
         help=f"Output JSONL file (default: {RAW_JSONL})",
     )
     parser.add_argument(
-        "--dry-run", action="store_true",
+        "--dry-run",
+        action="store_true",
         help="Generate and print stats without writing to disk",
     )
     args = parser.parse_args(argv)
@@ -628,17 +888,26 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[generate] Generating {args.count} examples (seed={args.seed}) …")
     examples = generate(total=args.count, seed=args.seed)
 
-    # Per-category stats
+    # Per-category stats (status-bearing specials have no schedule/monitoring)
     from collections import Counter
+
     cats = Counter(ex["metadata"]["category"] for ex in examples)
     diffs = Counter(ex["metadata"]["difficulty"] for ex in examples)
-    scheds = Counter(ex["expected_output"]["schedule"] for ex in examples)
+    scheds = Counter(ex["expected_output"].get("schedule", "n/a") for ex in examples)
+    statuses = Counter(ex["expected_output"].get("status", "normal") for ex in examples)
     print(f"[generate] Categories:   {dict(sorted(cats.items(), key=lambda x: -x[1]))}")
     print(f"[generate] Difficulties: {dict(diffs)}")
     print(f"[generate] Schedules:    {dict(scheds)}")
-    monitoring_count = sum(1 for ex in examples if ex["expected_output"]["monitoring"])
-    notify_count = sum(1 for ex in examples if ex["expected_output"]["failure_notification"])
-    print(f"[generate] monitoring=True: {monitoring_count}  failure_notification=True: {notify_count}")
+    print(f"[generate] Statuses:     {dict(statuses)}")
+    monitoring_count = sum(
+        1 for ex in examples if ex["expected_output"].get("monitoring")
+    )
+    notify_count = sum(
+        1 for ex in examples if ex["expected_output"].get("failure_notification")
+    )
+    print(
+        f"[generate] monitoring=True: {monitoring_count}  failure_notification=True: {notify_count}"
+    )
 
     if args.dry_run:
         print("[generate] Dry run — nothing written.")
@@ -653,16 +922,18 @@ def main(argv: list[str] | None = None) -> int:
     print("  python ml/scripts/prepare_datasets.py --source backend-scaffold")
     print("  — or to split only the requirement agent without touching other agents:")
     print()
-    print("  python -c \"")
+    print('  python -c "')
     print("  import json, sys")
     print("  from pathlib import Path")
     print("  ML = Path('ml')")
     print("  sys.path.insert(0, '.')")
     print("  from ml.preprocessing.pipeline import prepare_agent_dir")
     print("  contracts = json.loads((ML / 'agents.json').read_text())")
-    print("  schema = next(a['output_schema'] for a in contracts['agents'] if a['backend_agent']=='requirement_analysis')")
+    print(
+        "  schema = next(a['output_schema'] for a in contracts['agents'] if a['backend_agent']=='requirement_analysis')"
+    )
     print("  stats = prepare_agent_dir(ML / 'datasets' / 'requirement', schema=schema)")
-    print("  print(stats)\"")
+    print('  print(stats)"')
     return 0
 
 
