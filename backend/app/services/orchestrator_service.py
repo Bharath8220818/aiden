@@ -20,6 +20,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.models import registry as model_registry
+from app.ai.models.router import route as route_input
 from app.core.logging import get_logger
 from app.models import AgentRun, AgentRunStatus, AgentStageRun, StageStatus, User
 from app.services import ai_client
@@ -252,20 +254,28 @@ class OrchestratorService:
 
     async def _stage_requirement_analysis(self, run: AgentRun) -> dict[str, Any]:
         prompt = run.prompt or "Create a daily sales pipeline from PostgreSQL to Snowflake"
+        decision = route_input({"text": prompt})
+        model_ref = decision.serving_model_ref
         if await ai_client.ollama_available():
             try:
                 result = await ai_client.chat_json(
                     f"Analyze this data engineering requirement in one JSON object "
-                    f"{{\"topic\": str, \"pipeline_type\": \"batch_etl\"|\"streaming_cdc\", "
-                    f"\"summary\": str (<=140 chars)}}.\nRequirement: {prompt}",
+                    f'{{"topic": str, "pipeline_type": "batch_etl"|"streaming_cdc", '
+                    f'"summary": str (<=140 chars)}}.\nRequirement: {prompt}',
                     system="You are the AIDEN Requirement Analysis Agent. Respond with JSON only.",
+                    model=model_ref,
                 )
                 return {
-                    "summary": result.get("summary") or f"Intent extracted for {result.get('topic', 'dataset')}",
+                    "summary": result.get("summary")
+                    or f"Intent extracted for {result.get('topic', 'dataset')}",
                     "topic": result.get("topic", "order"),
                     "pipelineType": result.get("pipeline_type", "batch_etl"),
                     "source": "ai",
+                    "model": model_ref,
+                    "adapter": decision.adapter,
                 }
+                # ^ model-layer routed: serving ref + adapter come from the
+                # registry (app/ai/models/registry.py), not ad-hoc strings.
             except ai_client.AIServiceError:
                 logger.info("Requirement analysis fell back to heuristics", exc_info=True)
         topic = ai_client.extract_topic(prompt)
@@ -274,6 +284,8 @@ class OrchestratorService:
             "topic": topic,
             "pipelineType": "batch_etl",
             "source": "heuristic",
+            "model": model_registry.BASE_MODELS["base_a_general"].local_tag,
+            "adapter": model_registry.adapter_for_agent("requirement_analysis"),
         }
 
     async def _stage_data_source_discovery(self, run: AgentRun) -> dict[str, Any]:
@@ -493,7 +505,5 @@ class OrchestratorService:
 
 
 async def list_runs(db: AsyncSession, limit: int = 20) -> list[AgentRun]:
-    result = await db.execute(
-        select(AgentRun).order_by(AgentRun.created_at.desc()).limit(limit)
-    )
+    result = await db.execute(select(AgentRun).order_by(AgentRun.created_at.desc()).limit(limit))
     return list(result.scalars().all())

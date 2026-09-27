@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    agent_models,
     agents,
     architecture,
     auth,
@@ -43,6 +44,7 @@ api_router.include_router(pipelines.router)
 api_router.include_router(platform.router)
 api_router.include_router(connections.router)
 api_router.include_router(agents.router)
+api_router.include_router(agent_models.router)
 api_router.include_router(knowledge.router)
 api_router.include_router(integrations.router)
 api_router.include_router(monitoring.router)

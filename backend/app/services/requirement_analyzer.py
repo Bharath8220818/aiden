@@ -20,6 +20,7 @@ import re
 import uuid
 from datetime import UTC, datetime
 
+from app.ai.models import registry as model_registry
 from app.services import ai_client
 
 
@@ -70,6 +71,8 @@ async def analyze(input_state: dict) -> tuple[dict, dict, str]:
     return analysis, contract, "heuristic"
 
 
+_REQUIREMENT_MODEL_REF = model_registry.resolve_model_ref("requirement_analysis")
+
 _ANALYSIS_SYSTEM = (
     "You are AIDEN's Requirements Agent. Analyze the user's data-engineering "
     "intent and reply with ONLY a JSON object with exactly these keys: "
@@ -84,7 +87,7 @@ _ANALYSIS_SYSTEM = (
 async def _analyze_with_ai(input_state: dict) -> tuple[dict, dict]:
     """Model-backed analysis; raises AIServiceError on any failure."""
     text = _intent_text(input_state)
-    data = await ai_client.chat_json(text, system=_ANALYSIS_SYSTEM)
+    data = await ai_client.chat_json(text, system=_ANALYSIS_SYSTEM, model=_REQUIREMENT_MODEL_REF)
 
     topic = str(data.get("topic") or ai_client.extract_topic(text))[:40].lower()
     pattern = data.get("pipelinePattern")
