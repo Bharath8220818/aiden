@@ -17,15 +17,27 @@ gate, and let the platform detect, diagnose, and heal failures.
 │   ├── e2e/                      Playwright suites (closed loop + auth/RBAC/healing journeys)
 │   └── playwright.config.ts
 ├── backend/                      FastAPI + SQLAlchemy 2 async + Alembic
-│   ├── app/api/v1/               17 routers · 83 endpoints · WebSocket /ws
+│   ├── app/api/v1/               24 routers · 121 endpoints · WebSocket /ws
+│   ├── app/ai/                   model layer (11 agents → 4 bases → LoRA adapters),
+│   │                             multimodal router, RAG package, JSONL datasets
 │   ├── app/core/                 config, security, permissions (RBAC catalog), errors
 │   ├── app/services/             domain services incl. ai_client (Ollama), event_bus
-│   ├── migrations/               Alembic
-│   ├── scripts/                  seed_database.py · aiden_loop_demo.py (closed loop)
-│   └── tests/                    98 pytest tests (httpx ASGI, in-memory SQLite)
-├── docs/API_CONTRACT_MATRIX.md   Frontend ↔ backend contract verification matrix
-├── PROJECT_STATUS.md             Phase-by-phase progress log
-└── .github/workflows/ci.yml      CI: ruff + pytest · eslint + vitest + build · Playwright
+│   ├── migrations/               Alembic (schema source of truth)
+│   ├── scripts/                  seed_database.py · aiden_loop_demo.py · eval_models.py
+│   ├── data/datasets/            per-agent JSONL eval/train sets (+ runs/ reports)
+│   └── tests/                    235 pytest tests (httpx ASGI, in-memory SQLite)
+├── ml/                           Training/eval workspace: frozen agent contracts (agents.json),
+│                                 preprocessing (80/10/10 splits), LoRA/QLoRA training,
+│                                 per-agent metrics + baseline runner
+├── docs/                         architecture/ · api/ · agents/ · database/ ·
+│                                 deployment/ · testing/ + API_CONTRACT_MATRIX.md
+├── infrastructure/               nginx gateway · airflow · qdrant/redis/postgres/minio ·
+│                                 docker/{development,staging,production} overrides
+├── database/                     pointer only — schema lives in Alembic (no parallel SQL)
+├── scripts/                      setup.ps1/.sh · start-dev/stop-dev · health-check.py
+├── docker-compose.yml            Phase B local stack (pg, redis, qdrant, ollama, api, frontend)
+├── Makefile · CONTRIBUTING.md · LICENSE · .env.example · .vscode/
+└── .github/workflows/            ci.yml (backend+frontend+ml) · deploy-verify.yml (14-gate smoke)
 ```
 
 ## Quick start

@@ -1,0 +1,16 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend/venv/Scripts/python.exe",
+  "python.terminal.activateEnvironment": true,
+  "python.analysis.extraPaths": ["${workspaceFolder}/backend", "${workspaceFolder}"],
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": { "source.organizeImports": "explicit" }
+  },
+  "ruff.lint.args": ["--config", "${workspaceFolder}/backend/ruff.toml"],
+  "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[typescriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "editor.exclude": { "**/__pycache__": true, "**/node_modules": true, "**/venv": true },
+  "search.exclude": { "**/node_modules": true, "**/venv": true, "**/dist": true, "ml/experiments": true },
+  "yaml.schemaStore.enable": true
+}

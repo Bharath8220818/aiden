@@ -3,24 +3,56 @@
 .env.*
 !.env.example
 
-# OS / editor junk
+# OS / editor junk (shared .vscode config below IS tracked)
 .DS_Store
 Thumbs.db
 .idea/
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
 
 # Logs
 *.log
 
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+venv/
+.venv/
+
+# Frontend build & test artefacts
+frontend/test-results/
+frontend/playwright-report/
+frontend/dist/
+frontend/.next/
+node_modules/
+
+# ML — never commit model weights or raw experiments
+ml/models/
+ml/adapters/**/adapter_model.bin
+ml/adapters/**/pytorch_model.bin
+ml/adapters/**/*.safetensors
+ml/experiments/
+
+# SQLite dev databases
+backend/*.db
+*.db
+
+# Project status / deployment docs (generated, kept locally)
 PROJECT_STATUS.md
 DEPLOYMENT_PLAN.md
 FRONTEND_PLAN.md
 DESIGN.md
 
-
-*docs
-
-
-
-
+# Docs (generated)
+^docs
+!docs/
+!docs/**
 

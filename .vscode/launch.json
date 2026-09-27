@@ -1,0 +1,32 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Backend — uvicorn :8000",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["app.main:app", "--port", "8000", "--reload"],
+      "cwd": "${workspaceFolder}/backend",
+      "python": "${workspaceFolder}/backend/venv/Scripts/python.exe",
+      "envFile": "${workspaceFolder}/backend/.env"
+    },
+    {
+      "name": "Backend — pytest (all)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["tests", "-q"],
+      "cwd": "${workspaceFolder}/backend",
+      "python": "${workspaceFolder}/backend/venv/Scripts/python.exe",
+      "env": { "DATABASE_URL": "sqlite+aiosqlite:///:memory:" }
+    },
+    {
+      "name": "ML — contracts validate",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "ml.validate",
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
