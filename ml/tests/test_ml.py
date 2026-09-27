@@ -155,6 +155,55 @@ def test_prepare_agent_dir_writes_splits(tmp_path: Path) -> None:
     )
 
 
+def test_inference_extract_json_handles_fences_and_prose() -> None:
+    from ml.inference.requirement_agent import extract_json
+
+    assert extract_json('{"source": "s3"}') == {"source": "s3"}
+    assert extract_json('Sure! ```json\n{"a": 1}\n``` done') == {"a": 1}
+    assert extract_json('Here: {"a": [1, 2]}') == {"a": [1, 2]}
+    bad = extract_json("no json here at all")
+    assert bad["status"] == "invalid"
+
+
+def test_inference_heuristic_flags_ambiguous_and_destructive() -> None:
+    from ml.inference.requirement_agent import predict_heuristic
+
+    amb = predict_heuristic("Move customer data to the warehouse regularly.")
+    assert amb["status"] == "needs_clarification"
+    bad = predict_heuristic("Delete all production customer records.")
+    assert bad["status"] == "invalid"
+
+
+def test_compare_runs_flags_regression(tmp_path) -> None:
+    from ml.evaluation.compare_runs import load_run
+
+    a = tmp_path / "a.json"
+    b = tmp_path / "b.json"
+    a.write_text(
+        json.dumps(
+            {
+                "agent": "requirement_analysis",
+                "engine": "x",
+                "n_samples": 2,
+                "metrics": {"field_accuracy": 0.9, "json_validity": 1.0},
+            }
+        ),
+        encoding="utf-8",
+    )
+    b.write_text(
+        json.dumps(
+            {
+                "agent": "requirement_analysis",
+                "engine": "y",
+                "n_samples": 2,
+                "metrics": {"field_accuracy": 0.5, "json_validity": 1.0},
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert load_run(str(a))["metrics"]["field_accuracy"] == 0.9
+
+
 def _status_record(status: str, **extra: object) -> dict:
     return {
         "agent": "requirement_analysis",

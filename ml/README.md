@@ -18,7 +18,9 @@ ml/
 │   └── validation/  rca/  self_healing/  documentation/
 ├── preprocessing/       Phase 4 — clean, dedupe, normalize, validate
 ├── training/            Phase 6+ — LoRA/QLoRA (peft+trl), adapter export, configs/
+│                        train_requirement.py = GPU/Colab SFT + 5.9 self-test
 ├── evaluation/          Phase 5/16 — metrics engine + baseline runner + golden/
+│                        compare_runs.py = base-vs-LoRA promotion report
 ├── adapters/            Fine-tuned adapter artifacts (gitignored until exported)
 ├── models/              Base-model references (no weights committed)
 ├── inference/           Serving paths: local/ (Ollama), huggingface/ (adapters,
