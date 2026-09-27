@@ -28,3 +28,5 @@ Thumbs.db
 # Logs
 *.log
 logs/
+# Eval run reports (transient experiment outputs)
+data/datasets/runs/

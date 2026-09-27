@@ -1,0 +1,211 @@
+{
+  "$comment": "AIDEN frozen agent contracts (roadmap Phase 1). A1-A11 map 1:1 onto backend/app/ai/models/registry.py AGENTS. 'backend_agent' is the sync key; 'input'/'output' describe the JSON contract each fine-tuned adapter must honor. Do not rename ids or change output shapes without updating the backend registry AND running ml/validate.py.",
+  "version": "1.0",
+  "frozen_at": "2026-09-27",
+  "agents": [
+    {
+      "id": "A1",
+      "name": "Requirement Agent",
+      "backend_agent": "requirement_analysis",
+      "input_kind": "text",
+      "input": "natural-language data-engineering requirement",
+      "output": "Requirement JSON: {source, destination, schedule, transformations[], monitoring, failure_notification}",
+      "output_schema": {
+        "type": "object",
+        "required": ["source", "destination", "schedule"],
+        "properties": {
+          "source": { "type": "string" },
+          "destination": { "type": "string" },
+          "schedule": { "type": "string" },
+          "entity": { "type": "string" },
+          "transformations": { "type": "array", "items": { "type": "string" } },
+          "monitoring": { "type": "boolean" },
+          "failure_notification": { "type": "boolean" }
+        }
+      },
+      "base_model": "base_a_general",
+      "adapter": "requirement_adapter"
+    },
+    {
+      "id": "A2",
+      "name": "Vision / Diagram Agent",
+      "backend_agent": "vision_requirement",
+      "input_kind": "image",
+      "input": "architecture / data-flow diagram image",
+      "output": "Architecture JSON: {nodes[], connections[]}",
+      "output_schema": {
+        "type": "object",
+        "required": ["nodes", "connections"],
+        "properties": {
+          "nodes": { "type": "array", "items": { "type": "object", "required": ["type", "name"] } },
+          "connections": { "type": "array", "items": { "type": "array", "items": { "type": "string" } } }
+        }
+      },
+      "base_model": "base_c_vision",
+      "adapter": "vision_adapter"
+    },
+    {
+      "id": "A3",
+      "name": "Audio Requirement Agent",
+      "backend_agent": "audio_requirement",
+      "input_kind": "audio",
+      "input": "spoken requirement (Whisper large-v3, pretrained, no adapter)",
+      "output": "Transcript → Requirement JSON (A1 contract)",
+      "output_schema": {
+        "type": "object",
+        "required": ["source", "destination", "schedule"]
+      },
+      "base_model": "base_d_audio",
+      "adapter": null
+    },
+    {
+      "id": "A4",
+      "name": "Architecture Agent",
+      "backend_agent": "architecture",
+      "input_kind": "text",
+      "input": "Requirement JSON (A1 output)",
+      "output": "Architecture JSON: {architecture, components[], connections[]}",
+      "output_schema": {
+        "type": "object",
+        "required": ["architecture", "components", "connections"],
+        "properties": {
+          "architecture": { "type": "object" },
+          "components": { "type": "array", "items": { "type": "object", "required": ["type", "name"] } },
+          "connections": { "type": "array", "items": { "type": "array", "items": { "type": "string" } } }
+        }
+      },
+      "base_model": "base_a_general",
+      "adapter": "architecture_adapter"
+    },
+    {
+      "id": "A5",
+      "name": "Pipeline Planner Agent",
+      "backend_agent": "pipeline_planning",
+      "input_kind": "text",
+      "input": "Architecture JSON (A4 output)",
+      "output": "DAG JSON: {tasks[], dependencies[]}",
+      "output_schema": {
+        "type": "object",
+        "required": ["tasks", "dependencies"],
+        "properties": {
+          "tasks": { "type": "array", "items": { "type": "object", "required": ["id", "type"] } },
+          "dependencies": { "type": "array", "items": { "type": "array", "items": { "type": "string" } } }
+        }
+      },
+      "base_model": "base_a_general",
+      "adapter": "planning_adapter"
+    },
+    {
+      "id": "A6",
+      "name": "SQL / Data Agent",
+      "backend_agent": "sql_data",
+      "input_kind": "text",
+      "input": "schema + business requirement (+ existing SQL for fix/optimize tasks)",
+      "output": "SQL/analysis: {sql, dialect} (read-only enforced at serving)",
+      "output_schema": {
+        "type": "object",
+        "required": ["sql", "dialect"],
+        "properties": {
+          "sql": { "type": "string" },
+          "dialect": { "type": "string" }
+        }
+      },
+      "base_model": "base_b_coder",
+      "adapter": "sql_adapter"
+    },
+    {
+      "id": "A7",
+      "name": "Code Generator Agent",
+      "backend_agent": "pipeline_code",
+      "input_kind": "text",
+      "input": "DAG JSON (A5 output) or pipeline spec",
+      "output": "Code: {language, framework, code} — Python/Airflow/Spark/dbt; never deploys directly",
+      "output_schema": {
+        "type": "object",
+        "required": ["language", "framework", "code"],
+        "properties": {
+          "language": { "type": "string" },
+          "framework": { "type": "string" },
+          "code": { "type": "string" }
+        }
+      },
+      "base_model": "base_b_coder",
+      "adapter": "pipeline_code_adapter"
+    },
+    {
+      "id": "A8",
+      "name": "Validator Agent",
+      "backend_agent": "validation",
+      "input_kind": "text",
+      "input": "code / DAG / schema / requirement JSON",
+      "output": "Validation report: {valid, errors[]}",
+      "output_schema": {
+        "type": "object",
+        "required": ["valid", "errors"],
+        "properties": {
+          "valid": { "type": "boolean" },
+          "errors": { "type": "array", "items": { "type": "object", "required": ["type", "message"] } }
+        }
+      },
+      "base_model": "base_b_coder",
+      "adapter": "validation_self_healing_adapter"
+    },
+    {
+      "id": "A9",
+      "name": "RCA Agent",
+      "backend_agent": "monitoring_rca",
+      "input_kind": "text",
+      "input": "logs + pipeline + schema + previous incidents (RAG-boosted)",
+      "output": "Root cause: {root_cause, confidence, affected_task, evidence[], recommended_action}",
+      "output_schema": {
+        "type": "object",
+        "required": ["root_cause", "affected_task"],
+        "properties": {
+          "root_cause": { "type": "string" },
+          "confidence": { "type": "number" },
+          "affected_task": { "type": "string" },
+          "evidence": { "type": "array", "items": { "type": "string" } },
+          "recommended_action": { "type": "string" }
+        }
+      },
+      "base_model": "base_a_general",
+      "adapter": "rca_adapter"
+    },
+    {
+      "id": "A10",
+      "name": "Self-Healing Agent",
+      "backend_agent": "self_healing",
+      "input_kind": "text",
+      "input": "failure + RCA output (A9)",
+      "output": "Patch: {root_cause, patch, test_result} — sandbox-tested, human-approved; never direct deploy",
+      "output_schema": {
+        "type": "object",
+        "required": ["root_cause", "patch", "test_result"],
+        "properties": {
+          "root_cause": { "type": "string" },
+          "patch": { "type": "string" },
+          "test_result": { "type": "string", "enum": ["passed", "failed"] }
+        }
+      },
+      "base_model": "base_b_coder",
+      "adapter": "validation_self_healing_adapter"
+    },
+    {
+      "id": "A11",
+      "name": "Documentation Agent",
+      "backend_agent": "documentation_knowledge",
+      "input_kind": "text",
+      "input": "project data (requirements, architecture, runs, incidents, RCA)",
+      "output": "Documentation: {document} — pipeline docs, data dictionary, incident report, run summary, change log",
+      "output_schema": {
+        "type": "object",
+        "required": ["document"],
+        "properties": {
+          "document": { "type": "string" }
+        }
+      },
+      "base_model": "base_a_general",
+      "adapter": "documentation_adapter"
+    }
+  ]
+}

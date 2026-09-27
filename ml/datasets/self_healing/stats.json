@@ -1,0 +1,9 @@
+{
+  "input": 5,
+  "duplicates": 1,
+  "invalid": 0,
+  "unique": 4,
+  "train": 3,
+  "val": 0,
+  "test": 1
+}

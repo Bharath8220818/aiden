@@ -1,0 +1,14 @@
+# AIDEN ML — training/eval dependencies. NEVER installed into the backend app
+# venv used by uvicorn/pytest; create a separate venv for training work.
+# torch: install per your platform from https://pytorch.org (CUDA/CPU wheel).
+
+transformers>=4.45
+datasets>=3.0
+peft>=0.13
+accelerate>=1.0
+bitsandbytes>=0.44      # QLoRA 4-bit; CUDA-only — skip on CPU-only machines
+trl>=0.11
+sentence-transformers>=3.0
+qwen-vl-utils>=0.0.8    # Qwen2.5-VL image preprocessing
+openai-whisper>=20240930
+# torch installed separately per platform (CUDA/CPU wheel from pytorch.org)

@@ -1,0 +1,1 @@
+{"agent": "sql_data", "instruction": "Convert SQL for the analyst request", "input": "Schema: orders(amount, event_ts, customer_id, email). Request: convert query on email", "expected_output": {"sql": "SELECT CAST(email AS VARCHAR) AS email_text FROM orders;", "dialect": "postgresql"}, "metadata": {"source": "backend_scaffold"}}

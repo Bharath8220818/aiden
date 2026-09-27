@@ -1,0 +1,1 @@
+{"agent": "validation", "instruction": "Validate the pipeline DAG", "input": "{\"tasks\": [{\"id\": \"extract\"}, {\"id\": \"load\"}], \"dependencies\": [[\"extract\", \"load\"]]}", "expected_output": {"valid": true, "errors": []}, "metadata": {"source": "backend_scaffold"}}

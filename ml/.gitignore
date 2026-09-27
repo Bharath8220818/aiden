@@ -1,0 +1,16 @@
+# Adapter + base model artifacts (weights never committed)
+adapters/*
+!adapters/.gitkeep
+models/*
+!models/.gitkeep
+
+# Run reports and experiment outputs
+experiments/*
+!experiments/.gitkeep
+datasets/**/runs/
+
+# Environments / caches
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
