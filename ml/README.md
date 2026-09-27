@@ -17,11 +17,12 @@ ml/
 │   ├── vision/  audio/  architecture/  pipeline/  sql/  code/
 │   └── validation/  rca/  self_healing/  documentation/
 ├── preprocessing/       Phase 4 — clean, dedupe, normalize, validate
-├── training/            Phase 6+ — LoRA/QLoRA (peft+trl), adapter export
-├── evaluation/          Phase 5/16 — metrics engine + baseline runner
+├── training/            Phase 6+ — LoRA/QLoRA (peft+trl), adapter export, configs/
+├── evaluation/          Phase 5/16 — metrics engine + baseline runner + golden/
 ├── adapters/            Fine-tuned adapter artifacts (gitignored until exported)
 ├── models/              Base-model references (no weights committed)
-├── inference/           Serving helpers (adapter merge, Whisper, VL extract)
+├── inference/           Serving paths: local/ (Ollama), huggingface/ (adapters,
+│                        push_adapter.py), transformers/ (GPU eval loading)
 └── experiments/         Run reports (gitignored)
 ```
 
@@ -33,7 +34,7 @@ ml/
 | 1 | Freeze 11 agent contracts | `agents.json` + `validate.py` |
 | 2 | Dataset architecture | `datasets/<agent>/` record format |
 | 3–4 | Collect, clean, annotate, split | `preprocessing/`, `scripts/prepare_datasets.py` |
-| 5 | Baseline before fine-tuning | `evaluation/run_baseline.py` |
+| 5 | Baseline before fine-tuning | `evaluation/run_baseline.py` (A1: 0.332 field acc on 106 golden examples) |
 | 6–13 | Per-agent LoRA fine-tunes (A1 → A11) | `training/lora_finetune.py` |
 | 14 | Multi-agent orchestration | backend `OrchestratorService` (already routed) |
 | 15 | RAG | backend `app/ai/rag/` (already built) |

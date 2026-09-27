@@ -1,0 +1,8 @@
+{
+  "agent": "requirement",
+  "frozen_at": "2026-09-27T19:34:33.368707+00:00",
+  "source_split": "ml/datasets/requirement/test.jsonl",
+  "source_sha256": "6655500a60e85cfb863d18c787880f2c52e08c3cb556506b5ad3471b8e0046c8",
+  "golden_sha256": "6655500a60e85cfb863d18c787880f2c52e08c3cb556506b5ad3471b8e0046c8",
+  "n_examples": 106
+}

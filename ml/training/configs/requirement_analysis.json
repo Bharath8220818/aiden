@@ -1,0 +1,55 @@
+{
+  "$schema": "aiden-qlora-config-v1",
+  "agent": "requirement_analysis",
+  "adapter": "requirement_adapter",
+  "base_model": "Qwen/Qwen3-8B",
+  "quantization": {
+    "enabled": true,
+    "load_in_4bit": true,
+    "bnb_quant_type": "nf4",
+    "bnb_compute_dtype": "bfloat16",
+    "double_quant": true
+  },
+  "lora": {
+    "r": 16,
+    "alpha": 32,
+    "dropout": 0.05,
+    "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj"],
+    "bias": "none",
+    "task_type": "CAUSAL_LM"
+  },
+  "train": {
+    "epochs": 3,
+    "learning_rate": 0.0002,
+    "batch_size": 2,
+    "gradient_accumulation_steps": 8,
+    "warmup_ratio": 0.03,
+    "lr_scheduler": "cosine",
+    "max_seq_len": 2048,
+    "packing": false,
+    "bf16": true,
+    "gradient_checkpointing": true,
+    "seed": 42
+  },
+  "data": {
+    "train": "ml/datasets/requirement/train.jsonl",
+    "val": "ml/datasets/requirement/val.jsonl",
+    "test": "ml/datasets/requirement/test.jsonl",
+    "n_train_expected": 842,
+    "n_val_expected": 105,
+    "n_test_expected": 106
+  },
+  "output": {
+    "adapter_dir": "ml/adapters/requirement",
+    "hf_repo": "Bharath-k-s/AIDEN-requirement-agent",
+    "hf_private": false
+  },
+  "promotion": {
+    "gate": "must beat the frozen heuristic-majority baseline on the golden test set",
+    "min_json_validity": 0.95,
+    "min_field_accuracy_delta": 0.05,
+    "baseline_run": "ml/experiments/requirement_analysis_heuristic-majority_20260927_225412.json",
+    "baseline_field_accuracy": 0.3318,
+    "baseline_json_validity": 1.0
+  }
+}
