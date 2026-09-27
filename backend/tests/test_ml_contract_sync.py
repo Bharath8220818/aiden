@@ -9,9 +9,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-ML_DIR = Path(__file__).resolve().parents[2] / "ml"
-
 from app.ai.models import registry
+
+ML_DIR = Path(__file__).resolve().parents[2] / "ml"
 
 
 def _contracts() -> dict:
